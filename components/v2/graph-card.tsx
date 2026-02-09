@@ -22,9 +22,9 @@ export const GraphCard = ({ title, description, children, className = "" }: Grap
   return (
     <div className={`bg-white border border-border rounded-sm flex flex-col ${className}`}>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border bg-slate-100 rounded-t-sm">
-        <h3 className="text-xs font-semibold text-slate-700">{title}</h3>
-        {description && <p className="text-xs text-slate-500">{description}</p>}
+      <div className="px-4 py-3 border-b border-border bg-slate-600 rounded-t-sm">
+        <h3 className="text-xs font-semibold text-white">{title}</h3>
+        {description && <p className="text-xs text-slate-200">{description}</p>}
       </div>
 
       {/* Chart Content - with proper breathing room for labels */}

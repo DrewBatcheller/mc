@@ -4,8 +4,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Background & Surface — very subtle cool-grey tint */
-  --background: oklch(0.985 0.003 240);
+  /* Background & Surface — soft light blue */
+  --background: oklch(0.96 0.008 220);
   --foreground: oklch(0.17 0.02 255);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.17 0.02 255);

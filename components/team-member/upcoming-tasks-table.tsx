@@ -117,15 +117,25 @@ function parseDate(dateString: string): Date {
 
 interface UpcomingTasksTableProps {
   onTaskClick?: (task: ScheduleTask) => void
+  memberFilter?: string
+  deptFilter?: string
+  statusFilter?: string
 }
 
-export function UpcomingTasksTable({ onTaskClick }: UpcomingTasksTableProps) {
+export function UpcomingTasksTable({ onTaskClick, memberFilter, deptFilter, statusFilter }: UpcomingTasksTableProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   
   const upcomingTasks = allTasks.filter((task) => {
     const startDate = parseDate(task.startDate)
-    return startDate > today
+    if (startDate <= today) return false
+    if (deptFilter && deptFilter !== "All Departments" && deptFilter !== "All") {
+      if (task.category !== deptFilter) return false
+    }
+    if (statusFilter && statusFilter !== "All Status") {
+      if (task.status !== statusFilter) return false
+    }
+    return true
   })
 
   return (

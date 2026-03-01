@@ -94,9 +94,15 @@ const navSections: NavSection[] = [
     icon: UserCircle,
     label: "Team",
     subItems: [
-      { label: "Team Directory", href: "/team/directory" },
       { label: "Team Dashboard", href: "/team/dashboard" },
-      { label: "Schedule", href: "/team/schedule" },
+    ],
+  },
+  {
+    icon: UserCircle,
+    label: "Management",
+    subItems: [
+      { label: "Team Directory", href: "/management/team-directory" },
+      { label: "Team Dashboard", href: "/management/team-dashboard" },
     ],
   },
   {

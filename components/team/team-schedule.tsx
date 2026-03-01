@@ -174,19 +174,30 @@ const kanbanCols = [
 
 /* ── Main Component ── */
 
-export function TeamSchedule() {
+export function TeamSchedule({
+  simplified = false,
+  memberFilter = "All Members",
+  deptFilter = "All Departments",
+  statusFilter: externalStatusFilter,
+}: {
+  simplified?: boolean
+  memberFilter?: string
+  deptFilter?: string
+  statusFilter?: string
+}) {
   const [view, setView] = useState<"calendar" | "kanban" | "list">("calendar")
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("All Status")
-  const [memberFilter, setMemberFilter] = useState("All Team Members")
-  const [deptFilter, setDeptFilter] = useState("All")
+  const [internalStatusFilter, setInternalStatusFilter] = useState("All Status")
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+
+  // If an external statusFilter is passed (management page), use it; otherwise use internal
+  const statusFilter = externalStatusFilter ?? internalStatusFilter
 
   const filtered = useMemo(() => {
     let res = tasks
     if (statusFilter !== "All Status") res = res.filter((t) => t.status === statusFilter)
-    if (memberFilter !== "All Team Members") res = res.filter((t) => t.assigned === memberFilter)
-    if (deptFilter !== "All") res = res.filter((t) => t.department === deptFilter)
+    if (!simplified && memberFilter !== "All Members") res = res.filter((t) => t.assigned === memberFilter)
+    if (!simplified && deptFilter !== "All Departments" && deptFilter !== "All") res = res.filter((t) => t.department === deptFilter)
     if (search) {
       const q = search.toLowerCase()
       res = res.filter(
@@ -197,7 +208,7 @@ export function TeamSchedule() {
       )
     }
     return res
-  }, [search, statusFilter, memberFilter, deptFilter])
+  }, [search, statusFilter, memberFilter, deptFilter, simplified])
 
   const views = [
     { key: "calendar" as const, label: "Calendar", icon: Calendar },
@@ -229,9 +240,12 @@ export function TeamSchedule() {
       {/* Filters + Views */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-4 py-3 border-b border-border">
-          <SelectField value={statusFilter} onChange={setStatusFilter} options={["All Status", ...allStatuses]} />
-          <SelectField value={memberFilter} onChange={setMemberFilter} options={["All Team Members", ...allMembers]} />
-          <SelectField value={deptFilter} onChange={setDeptFilter} options={["All", ...allDepts]} />
+          {!simplified && externalStatusFilter === undefined && (
+            <SelectField value={internalStatusFilter} onChange={setInternalStatusFilter} options={["All Status", ...allStatuses]} />
+          )}
+          {simplified && (
+            <SelectField value={internalStatusFilter} onChange={setInternalStatusFilter} options={["All Status", ...allStatuses]} />
+          )}
           <div className="relative flex-1 w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
@@ -244,7 +258,7 @@ export function TeamSchedule() {
         </div>
 
         {/* Views */}
-        {view === "calendar" && <CalendarView tasks={filtered} onTaskClick={setSelectedTask} />}
+        {view === "calendar" && <CalendarView tasks={filtered} onTaskClick={setSelectedTask} simplified={simplified} />}
         {view === "kanban" && <div className="p-4"><KanbanView tasks={filtered} onTaskClick={setSelectedTask} /></div>}
         {view === "list" && <ListView tasks={filtered} onTaskClick={setSelectedTask} />}
       </div>
@@ -296,7 +310,7 @@ export function TeamSchedule() {
 /*  CALENDAR VIEW — matches SalesCalendar exactly */
 /* ═══════════════════════════════════════════════ */
 
-function CalendarView({ tasks: filteredTasks, onTaskClick }: { tasks: Task[]; onTaskClick: (task: Task) => void }) {
+function CalendarView({ tasks: filteredTasks, onTaskClick, simplified = false }: { tasks: Task[]; onTaskClick: (task: Task) => void; simplified?: boolean }) {
   const [year, setYear] = useState(2026)
   const [month, setMonth] = useState(0) // January — where the data lives
   const [expandedDay, setExpandedDay] = useState<number | null>(null)
@@ -355,15 +369,17 @@ function CalendarView({ tasks: filteredTasks, onTaskClick }: { tasks: Task[]; on
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-3 text-[11px]">
-            {Object.entries(typeStyles).slice(0, 5).map(([type, styles]) => (
-              <div key={type} className="flex items-center gap-1.5">
-                <span className={cn("h-2 w-2 rounded-full", styles.dot)} />
-                <span className="text-muted-foreground capitalize">{type}</span>
-              </div>
-            ))}
-          </div>
+          <div className="flex items-center gap-4">
+          {!simplified && (
+            <div className="hidden sm:flex items-center gap-3 text-[11px]">
+              {Object.entries(typeStyles).slice(0, 5).map(([type, styles]) => (
+                <div key={type} className="flex items-center gap-1.5">
+                  <span className={cn("h-2 w-2 rounded-full", styles.dot)} />
+                  <span className="text-muted-foreground capitalize">{type}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <button onClick={goToday} className="text-[13px] font-medium text-foreground border border-border rounded-lg px-3.5 py-1.5 hover:bg-accent transition-colors">
             Today
           </button>

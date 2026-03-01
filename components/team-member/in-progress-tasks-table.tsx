@@ -49,47 +49,33 @@ function convertToScheduleTask(task: Task): ScheduleTask {
 
 interface InProgressTasksTableProps {
   onTaskClick?: (task: ScheduleTask) => void
+  memberFilter?: string
+  deptFilter?: string
+  statusFilter?: string
 }
 
-function getStatusStyle(status: string) {
-  switch (status) {
-    case "Ready to Start":
-      return "bg-emerald-600 text-white"
-    case "In Progress":
-      return "bg-amber-500 text-white"
-    case "Pending Approval":
-      return "bg-purple-600 text-white"
-    case "Complete":
-      return "bg-sky-600 text-white"
-    default:
-      return "bg-gray-600 text-white"
-  }
-}
-
-function getCategoryStyle(category: string) {
-  return category === "Design"
-    ? "bg-sky-500/10 text-sky-600 border border-sky-500/20"
-    : "bg-purple-500/10 text-purple-600 border border-purple-500/20"
-}
-
-function parseDate(dateString: string): Date {
-  return new Date(dateString)
-}
-
-export function InProgressTasksTable({ onTaskClick }: InProgressTasksTableProps) {
+export function InProgressTasksTable({ onTaskClick, memberFilter, deptFilter, statusFilter }: InProgressTasksTableProps) {
   const [inProgressTasks, setInProgressTasks] = useState<typeof allTasks>([])
 
   useEffect(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const parseDate = (d: string) => { const [y, m, day] = d.split("-").map(Number); const dt = new Date(y, m - 1, day); dt.setHours(0,0,0,0); return dt }
     setInProgressTasks(
       allTasks.filter((task) => {
         const startDate = parseDate(task.startDate)
         const dueDate = parseDate(task.dueDate)
-        return startDate <= today && today <= dueDate
+        if (!(startDate <= today && today <= dueDate)) return false
+        if (deptFilter && deptFilter !== "All Departments" && deptFilter !== "All") {
+          if (task.category !== deptFilter) return false
+        }
+        if (statusFilter && statusFilter !== "All Status") {
+          if (task.status !== statusFilter) return false
+        }
+        return true
       })
     )
-  }, [])
+  }, [deptFilter, statusFilter])
 
   return (
     <div className="bg-card rounded-xl border border-border">

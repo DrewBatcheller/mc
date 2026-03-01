@@ -1,39 +1,29 @@
 "use client"
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { useMemo } from "react"
 
-const revenueData = [
-  { name: "CRO Retainer", value: 83.8, color: "hsl(195, 70%, 50%)" },
-  { name: "Affiliate Software", value: 8.3, color: "hsl(220, 70%, 50%)" },
-  { name: "Shopify Design & Dev", value: 7.8, color: "hsl(175, 60%, 42%)" },
-  { name: "CRO Course", value: 0.4, color: "hsl(142, 72%, 40%)" },
-  { name: "Development Retainer", value: 4.3, color: "hsl(38, 92%, 50%)" },
-  { name: "Affiliate Referral", value: 0.3, color: "hsl(0, 72%, 51%)" },
-  { name: "Meta Media Buying", value: 1.5, color: "hsl(262, 52%, 47%)" },
-  { name: "CRO Audit", value: 0.2, color: "hsl(340, 60%, 50%)" },
-  { name: "Shopify Site Speed Dev", value: 1.1, color: "hsl(160, 50%, 40%)" },
-]
-
-const expenseData = [
-  { name: "Outsourcing / Freelancers", value: 31.5, color: "hsl(195, 70%, 50%)" },
-  { name: "Affiliate Payment", value: 0.8, color: "hsl(220, 70%, 50%)" },
-  { name: "Outsourcing (Strategy)", value: 6.4, color: "hsl(175, 60%, 42%)" },
-  { name: "Other", value: 0.8, color: "hsl(142, 72%, 40%)" },
-  { name: "Outsourcing (Development)", value: 0.2, color: "hsl(38, 92%, 50%)" },
-  { name: "Outsourcing (Video)", value: 0.7, color: "hsl(0, 72%, 51%)" },
-  { name: "Software (Testing)", value: 0.2, color: "hsl(262, 52%, 47%)" },
-  { name: "Travel", value: 0.6, color: "hsl(340, 60%, 50%)" },
-  { name: "Operations", value: 0.6, color: "hsl(160, 50%, 40%)" },
-  { name: "Equipment / Infra", value: 0.6, color: "hsl(30, 60%, 50%)" },
-  { name: "Software", value: 1.0, color: "hsl(200, 55%, 60%)" },
-  { name: "Legal", value: 0.3, color: "hsl(280, 45%, 55%)" },
-  { name: "Outsourcing (Design)", value: 0.3, color: "hsl(120, 40%, 50%)" },
-  { name: "Interest & Bank Fees", value: 0.2, color: "hsl(50, 70%, 50%)" },
-  { name: "Marketing & Branding", value: 0.2, color: "hsl(15, 65%, 50%)" },
-  { name: "Outsourcing (QA)", value: 1.0, color: "hsl(310, 50%, 50%)" },
-  { name: "Accounting", value: 2.8, color: "hsl(70, 55%, 45%)" },
-  { name: "Educational", value: 0.4, color: "hsl(240, 45%, 55%)" },
-]
+const categoryColors: Record<string, string> = {
+  "CRO Retainer": "hsl(195, 70%, 50%)",
+  "Affiliate Software": "hsl(220, 70%, 50%)",
+  "Shopify Design & Development": "hsl(175, 60%, 42%)",
+  "CRO Course": "hsl(142, 72%, 40%)",
+  "Development Retainer": "hsl(38, 92%, 50%)",
+  "Affiliate Referral": "hsl(0, 72%, 51%)",
+  "Meta Media Buying": "hsl(262, 52%, 47%)",
+  "CRO Audit": "hsl(340, 60%, 50%)",
+  "Shopify Site Speed Development": "hsl(160, 50%, 40%)",
+  "Outsourcing / Freelancers": "hsl(195, 70%, 50%)",
+  "Software": "hsl(220, 70%, 50%)",
+  "Operations": "hsl(175, 60%, 42%)",
+  "Accounting": "hsl(142, 72%, 40%)",
+  "Marketing & Branding": "hsl(38, 92%, 50%)",
+  "Travel": "hsl(0, 72%, 51%)",
+  "Interest and Bank Fees": "hsl(262, 52%, 47%)",
+  "Equipment / Infrastructure": "hsl(340, 60%, 50%)",
+}
 
 interface CategoryPieProps {
   title: string
@@ -76,7 +66,7 @@ function CategoryPie({ title, subtitle, data, dateRange = "All Time" }: Category
                   boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
                   backgroundColor: "white",
                 }}
-                formatter={(value: number, name: string) => [`${value}%`, name]}
+                formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -91,7 +81,7 @@ function CategoryPie({ title, subtitle, data, dateRange = "All Time" }: Category
               <span className="text-muted-foreground">
                 {entry.name}{" "}
                 <span className="text-foreground font-medium">
-                  {entry.value}%
+                  {entry.value.toFixed(1)}%
                 </span>
               </span>
             </div>
@@ -103,22 +93,74 @@ function CategoryPie({ title, subtitle, data, dateRange = "All Time" }: Category
 }
 
 export function RevenueByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawRevenue, isLoading } = useAirtable('revenue', {
+    fields: ['Amount USD', 'Category'],
+  })
+
+  const chartData = useMemo(() => {
+    if (!rawRevenue?.length) return []
+    
+    const totals: Record<string, number> = {}
+    for (const r of rawRevenue) {
+      const cat = String(r.fields['Category'] ?? 'Other')
+      const amt = parseCurrency(r.fields['Amount USD'] as string)
+      totals[cat] = (totals[cat] ?? 0) + amt
+    }
+
+    const total = Object.values(totals).reduce((a, b) => a + b, 0)
+    if (total === 0) return []
+
+    return Object.entries(totals)
+      .map(([name, value]) => ({
+        name,
+        value: (value / total) * 100,
+        color: categoryColors[name] || `hsl(${Math.random() * 360}, 60%, 50%)`,
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [rawRevenue])
+
   return (
     <CategoryPie
       title="Revenue by Category"
       subtitle="Revenue distribution across categories"
-      data={revenueData}
+      data={chartData}
       dateRange={dateRange}
     />
   )
 }
 
 export function ExpenseByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawExpenses, isLoading } = useAirtable('expenses', {
+    fields: ['Expense', 'Category'],
+  })
+
+  const chartData = useMemo(() => {
+    if (!rawExpenses?.length) return []
+    
+    const totals: Record<string, number> = {}
+    for (const r of rawExpenses) {
+      const cat = String(r.fields['Category'] ?? 'Other')
+      const amt = parseCurrency(r.fields['Expense'] as string)
+      totals[cat] = (totals[cat] ?? 0) + amt
+    }
+
+    const total = Object.values(totals).reduce((a, b) => a + b, 0)
+    if (total === 0) return []
+
+    return Object.entries(totals)
+      .map(([name, value]) => ({
+        name,
+        value: (value / total) * 100,
+        color: categoryColors[name] || `hsl(${Math.random() * 360}, 60%, 50%)`,
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [rawExpenses])
+
   return (
     <CategoryPie
       title="Expense by Category"
       subtitle="Expense distribution across categories"
-      data={expenseData}
+      data={chartData}
       dateRange={dateRange}
     />
   )

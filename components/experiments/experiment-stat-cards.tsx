@@ -1,28 +1,44 @@
-import { FlaskConical, CalendarClock, Radio, HelpCircle, XCircle, CheckCircle2, DollarSign } from "lucide-react"
+'use client'
+
+import { FlaskConical, CheckCircle, XCircle, HelpCircle, DollarSign, Calendar } from "lucide-react"
 import { MetricCard } from "@/components/shared/metric-card"
+import { useAirtable } from "@/hooks/use-airtable"
 
-const row1 = [
-  { label: "Total Experiments", value: "535", icon: FlaskConical },
-  { label: "Scheduled Experiments", value: "3", icon: CalendarClock },
-  { label: "Live Experiments", value: "4", icon: Radio },
-]
-
-const row2 = [
-  { label: "Inconclusive", value: "60", icon: HelpCircle },
-  { label: "Unsuccessful", value: "188", icon: XCircle },
-  { label: "Successful", value: "236", icon: CheckCircle2 },
-  { label: "Total Revenue Added", value: "$10,170.60", sub: "New MRR", icon: DollarSign },
-]
+function parseCur(v: unknown): number {
+  if (typeof v === 'number') return v
+  return parseFloat(String(v ?? '0').replace(/[$,KkMm]/g, match => match.toLowerCase() === 'k' ? '000' : match.toLowerCase() === 'm' ? '000000' : '').replace(/[^0-9.]/g, '')) || 0
+}
 
 export function ExperimentStatCards() {
+  const { data, isLoading } = useAirtable('experiments', {
+    fields: ['Test Status', 'Revenue Added (MRR) (Regular Format)'],
+  })
+
+  const exps = data ?? []
+  const total = exps.length
+  const successful = exps.filter(r => String(r.fields['Test Status']) === 'Successful').length
+  const unsuccessful = exps.filter(r => String(r.fields['Test Status']) === 'Unsuccessful').length
+  const inconclusive = exps.filter(r => String(r.fields['Test Status']) === 'Inconclusive').length
+  const live = exps.filter(r => String(r.fields['Test Status']) === 'Live - Collecting Data').length
+  const pending = exps.filter(r => String(r.fields['Test Status']) === 'Pending').length
+
+  const totalMrr = exps
+    .filter(r => String(r.fields['Test Status']) === 'Successful')
+    .reduce((sum, r) => sum + parseCur(r.fields['Revenue Added (MRR) (Regular Format)']), 0)
+
+  const stats = [
+    { label: "Total Experiments", value: isLoading ? '—' : String(total), icon: FlaskConical },
+    { label: "Scheduled", value: isLoading ? '—' : String(pending), icon: Calendar },
+    { label: "Live", value: isLoading ? '—' : String(live), icon: FlaskConical },
+    { label: "Inconclusive", value: isLoading ? '—' : String(inconclusive), icon: HelpCircle },
+    { label: "Unsuccessful", value: isLoading ? '—' : String(unsuccessful), icon: XCircle },
+    { label: "Successful", value: isLoading ? '—' : String(successful), icon: CheckCircle },
+    { label: "Total Revenue Added (New MRR)", value: isLoading ? 0 : totalMrr, icon: DollarSign, currency: true },
+  ]
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {row1.map((s) => <MetricCard key={s.label} {...s} />)}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {row2.map((s) => <MetricCard key={s.label} {...s} />)}
-      </div>
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      {stats.map(s => <MetricCard key={s.label} {...s} small />)}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { MobileNav } from "./mobile-nav"
+import { useUser } from "@/contexts/UserContext"
 
 const notifications = [
   { id: 1, title: "New experiment launched", desc: "Vita Hustle - PDP Restructure is now live", time: "2m ago", unread: true },
@@ -152,6 +153,8 @@ export function DashboardHeader() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const { user, logout } = useUser()
+  const avatarInitials = user?.avatarInitials ?? user?.name?.slice(0, 2).toUpperCase() ?? 'MC'
 
   // Get breadcrumb items based on current pathname
   const getBreadcrumbs = () => {
@@ -291,7 +294,7 @@ export function DashboardHeader() {
             >
               <Avatar className="h-7 w-7">
                 <AvatarFallback className="bg-foreground text-card text-[11px] font-semibold">
-                  JD
+                  {avatarInitials}
                 </AvatarFallback>
               </Avatar>
             </button>
@@ -311,9 +314,7 @@ export function DashboardHeader() {
                   <button
                     onClick={() => {
                       setUserMenuOpen(false)
-                      localStorage.removeItem('isAuthenticated')
-                      localStorage.removeItem('userEmail')
-                      router.push('/login')
+                      logout()
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-foreground hover:bg-accent/40 transition-colors"
                   >

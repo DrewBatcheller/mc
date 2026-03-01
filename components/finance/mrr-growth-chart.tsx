@@ -1,121 +1,64 @@
-"use client"
+'use client'
 
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts"
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { useMemo } from "react"
 
-interface MrrGrowthChartProps {
-  dateRange?: string
-}
+const tip = { fontSize: 12, borderRadius: 8, border: "1px solid hsl(220, 13%, 91%)", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)", backgroundColor: "white" }
+
+interface MrrGrowthChartProps { dateRange?: string }
 
 export function MrrGrowthChart({ dateRange = "All Time" }: MrrGrowthChartProps) {
-  const allData = [
-    { month: "Oct 2022", mrr: 12200 },
-    { month: "Dec 2022", mrr: 18500 },
-    { month: "Feb 2023", mrr: 22300 },
-    { month: "Apr 2023", mrr: 28800 },
-    { month: "Jun 2023", mrr: 25400 },
-    { month: "Aug 2023", mrr: 42100 },
-    { month: "Oct 2023", mrr: 38200 },
-    { month: "Dec 2023", mrr: 51200 },
-    { month: "Feb 2024", mrr: 56800 },
-    { month: "Apr 2024", mrr: 62300 },
-    { month: "Jun 2024", mrr: 71200 },
-    { month: "Aug 2024", mrr: 82400 },
-    { month: "Oct 2024", mrr: 78100 },
-    { month: "Dec 2024", mrr: 91200 },
-    { month: "Feb 2025", mrr: 88400 },
-  ]
+  const { data: clients, isLoading } = useAirtable('clients', {
+    fields: ['Client Status', 'Monthly Price', 'Initial Closed Date', 'Closed Date'],
+    sort: [{ field: 'Initial Closed Date', direction: 'asc' }],
+  })
 
-  const getFilteredData = () => {
-    if (dateRange === "All Time") return allData
-    if (dateRange === "Last Month") return allData.slice(-1)
-    if (dateRange === "Last 3 Months") return allData.slice(-3)
-    if (dateRange === "Last 6 Months") return allData.slice(-6)
-    if (dateRange.match(/^\d{4}$/)) {
-      const year = parseInt(dateRange)
-      return allData.filter(d => parseInt(d.month.split(" ")[1]) === year)
+  const chartData = useMemo(() => {
+    if (!clients?.length) return []
+    const all = clients ?? []
+    const dates = all.map(r => r.fields['Initial Closed Date'] as string).filter(Boolean).sort()
+    if (!dates.length) return []
+    const start = new Date(dates[0])
+    const now = new Date()
+    const months: { month: string; mrr: number }[] = []
+    for (let d = new Date(start); d <= now; d.setMonth(d.getMonth() + 1)) {
+      const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+      const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`
+      const activeThen = all.filter(r => {
+        const opened = r.fields['Initial Closed Date'] as string
+        const closed = r.fields['Closed Date'] as string
+        return opened && new Date(opened) <= endOfMonth && (!closed || new Date(closed) > endOfMonth)
+      })
+      const mrrVal = activeThen.reduce((s, r) => s + parseCurrency(r.fields['Monthly Price'] as string), 0)
+      months.push({ month: key, mrr: mrrVal })
     }
-    return allData
-  }
-
-  const data = getFilteredData()
-
-  const getInterval = () => {
-    if (data.length <= 3) return 0
-    if (data.length <= 6) return 1
-    return 2
-  }
-
-function formatDollar(value: number) {
-  if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`
-  return `$${value}`
-}
+    return months
+  }, [clients])
 
   return (
     <div className="bg-card rounded-xl border border-border">
-      <div className="px-5 py-4 border-b border-border">
-        <h2 className="text-sm font-semibold text-foreground">
-          MRR Growth by Month
-        </h2>
-        <p className="text-[12px] text-muted-foreground mt-0.5">
-          Monthly Recurring Revenue trend for the selected year
-        </p>
-      </div>
-      <div className="p-5 pt-4">
-        <div className="h-[260px]">
+      <div className="px-5 py-4 border-b border-border"><h2 className="text-sm font-semibold text-foreground">MRR Growth</h2><p className="text-[12px] text-muted-foreground mt-0.5">Monthly recurring revenue over time</p></div>
+      <div className="p-5 pt-4"><div className="h-[240px]">
+        {isLoading ? <div className="h-full bg-muted animate-pulse rounded" /> : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="fillMrr" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(262, 52%, 47%)" stopOpacity={0.1} />
+                  <stop offset="0%" stopColor="hsl(262, 52%, 47%)" stopOpacity={0.12} />
                   <stop offset="100%" stopColor="hsl(262, 52%, 47%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220, 13%, 91%)" />
-              <XAxis
-                dataKey="month"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
-                dy={8}
-                interval={getInterval()}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
-                dx={-4}
-                width={44}
-                tickFormatter={formatDollar}
-              />
-              <Tooltip
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 8,
-                  border: "1px solid hsl(220, 13%, 91%)",
-                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-                  backgroundColor: "white",
-                }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "MRR"]}
-              />
-              <Area
-                type="monotone"
-                dataKey="mrr"
-                stroke="hsl(262, 52%, 47%)"
-                strokeWidth={1.5}
-                fill="url(#fillMrr)"
-              />
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "hsl(220, 8%, 46%)" }} dy={8} interval="preserveStartEnd" />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "hsl(220, 8%, 46%)" }} dx={-4} width={50} tickFormatter={(v: number) => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
+              <Tooltip contentStyle={tip} formatter={(v: number) => [`$${v.toLocaleString()}`, "MRR"]} />
+              <Area type="monotone" dataKey="mrr" name="MRR" stroke="hsl(262, 52%, 47%)" strokeWidth={1.5} fill="url(#fillMrr)" />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
-      </div>
+        )}
+      </div></div>
     </div>
   )
 }

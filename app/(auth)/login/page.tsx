@@ -1,27 +1,39 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { login } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/auth'
+import { DEFAULT_ROUTE } from '@/lib/permissions'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // If already logged in, redirect to the correct dashboard
+  useEffect(() => {
+    const user = getCurrentUser()
+    if (user) {
+      router.replace(DEFAULT_ROUTE[user.role])
+    }
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setIsLoading(true)
-    
-    // Simulate login delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // Store auth state in localStorage (mockup only)
-    localStorage.setItem('isAuthenticated', 'true')
-    localStorage.setItem('userEmail', email)
-    
-    // Redirect to dashboard
-    router.push('/clients/client-dashboard')
+
+    try {
+      const { redirectTo } = await login(email.trim(), password)
+      router.push(redirectTo)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -32,6 +44,13 @@ export default function LoginPage() {
           <h1 className="text-3xl font-semibold text-foreground">Welcome back</h1>
           <p className="text-sm text-muted-foreground mt-2">Sign in to your account to continue</p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {/* Login form */}
         <form onSubmit={handleLogin} className="space-y-4">
@@ -46,6 +65,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-sky-500 transition-all"
             />
           </div>
@@ -56,9 +76,6 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-sm font-medium text-foreground">
                 Password
               </label>
-              <a href="#" className="text-xs text-sky-600 hover:text-sky-700">
-                Forgot password?
-              </a>
             </div>
             <input
               id="password"
@@ -66,6 +83,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-sky-500 transition-all"
             />
           </div>
@@ -86,11 +104,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* Demo mode note */}
-        <p className="text-xs text-muted-foreground text-center mt-6">
-          Demo mode: Enter any email and password to continue
-        </p>
       </div>
     </div>
   )

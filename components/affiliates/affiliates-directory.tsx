@@ -10,7 +10,7 @@ import { ContentCard } from "@/components/shared/content-card"
 import { AddPartnerModal, type PartnerFormData } from "./add-partner-modal"
 import { EditPartnerModal } from "./edit-partner-modal"
 import { SelectField } from "@/components/shared/select-field"
-import { clients } from "@/components/clients/clients-table"
+import { useAirtable } from "@/hooks/use-airtable"
 
 /* ── Data ── */
 interface Referral { client: string; status: "Active" | "Inactive"; date: string; mrr: number; commission: number }
@@ -93,6 +93,12 @@ export function AffiliatesDirectory() {
   const [selectedId, setSelectedId] = useState(partners[0].id)
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("Overview")
+
+  const { data: rawClients } = useAirtable('clients', { fields: ['Brand Name'] })
+  const clientNames = useMemo(
+    () => (rawClients ?? []).map(r => String(r.fields['Brand Name'] ?? '')).filter(Boolean).sort(),
+    [rawClients]
+  )
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -316,6 +322,7 @@ export function AffiliatesDirectory() {
           {activeTab === "Referrals" && (
             <ReferralsTab
               partner={partner}
+              clientNames={clientNames}
               onAddReferral={(r) => setPartnerList(prev => prev.map(p => p.id === selectedId ? { ...p, referrals: [...p.referrals, r] } : p))}
               onEditReferral={(idx, r) => setPartnerList(prev => prev.map(p => p.id === selectedId ? { ...p, referrals: p.referrals.map((ref, i) => i === idx ? r : ref) } : p))}
               onDeleteReferral={(idx) => setPartnerList(prev => prev.map(p => p.id === selectedId ? { ...p, referrals: p.referrals.filter((_, i) => i !== idx) } : p))}
@@ -428,8 +435,8 @@ const REFERRAL_STATUSES: Referral["status"][] = ["Active", "Inactive"]
 const emptyReferral = (): Referral => ({ client: "", status: "Active", date: new Date().toISOString().split("T")[0], mrr: 0, commission: 10 })
 
 function ReferralFormModal({
-  title, initial, onSave, onClose,
-}: { title: string; initial: Referral; onSave: (r: Referral) => void; onClose: () => void }) {
+  title, initial, onSave, onClose, clientNames = [],
+}: { title: string; initial: Referral; onSave: (r: Referral) => void; onClose: () => void; clientNames?: string[] }) {
   const [form, setForm] = useState<Referral>(initial)
   const set = (k: keyof Referral, v: string | number) => setForm(f => ({ ...f, [k]: v }))
 
@@ -447,7 +454,7 @@ function ReferralFormModal({
             <SelectField
               value={form.client || "Select a client"}
               onChange={v => set("client", v === "Select a client" ? "" : v)}
-              options={["Select a client", ...clients.map(c => c.brand)]}
+              options={["Select a client", ...clientNames]}
               containerClassName="w-full"
               className="w-full"
             />
@@ -508,7 +515,7 @@ function ReferralFormModal({
   )
 }
 
-function ReferralsTab({ partner, onAddReferral, onEditReferral, onDeleteReferral }: { partner: Partner } & ReferralHandlers) {
+function ReferralsTab({ partner, onAddReferral, onEditReferral, onDeleteReferral, clientNames = [] }: { partner: Partner; clientNames?: string[] } & ReferralHandlers) {
   const [addOpen, setAddOpen] = useState(false)
   const [editIdx, setEditIdx] = useState<number | null>(null)
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null)
@@ -521,6 +528,7 @@ function ReferralsTab({ partner, onAddReferral, onEditReferral, onDeleteReferral
           initial={emptyReferral()}
           onSave={onAddReferral}
           onClose={() => setAddOpen(false)}
+          clientNames={clientNames}
         />
       )}
       {editIdx !== null && (
@@ -529,6 +537,7 @@ function ReferralsTab({ partner, onAddReferral, onEditReferral, onDeleteReferral
           initial={partner.referrals[editIdx]}
           onSave={(r) => { onEditReferral(editIdx, r); setEditIdx(null) }}
           onClose={() => setEditIdx(null)}
+          clientNames={clientNames}
         />
       )}
       {deleteIdx !== null && (

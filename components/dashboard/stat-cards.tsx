@@ -1,14 +1,50 @@
+'use client'
+
 import { Users, FlaskConical, FolderKanban, TrendingUp } from "lucide-react"
 import { MetricCard } from "@/components/shared/metric-card"
-
-const stats = [
-  { label: "Total Clients", value: "70", sub: "10 active", icon: Users },
-  { label: "Total Experiments", value: "535", sub: "0 live", icon: FlaskConical },
-  { label: "Active Batches", value: "0", sub: "of 192 total", icon: FolderKanban },
-  { label: "Avg Win Rate", value: "0%", sub: "from 0 completed", icon: TrendingUp },
-]
+import { useAirtable } from "@/hooks/use-airtable"
 
 export function StatCards() {
+  const { data: clientRecords, isLoading: cL } = useAirtable('clients', {
+    fields: ['Client Status', 'Total Tests Run', 'Successful Tests'],
+  })
+  const { data: experimentRecords, isLoading: eL } = useAirtable('experiments', {
+    fields: ['Test Status'],
+  })
+  const { data: batchRecords, isLoading: bL } = useAirtable('batches', {
+    fields: ['All Tests Status'],
+  })
+
+  const isLoading = cL || eL || bL
+
+  const totalClients = clientRecords?.length ?? 0
+  const activeClients = clientRecords?.filter(r => r.fields['Client Status'] === 'Active').length ?? 0
+
+  const totalExperiments = experimentRecords?.length ?? 0
+  const liveExperiments = experimentRecords?.filter(r => String(r.fields['Test Status'] ?? '') === 'Live - Collecting Data').length ?? 0
+
+  const totalBatches = batchRecords?.length ?? 0
+  const activeBatches = batchRecords?.filter(r => {
+    const s = String(r.fields['All Tests Status'] ?? '')
+    return s === 'Live - Collecting Data' || s === 'Pending' || s === 'Mixed'
+  }).length ?? 0
+
+  const completedExps = experimentRecords?.filter(r => {
+    const s = String(r.fields['Test Status'] ?? '')
+    return s === 'Successful' || s === 'Unsuccessful' || s === 'Inconclusive'
+  }) ?? []
+  const successfulExps = experimentRecords?.filter(r => String(r.fields['Test Status'] ?? '') === 'Successful') ?? []
+  const avgWinRate = completedExps.length > 0
+    ? Math.round((successfulExps.length / completedExps.length) * 100)
+    : 0
+
+  const stats = [
+    { label: "Total Clients", value: isLoading ? '—' : String(totalClients), sub: isLoading ? 'Loading…' : `${activeClients} active`, icon: Users },
+    { label: "Total Experiments", value: isLoading ? '—' : String(totalExperiments), sub: isLoading ? 'Loading…' : `${liveExperiments} live`, icon: FlaskConical },
+    { label: "Active Batches", value: isLoading ? '—' : String(activeBatches), sub: isLoading ? 'Loading…' : `of ${totalBatches} total`, icon: FolderKanban },
+    { label: "Avg Win Rate", value: isLoading ? '—' : `${avgWinRate}%`, sub: isLoading ? 'Loading…' : `from ${completedExps.length} completed`, icon: TrendingUp },
+  ]
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {stats.map((stat) => (

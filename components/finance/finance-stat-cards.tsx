@@ -1,34 +1,89 @@
+﻿'use client'
+
 import { DollarSign, Repeat, CreditCard, Receipt, TrendingUp, BarChart3, Percent, PieChart } from "lucide-react"
 import { MetricCard } from "@/components/shared/metric-card"
+import { useAirtable } from "@/hooks/use-airtable"
+import { useMemo } from "react"
+import { parseCurrency } from "@/lib/transforms"
 
 interface FinanceStatCardsProps {
   dateRange?: string
 }
 
+function getDateFilter(dateRange: string): string {
+  const now = new Date()
+  if (dateRange === 'Last Month') {
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return `IS_AFTER({Date}, "${lm.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 3 Months') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 6 Months') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  return ''
+}
+
 export function FinanceStatCards({ dateRange = "All Time" }: FinanceStatCardsProps) {
-  // Filter stats based on dateRange (using sample data multipliers for demo purposes)
-  const getFilteredStats = () => {
-    const multiplier = dateRange === "All Time" ? 1 : dateRange === "Last Month" ? 0.08 : dateRange === "Last 3 Months" ? 0.22 : dateRange === "Last 6 Months" ? 0.45 : 1
-    
-    return [
-      { label: "Total Revenue", value: 2015115.54 * multiplier, icon: DollarSign, currency: true },
-      { label: "Total MRR", value: 1311596.28 * multiplier, icon: Repeat, currency: true },
-      { label: "Total Expenses", value: 764002.46 * multiplier, icon: CreditCard, currency: true },
-      { label: "Processing Fees", value: 53110.20 * multiplier, icon: Receipt, currency: true },
-      { label: "EBITDA", value: 1072618.80 * multiplier, sub: "Before Taxes & Revenue Allocation", icon: TrendingUp, currency: true },
-      { label: "Net Profit", value: 1179082.96 * multiplier, sub: "After Taxes & Reserve Allocations", icon: BarChart3, currency: true },
-      { label: "EBITDA Margin %", value: "14.82%", icon: Percent },
-      { label: "Gross Margin %", value: "44.75%", icon: PieChart },
-    ]
+  const dateFilter = getDateFilter(dateRange)
+
+  const { data: revenue, isLoading: revLoading } = useAirtable('revenue', {
+    fields: ['Amount', 'Date', 'Category', 'Type'],
+    ...(dateFilter ? { filterExtra: dateFilter } : {}),
+  })
+
+  const { data: expenses, isLoading: expLoading } = useAirtable('expenses', {
+    fields: ['Amount', 'Date', 'Category'],
+    ...(dateFilter ? { filterExtra: dateFilter } : {}),
+  })
+
+  const { data: clients, isLoading: clientsLoading } = useAirtable('clients', {
+    fields: ['Client Status', 'Monthly Price'],
+    filterExtra: '{Client Status} = "Active"',
+  })
+
+  const isLoading = revLoading || expLoading || clientsLoading
+
+  const stats = useMemo(() => {
+    const totalRev = (revenue ?? []).reduce((s, r) => s + parseCurrency(r.fields['Amount'] as string), 0)
+    const totalExp = (expenses ?? []).reduce((s, r) => s + parseCurrency(r.fields['Amount'] as string), 0)
+    const mrr = (clients ?? []).reduce((s, r) => s + parseCurrency(r.fields['Monthly Price'] as string), 0)
+
+    const mrrRevenue = (revenue ?? [])
+      .filter(r => String(r.fields['Type'] ?? '').includes('MRR') || String(r.fields['Category'] ?? '').includes('MRR'))
+      .reduce((s, r) => s + parseCurrency(r.fields['Amount'] as string), 0)
+
+    const ebitda = totalRev - totalExp
+    const ebitdaMargin = totalRev > 0 ? ((ebitda / totalRev) * 100).toFixed(2) : '0.00'
+    const grossMargin = totalRev > 0 ? (((totalRev - totalExp) / totalRev) * 100).toFixed(2) : '0.00'
+
+    return { totalRev, totalExp, mrr, mrrRevenue, ebitda, ebitdaMargin, grossMargin }
+  }, [revenue, expenses, clients])
+
+  const fmt = (n: number) => {
+    if (isLoading) return '\u2014'
+    if (n >= 1000000) return `$${(n / 1000000).toFixed(2)}M`
+    if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`
+    return `$${n.toFixed(2)}`
   }
 
-  const stats = getFilteredStats()
+  const statCards = [
+    { label: "Total Revenue", value: fmt(stats.totalRev), icon: DollarSign },
+    { label: "Total MRR (Active)", value: fmt(stats.mrr), icon: Repeat },
+    { label: "Total Expenses", value: fmt(stats.totalExp), icon: CreditCard },
+    { label: "EBITDA", value: fmt(stats.ebitda), sub: "Revenue minus Expenses", icon: TrendingUp },
+    { label: "Net Profit", value: fmt(stats.ebitda), sub: "After Expenses", icon: BarChart3 },
+    { label: "EBITDA Margin %", value: isLoading ? '\u2014' : `${stats.ebitdaMargin}%`, icon: Percent },
+    { label: "Gross Margin %", value: isLoading ? '\u2014' : `${stats.grossMargin}%`, icon: PieChart },
+    { label: "MRR Revenue", value: fmt(stats.mrrRevenue), icon: Receipt },
+  ]
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat) => (
-        <MetricCard key={stat.label} {...stat} />
-      ))}
+      {statCards.map(stat => <MetricCard key={stat.label} {...stat} />)}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import { UserContextProvider } from '@/contexts/UserContext'
 
 import './globals.css'
 
@@ -24,7 +25,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <UserContextProvider>
+          {children}
+        </UserContextProvider>
+      </body>
     </html>
   )
 }

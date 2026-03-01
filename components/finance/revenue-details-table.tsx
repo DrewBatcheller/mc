@@ -3,8 +3,8 @@
 import { ArrowUpDown, Pencil, Trash2, AlertCircle } from "lucide-react"
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import { clients } from "@/components/clients/clients-table"
 import { SelectField } from "@/components/shared/select-field"
+import { useAirtable } from "@/hooks/use-airtable"
 
 type SortKey = "name" | "client" | "date" | "amountUsd" | "feesUsd" | "conversionRate" | "amountCad" | "feesCad"
 type SortDirection = "asc" | "desc"
@@ -75,10 +75,18 @@ export function RevenueDetailsTable({
   const [formData, setFormData] = useState<Partial<RevenueRow>>({})
   const [deleteConfirm, setDeleteConfirm] = useState<{index: number, row: RevenueRow} | null>(null)
 
-  // Get only active clients for dropdown
+  // Fetch active clients for dropdown
+  const { data: rawClients } = useAirtable('clients', {
+    fields: ['Brand Name', 'Client Status'],
+    filterByFormula: "{Client Status}='Active'",
+  })
+
   const activeClients = useMemo(
-    () => clients.filter((c) => c.status === "Active").map((c) => c.brand).sort(),
-    []
+    () => (rawClients ?? [])
+      .map(r => String(r.fields['Brand Name'] ?? ''))
+      .filter(Boolean)
+      .sort(),
+    [rawClients]
   )
 
   // Filter data based on date range

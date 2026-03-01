@@ -78,15 +78,6 @@ export function RevenueByCategoryList({ dateRange = "All Time" }: { dateRange?: 
     fields: ['Amount USD', 'Category'],
   })
 
-  const { data: rawCategories } = useAirtable('revenue-categories', {
-    fields: ['Category'],
-  })
-
-  const categoryList = useMemo(() => {
-    if (!rawCategories) return []
-    return rawCategories.map(r => String(r.fields['Category'] ?? '')).filter(Boolean)
-  }, [rawCategories])
-
   const categoryTotals = useMemo(() => {
     if (!rawRevenue) return []
     const totals: Record<string, number> = {}
@@ -94,12 +85,11 @@ export function RevenueByCategoryList({ dateRange = "All Time" }: { dateRange?: 
       const cat = String(r.fields['Category'] ?? 'Other')
       totals[cat] = (totals[cat] ?? 0) + parseCurrency(r.fields['Amount USD'] as string)
     }
-    const cats = categoryList.length > 0 ? categoryList : Object.keys(totals)
-    return cats
-      .filter(cat => (totals[cat] ?? 0) > 0)
-      .map(cat => ({ name: cat, revenue: totals[cat] ?? 0 }))
+    return Object.entries(totals)
+      .filter(([, amount]) => amount > 0)
+      .map(([name, revenue]) => ({ name, revenue }))
       .sort((a, b) => b.revenue - a.revenue)
-  }, [rawRevenue, categoryList])
+  }, [rawRevenue])
 
   const getMultiplier = () => {
     if (dateRange === "All Time") return 1

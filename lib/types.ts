@@ -69,6 +69,8 @@ export const TABLE_NAMES = {
   partners: 'Partners',
   permissions: 'Permissions',
   'onboard-qa': 'Onboard QA',
+  'revenue-categories': 'Revenue Categories',
+  'expense-categories': 'Expense Categories',
 } as const
 
 export type ResourceSlug = keyof typeof TABLE_NAMES

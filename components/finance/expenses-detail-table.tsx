@@ -59,13 +59,74 @@ const expenseData: CategoryGroup[] = [
     ],
   },
   {
+    category: "Outsourcing / Freelancers (Development)",
+    count: 3,
+    rows: [
+      { expenses: 6500, statementName: "Developer - Sprint November", date: "11/5/2025", vendor: "-" },
+      { expenses: 6500, statementName: "Developer - Sprint October", date: "10/5/2025", vendor: "-" },
+      { expenses: 5000, statementName: "Developer - Sprint September", date: "9/5/2025", vendor: "-" },
+    ],
+  },
+  {
+    category: "Outsourcing / Freelancers (Strategy)",
+    count: 3,
+    rows: [
+      { expenses: 7284, statementName: "Strategy retainer - November", date: "11/1/2025", vendor: "-" },
+      { expenses: 6915, statementName: "Strategy retainer - October", date: "10/1/2025", vendor: "-" },
+      { expenses: 7025, statementName: "Strategy retainer - September", date: "9/1/2025", vendor: "-" },
+    ],
+  },
+  {
+    category: "Outsourcing / Freelancers (Design)",
+    count: 3,
+    rows: [
+      { expenses: 1904, statementName: "Design sprint - November", date: "11/8/2025", vendor: "-" },
+      { expenses: 1521, statementName: "Design sprint - October", date: "10/10/2025", vendor: "-" },
+      { expenses: 1337, statementName: "Design sprint - September", date: "9/12/2025", vendor: "-" },
+    ],
+  },
+  {
     category: "Software",
     count: 4,
     rows: [
-      { expenses: 3200, statementName: "Convert.com - Annual", date: "11/1/2025", vendor: "Convert.com" },
-      { expenses: 1200, statementName: "ActiveCampaign - Monthly", date: "11/1/2025", vendor: "ActiveCampaign" },
-      { expenses: 499, statementName: "ChatGPT Plus - Monthly", date: "11/1/2025", vendor: "OpenAI" },
+      { expenses: 149.76, statementName: "Airtable - Monthly", date: "11/1/2025", vendor: "Airtable" },
       { expenses: 79, statementName: "Calendly - Monthly", date: "11/1/2025", vendor: "Calendly" },
+      { expenses: 41.99, statementName: "DocuSign - Monthly", date: "11/1/2025", vendor: "DocuSign" },
+      { expenses: 13.43, statementName: "DigitalOcean - Monthly", date: "11/1/2025", vendor: "DigitalOcean" },
+    ],
+  },
+  {
+    category: "Software (Testing Platforms)",
+    count: 3,
+    rows: [
+      { expenses: 4724, statementName: "Convert.com - Monthly", date: "11/1/2025", vendor: "Convert.com" },
+      { expenses: 4531, statementName: "Convert.com - October", date: "10/1/2025", vendor: "Convert.com" },
+      { expenses: 4207, statementName: "Convert.com - September", date: "9/1/2025", vendor: "Convert.com" },
+    ],
+  },
+  {
+    category: "Marketing & Branding",
+    count: 3,
+    rows: [
+      { expenses: 8554.63, statementName: "Meta Ads - November", date: "11/30/2025", vendor: "Meta" },
+      { expenses: 787.50, statementName: "Content creation - October", date: "10/20/2025", vendor: "-" },
+      { expenses: 622.23, statementName: "SEO tools - September", date: "9/10/2025", vendor: "-" },
+    ],
+  },
+  {
+    category: "Interest and Bank Fees",
+    count: 2,
+    rows: [
+      { expenses: 161.02, statementName: "Bank service fee", date: "11/1/2025", vendor: "-" },
+      { expenses: 29, statementName: "Wire transfer fee", date: "10/15/2025", vendor: "-" },
+    ],
+  },
+  {
+    category: "Affiliate Payment",
+    count: 2,
+    rows: [
+      { expenses: 1263.18, statementName: "Affiliate payout - November", date: "11/20/2025", vendor: "-" },
+      { expenses: 1242.15, statementName: "Affiliate payout - October", date: "10/18/2025", vendor: "-" },
     ],
   },
 ]

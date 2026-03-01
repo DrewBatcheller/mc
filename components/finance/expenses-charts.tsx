@@ -163,7 +163,7 @@ const categoryColors: Record<string, string> = {
   software: "hsl(142, 45%, 55%)",
   operations: "hsl(38, 70%, 55%)",
   accounting: "hsl(262, 45%, 58%)",
-  other: "hsl(220, 13%, 72%)",
+  marketing: "hsl(330, 45%, 55%)",
 }
 
 const categoryLabels: Record<string, string> = {
@@ -171,7 +171,7 @@ const categoryLabels: Record<string, string> = {
   software: "Software",
   operations: "Operations",
   accounting: "Accounting",
-  other: "Other",
+  marketing: "Marketing & Branding",
 }
 
 export function ExpensesByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
@@ -375,30 +375,38 @@ export function ExpensesByVendorPie({ dateRange = "All Time" }: { dateRange?: st
 
 const categoryPieData = [
   { name: "Outsourcing / Freelancers", value: 198200 },
-  { name: "Affiliate Payment", value: 5200 },
+  { name: "Outsourcing / Freelancers (Development)", value: 82000 },
+  { name: "Outsourcing / Freelancers (Strategy)", value: 74000 },
+  { name: "Outsourcing / Freelancers (Design)", value: 22000 },
+  { name: "Software (Testing Platforms)", value: 45000 },
+  { name: "Software", value: 28400 },
+  { name: "Marketing & Branding", value: 26000 },
+  { name: "Operations", value: 42300 },
+  { name: "Accounting", value: 15800 },
   { name: "Equipment / Infrastructure", value: 5800 },
+  { name: "Travel", value: 6100 },
   { name: "Interest and Bank Fees", value: 2100 },
   { name: "Legal", value: 3400 },
-  { name: "Marketing & Branding", value: 2600 },
-  { name: "Operations", value: 42300 },
-  { name: "Software", value: 28400 },
-  { name: "Accounting", value: 15800 },
   { name: "Educational", value: 3800 },
-  { name: "Travel", value: 6100 },
+  { name: "Affiliate Payment", value: 5200 },
 ]
 
 const catPieColors = [
   "hsl(195, 65%, 48%)",
-  "hsl(38, 70%, 55%)",
+  "hsl(220, 55%, 62%)",
   "hsl(142, 45%, 55%)",
+  "hsl(38, 70%, 55%)",
   "hsl(0, 50%, 65%)",
   "hsl(262, 45%, 58%)",
   "hsl(330, 45%, 55%)",
-  "hsl(220, 55%, 62%)",
+  "hsl(195, 40%, 65%)",
   "hsl(170, 45%, 50%)",
   "hsl(50, 60%, 50%)",
   "hsl(10, 55%, 55%)",
   "hsl(220, 13%, 72%)",
+  "hsl(280, 40%, 58%)",
+  "hsl(155, 45%, 52%)",
+  "hsl(25, 65%, 55%)",
 ]
 
 export function ExpensesByCategoryPie({ dateRange = "All Time" }: { dateRange?: string }) {

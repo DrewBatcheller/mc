@@ -65,7 +65,7 @@ export function RevenueDetailsTable({
 
   // Fetch revenue data from Airtable
   const { data: rawRevenue, isLoading: revLoading } = useAirtable('revenue', {
-    fields: ['Name', 'Client (from Client)', 'Date', 'Amount USD', 'Fees USD', 'Conversion Rate', 'Amount CAD', 'Fees CAD'],
+    fields: ['Entry', 'Brand Name (from Client)', 'Date', 'Amount USD', 'Fees USD', 'Conversion Rate (USD>CAD)', 'Amount CAD', 'Fees CAD'],
     sort: [{ field: 'Date', direction: 'desc' }],
   })
 
@@ -87,7 +87,7 @@ export function RevenueDetailsTable({
   useEffect(() => {
     if (rawRevenue) {
       const transformed = rawRevenue.map(r => {
-        const clientValue = r.fields['Client (from Client)']
+        const clientValue = r.fields['Brand Name (from Client)']
         let client = ''
         if (Array.isArray(clientValue)) {
           client = String(clientValue[0] ?? '')
@@ -96,12 +96,12 @@ export function RevenueDetailsTable({
         }
 
         return {
-          name: String(r.fields['Name'] ?? ''),
+          name: String(r.fields['Entry'] ?? ''),
           client,
           date: String(r.fields['Date'] ?? ''),
           amountUsd: parseCurrency(r.fields['Amount USD'] as string),
           feesUsd: parseCurrency(r.fields['Fees USD'] as string),
-          conversionRate: parseFloat(String(r.fields['Conversion Rate'] ?? '0')) || null,
+          conversionRate: parseFloat(String(r.fields['Conversion Rate (USD>CAD)'] ?? '0')) || null,
           amountCad: parseCurrency(r.fields['Amount CAD'] as string),
           feesCad: parseCurrency(r.fields['Fees CAD'] as string),
         }

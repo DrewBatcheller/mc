@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
 
 type SortKey = "name" | "client" | "date" | "amountUsd" | "feesUsd" | "conversionRate" | "amountCad" | "feesCad"
 type SortDirection = "asc" | "desc"
@@ -20,20 +21,7 @@ interface RevenueRow {
   feesCad: number
 }
 
-const data: RevenueRow[] = [
-  { name: "Klone Scents - Dec 3, 2025", client: "Klone Scents", date: "2025-12-03", amountUsd: 6000, feesUsd: 222.30, conversionRate: 0, amountCad: 0, feesCad: 0 },
-  { name: "Goose Creek Candles - Dec 1, 2025", client: "Goose Creek Candles", date: "2025-12-01", amountUsd: 2500, feesUsd: 92.71, conversionRate: 0, amountCad: 0, feesCad: 0 },
-  { name: "Plufl - Nov 28, 2025", client: "Plufl", date: "2025-11-28", amountUsd: 1000, feesUsd: 37.30, conversionRate: 1.3952, amountCad: 1395.20, feesCad: 52.04 },
-  { name: "Club Early Bird - Nov 27, 2025", client: "Club Early Bird", date: "2025-11-27", amountUsd: 5000, feesUsd: 185.21, conversionRate: 1.3952, amountCad: 6976, feesCad: 258.40 },
-  { name: "Primal Queen - Nov 15, 2025", client: "Primal Queen", date: "2025-11-15", amountUsd: 8500, feesUsd: 315.10, conversionRate: 1.3952, amountCad: 11859.20, feesCad: 439.59 },
-  { name: "Blox Boom - Nov 10, 2025", client: "Blox Boom", date: "2025-11-10", amountUsd: 4200, feesUsd: 155.82, conversionRate: 1.3952, amountCad: 5859.84, feesCad: 217.34 },
-  { name: "Perfect White Tee - Nov 5, 2025", client: "Perfect White Tee", date: "2025-11-05", amountUsd: 6800, feesUsd: 252.16, conversionRate: 1.3952, amountCad: 9487.36, feesCad: 351.84 },
-  { name: "Kitty Spout - Oct 28, 2025", client: "Kitty Spout", date: "2025-10-28", amountUsd: 3500, feesUsd: 129.85, conversionRate: 1.3952, amountCad: 4883.20, feesCad: 181.16 },
-  { name: "Goose Creek Candles - Oct 15, 2025", client: "Goose Creek Candles", date: "2025-10-15", amountUsd: 2500, feesUsd: 92.71, conversionRate: 0, amountCad: 0, feesCad: 0 },
-  { name: "Primal Queen - Oct 1, 2025", client: "Primal Queen", date: "2025-10-01", amountUsd: 8500, feesUsd: 315.10, conversionRate: 1.3952, amountCad: 11859.20, feesCad: 439.59 },
-  { name: "Club Early Bird - Sep 25, 2025", client: "Club Early Bird", date: "2025-09-25", amountUsd: 5000, feesUsd: 185.21, conversionRate: 1.3952, amountCad: 6976, feesCad: 258.40 },
-  { name: "Blox Boom - Sep 15, 2025", client: "Blox Boom", date: "2025-09-15", amountUsd: 4200, feesUsd: 155.82, conversionRate: 1.3952, amountCad: 5859.84, feesCad: 217.34 },
-]
+const data: RevenueRow[] = []
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -70,10 +58,16 @@ export function RevenueDetailsTable({
 }: RevenueDetailsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
-  const [revenueData, setRevenueData] = useState<RevenueRow[]>(data)
+  const [revenueData, setRevenueData] = useState<RevenueRow[]>([])
   const [editingRow, setEditingRow] = useState<{index: number, row: RevenueRow} | null>(null)
   const [formData, setFormData] = useState<Partial<RevenueRow>>({})
   const [deleteConfirm, setDeleteConfirm] = useState<{index: number, row: RevenueRow} | null>(null)
+
+  // Fetch revenue data from Airtable
+  const { data: rawRevenue, isLoading: revLoading } = useAirtable('revenue', {
+    fields: ['Name', 'Client (from Client)', 'Date', 'Amount USD', 'Fees USD', 'Conversion Rate', 'Amount CAD', 'Fees CAD'],
+    sort: [{ field: 'Date', direction: 'desc' }],
+  })
 
   // Fetch active clients for dropdown
   const { data: rawClients } = useAirtable('clients', {
@@ -88,6 +82,33 @@ export function RevenueDetailsTable({
       .sort(),
     [rawClients]
   )
+
+  // Transform Airtable revenue data to RevenueRow format
+  useEffect(() => {
+    if (rawRevenue) {
+      const transformed = rawRevenue.map(r => {
+        const clientValue = r.fields['Client (from Client)']
+        let client = ''
+        if (Array.isArray(clientValue)) {
+          client = String(clientValue[0] ?? '')
+        } else if (clientValue) {
+          client = String(clientValue)
+        }
+
+        return {
+          name: String(r.fields['Name'] ?? ''),
+          client,
+          date: String(r.fields['Date'] ?? ''),
+          amountUsd: parseCurrency(r.fields['Amount USD'] as string),
+          feesUsd: parseCurrency(r.fields['Fees USD'] as string),
+          conversionRate: parseFloat(String(r.fields['Conversion Rate'] ?? '0')) || null,
+          amountCad: parseCurrency(r.fields['Amount CAD'] as string),
+          feesCad: parseCurrency(r.fields['Fees CAD'] as string),
+        }
+      })
+      setRevenueData(transformed)
+    }
+  }, [rawRevenue])
 
   // Filter data based on date range
   const filterByDateRange = (data: RevenueRow[], range: string): RevenueRow[] => {

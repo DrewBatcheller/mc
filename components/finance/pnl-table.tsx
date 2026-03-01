@@ -195,7 +195,6 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
           <div className="p-8 text-center text-muted-foreground">No P&L data available for the selected year.</div>
         ) : (
           <table className="w-full">
-            <thead>
               <tr className="border-b border-border">
                 {columns.map((col) => (
                   <th
@@ -494,7 +493,8 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
               )}
             </tr>
           </tfoot>
-        </table>
+          </table>
+        )}
       </div>
     </div>
   )

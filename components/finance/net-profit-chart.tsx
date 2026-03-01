@@ -10,8 +10,8 @@ const tip = { fontSize: 12, borderRadius: 8, border: "1px solid hsl(220, 13%, 91
 interface NetProfitChartProps { dateRange?: string }
 
 export function NetProfitChart({ dateRange = "All Time" }: NetProfitChartProps) {
-  const { data: revenue, isLoading: revLoad } = useAirtable('revenue', { fields: ['Amount', 'Date'], sort: [{ field: 'Date', direction: 'asc' }] })
-  const { data: expenses, isLoading: expLoad } = useAirtable('expenses', { fields: ['Amount', 'Date'], sort: [{ field: 'Date', direction: 'asc' }] })
+  const { data: revenue, isLoading: revLoad } = useAirtable('revenue', { fields: ['Amount USD', 'Date'], sort: [{ field: 'Date', direction: 'asc' }] })
+  const { data: expenses, isLoading: expLoad } = useAirtable('expenses', { fields: ['Expense', 'Date'], sort: [{ field: 'Date', direction: 'asc' }] })
 
   const chartData = useMemo(() => {
     const revByMonth: Record<string, number> = {}
@@ -19,14 +19,14 @@ export function NetProfitChart({ dateRange = "All Time" }: NetProfitChartProps) 
       const d = r.fields['Date'] as string; if (!d) continue
       const dt = new Date(d)
       const key = `${dt.toLocaleString('default', { month: 'short' })} ${dt.getFullYear()}`
-      revByMonth[key] = (revByMonth[key] ?? 0) + parseCurrency(r.fields['Amount'] as string)
+      revByMonth[key] = (revByMonth[key] ?? 0) + parseCurrency(r.fields['Amount USD'] as string)
     }
     const expByMonth: Record<string, number> = {}
     for (const r of expenses ?? []) {
       const d = r.fields['Date'] as string; if (!d) continue
       const dt = new Date(d)
       const key = `${dt.toLocaleString('default', { month: 'short' })} ${dt.getFullYear()}`
-      expByMonth[key] = (expByMonth[key] ?? 0) + parseCurrency(r.fields['Amount'] as string)
+      expByMonth[key] = (expByMonth[key] ?? 0) + parseCurrency(r.fields['Expense'] as string)
     }
     const months = Array.from(new Set([...Object.keys(revByMonth), ...Object.keys(expByMonth)])).sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
     return months.map(month => ({ month, profit: (revByMonth[month] ?? 0) - (expByMonth[month] ?? 0) }))

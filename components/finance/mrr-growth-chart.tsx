@@ -11,7 +11,7 @@ interface MrrGrowthChartProps { dateRange?: string }
 
 export function MrrGrowthChart({ dateRange = "All Time" }: MrrGrowthChartProps) {
   const { data: clients, isLoading } = useAirtable('clients', {
-    fields: ['Client Status', 'Monthly Price', 'Initial Closed Date', 'Closed Date'],
+    fields: ['Client Status', 'Monthly Price', 'Initial Closed Date', 'Churn Date'],
     sort: [{ field: 'Initial Closed Date', direction: 'asc' }],
   })
 
@@ -28,7 +28,7 @@ export function MrrGrowthChart({ dateRange = "All Time" }: MrrGrowthChartProps) 
       const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`
       const activeThen = all.filter(r => {
         const opened = r.fields['Initial Closed Date'] as string
-        const closed = r.fields['Closed Date'] as string
+        const closed = r.fields['Churn Date'] as string
         return opened && new Date(opened) <= endOfMonth && (!closed || new Date(closed) > endOfMonth)
       })
       const mrrVal = activeThen.reduce((s, r) => s + parseCurrency(r.fields['Monthly Price'] as string), 0)

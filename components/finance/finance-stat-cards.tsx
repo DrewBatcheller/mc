@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { DollarSign, Repeat, CreditCard, Receipt, TrendingUp, BarChart3, Percent, PieChart } from "lucide-react"
 import { MetricCard } from "@/components/shared/metric-card"
@@ -31,12 +31,12 @@ export function FinanceStatCards({ dateRange = "All Time" }: FinanceStatCardsPro
   const dateFilter = getDateFilter(dateRange)
 
   const { data: revenue, isLoading: revLoading } = useAirtable('revenue', {
-    fields: ['Amount', 'Date', 'Category', 'Type'],
+    fields: ['Amount USD', 'Date', 'Category', 'Type'],
     ...(dateFilter ? { filterExtra: dateFilter } : {}),
   })
 
   const { data: expenses, isLoading: expLoading } = useAirtable('expenses', {
-    fields: ['Amount', 'Date', 'Category'],
+    fields: ['Expense', 'Date', 'Category'],
     ...(dateFilter ? { filterExtra: dateFilter } : {}),
   })
 
@@ -48,13 +48,13 @@ export function FinanceStatCards({ dateRange = "All Time" }: FinanceStatCardsPro
   const isLoading = revLoading || expLoading || clientsLoading
 
   const stats = useMemo(() => {
-    const totalRev = (revenue ?? []).reduce((s, r) => s + parseCurrency(r.fields['Amount'] as string), 0)
-    const totalExp = (expenses ?? []).reduce((s, r) => s + parseCurrency(r.fields['Amount'] as string), 0)
+    const totalRev = (revenue ?? []).reduce((s, r) => s + parseCurrency(r.fields['Amount USD'] as string), 0)
+    const totalExp = (expenses ?? []).reduce((s, r) => s + parseCurrency(r.fields['Expense'] as string), 0)
     const mrr = (clients ?? []).reduce((s, r) => s + parseCurrency(r.fields['Monthly Price'] as string), 0)
 
     const mrrRevenue = (revenue ?? [])
       .filter(r => String(r.fields['Type'] ?? '').includes('MRR') || String(r.fields['Category'] ?? '').includes('MRR'))
-      .reduce((s, r) => s + parseCurrency(r.fields['Amount'] as string), 0)
+      .reduce((s, r) => s + parseCurrency(r.fields['Amount USD'] as string), 0)
 
     const ebitda = totalRev - totalExp
     const ebitdaMargin = totalRev > 0 ? ((ebitda / totalRev) * 100).toFixed(2) : '0.00'

@@ -531,7 +531,7 @@ export function transformReserve(id: string, f: Record<string, unknown>): AppRes
   return {
     id,
     allocation: String(f['Allocation'] ?? ''),
-    amount: parseCurrency(f['Amount'] as string),
+    amount: parseCurrency(f['Allocated Amount'] as string),
     category: String(f['Category'] ?? ''),
     description: String(f['Description'] ?? ''),
     date: f['Date'] ? String(f['Date']) : null,

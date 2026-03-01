@@ -94,7 +94,7 @@ function CategoryPie({ title, subtitle, data, dateRange = "All Time" }: Category
 
 export function RevenueByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
   const { data: rawRevenue, isLoading } = useAirtable('revenue', {
-    fields: ['Amount USD', 'Category'],
+    fields: ['Amount USD', 'Category (from Category)'],
   })
 
   const chartData = useMemo(() => {
@@ -102,7 +102,17 @@ export function RevenueByCategoryChart({ dateRange = "All Time" }: { dateRange?:
     
     const totals: Record<string, number> = {}
     for (const r of rawRevenue) {
-      const cat = String(r.fields['Category'] ?? 'Other')
+      // Handle linked field - could be array or string
+      let catValue = r.fields['Category (from Category)']
+      let cat = 'Other'
+      
+      if (Array.isArray(catValue)) {
+        // If it's an array, take first element
+        cat = String(catValue[0] ?? 'Other')
+      } else if (catValue) {
+        cat = String(catValue)
+      }
+      
       const amt = parseCurrency(r.fields['Amount USD'] as string)
       totals[cat] = (totals[cat] ?? 0) + amt
     }
@@ -131,7 +141,7 @@ export function RevenueByCategoryChart({ dateRange = "All Time" }: { dateRange?:
 
 export function ExpenseByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
   const { data: rawExpenses, isLoading } = useAirtable('expenses', {
-    fields: ['Expense', 'Category'],
+    fields: ['Expense', 'Category (from Category)'],
   })
 
   const chartData = useMemo(() => {
@@ -139,7 +149,17 @@ export function ExpenseByCategoryChart({ dateRange = "All Time" }: { dateRange?:
     
     const totals: Record<string, number> = {}
     for (const r of rawExpenses) {
-      const cat = String(r.fields['Category'] ?? 'Other')
+      // Handle linked field - could be array or string
+      let catValue = r.fields['Category (from Category)']
+      let cat = 'Other'
+      
+      if (Array.isArray(catValue)) {
+        // If it's an array, take first element
+        cat = String(catValue[0] ?? 'Other')
+      } else if (catValue) {
+        cat = String(catValue)
+      }
+      
       const amt = parseCurrency(r.fields['Expense'] as string)
       totals[cat] = (totals[cat] ?? 0) + amt
     }

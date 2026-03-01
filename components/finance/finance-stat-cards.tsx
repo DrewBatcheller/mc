@@ -31,7 +31,7 @@ export function FinanceStatCards({ dateRange = "All Time" }: FinanceStatCardsPro
   const dateFilter = getDateFilter(dateRange)
 
   const { data: revenue, isLoading: revLoading } = useAirtable('revenue', {
-    fields: ['Amount USD', 'Date', 'Category', 'Type'],
+    fields: ['Amount USD', 'Date', 'Category', 'Monthly Recurring Revenue'],
     ...(dateFilter ? { filterExtra: dateFilter } : {}),
   })
 
@@ -53,7 +53,7 @@ export function FinanceStatCards({ dateRange = "All Time" }: FinanceStatCardsPro
     const mrr = (clients ?? []).reduce((s, r) => s + parseCurrency(r.fields['Monthly Price'] as string), 0)
 
     const mrrRevenue = (revenue ?? [])
-      .filter(r => String(r.fields['Type'] ?? '').includes('MRR') || String(r.fields['Category'] ?? '').includes('MRR'))
+      .filter(r => r.fields['Monthly Recurring Revenue'] || String(r.fields['Category'] ?? '').toLowerCase().includes('mrr'))
       .reduce((s, r) => s + parseCurrency(r.fields['Amount USD'] as string), 0)
 
     const ebitda = totalRev - totalExp

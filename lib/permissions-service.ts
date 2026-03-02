@@ -11,7 +11,7 @@ const PERMISSIONS_TABLE = 'Permissions'
 const DEFAULT_PERMISSION_VIEW = 'Team'  // Fallback for departments without unique permissions
 
 interface AirtablePermissionsRow {
-  'View': string
+  'Name': string
   'Finances'?: boolean
   'Sales'?: boolean
   'Experiments'?: boolean
@@ -54,21 +54,12 @@ async function lookupPermissionsByView(viewName: string): Promise<UserPermission
   try {
     const records = await listAllRecords<AirtablePermissionsRow>(PERMISSIONS_TABLE)
     
-    console.log(`[v0] Fetched ${records.length} records from Permissions table`)
-    console.log(`[v0] Looking for view: "${viewName}"`)
-    console.log(`[v0] Available views:`, records.map(r => ({ view: r.fields['View'], id: r.id })))
-    
     const record = records.find(r => {
-      const view = (r.fields)['View']
-      const matches = view?.toLowerCase() === viewName.toLowerCase()
-      console.log(`[v0] Comparing "${view}" (type: ${typeof view}) with "${viewName}" (type: ${typeof viewName}) => ${matches}`)
-      return matches
+      const name = r.fields['Name']
+      return name?.toLowerCase() === viewName.toLowerCase()
     })
     
-    if (!record) {
-      console.log(`[v0] No record found for view "${viewName}"`)
-      return null
-    }
+    if (!record) return null
     
     const fields = record.fields
     
@@ -83,7 +74,7 @@ async function lookupPermissionsByView(viewName: string): Promise<UserPermission
       affiliates: fields['Affiliates'] ?? false,
     }
   } catch (err) {
-    console.error(`[permissions] Failed to lookup view "${viewName}":`, err)
+    console.error(`[permissions] Failed to lookup permission "${viewName}":`, err)
     return null
   }
 }
@@ -96,7 +87,7 @@ export async function getAllPermissionViews(): Promise<PermissionsRecord[]> {
     const records = await listAllRecords<AirtablePermissionsRow>(PERMISSIONS_TABLE)
     
     return records.map(r => ({
-      view: r.fields['View'] || 'Unknown',
+      view: r.fields['Name'] || 'Unknown',
       permissions: {
         finances: r.fields['Finances'] ?? false,
         sales: r.fields['Sales'] ?? false,

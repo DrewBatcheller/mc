@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SelectField } from '@/components/shared/select-field'
 import { useToast } from '@/hooks/use-toast'
+import { useUser } from '@/contexts/UserContext'
 
 interface NewIdeaModalProps {
   isOpen: boolean
@@ -35,6 +36,7 @@ const DEVICES = ['All Devices', 'Desktop', 'Mobile']
 const COUNTRIES = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Mexico', 'European Union', 'Germany', 'France', 'Spain', 'Italy', 'Japan', 'South Korea', 'India', 'Brazil', 'New Zealand', 'AU (Primary Focus)', 'All GEOs', 'International']
 
 export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId }: NewIdeaModalProps) {
+  const { user } = useUser()
   const { toast } = useToast()
   const [showCountriesMenu, setShowCountriesMenu] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -99,7 +101,12 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
       console.log('[v0] Sending POST to /api/airtable/experiment-ideas with clientId:', clientId)
       const response = await fetch('/api/airtable/experiment-ideas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': user?.role || '',
+          'x-user-id': user?.id || '',
+          ...(user?.clientId ? { 'x-client-id': user.clientId } : {}),
+        },
         body: JSON.stringify({ fields: airtableFields }),
       })
 

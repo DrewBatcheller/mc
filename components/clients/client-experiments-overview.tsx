@@ -171,30 +171,29 @@ export function ClientExperimentsOverview() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="bg-card rounded-xl border border-border p-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
-          </div>
-          <div className="relative flex-1 w-full sm:w-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search by date..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full text-[13px] bg-card border border-border rounded-lg pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            />
+      {/* Table with integrated filters */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="border-b border-border p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
+            </div>
+            <div className="relative flex-1 w-full sm:w-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search by date..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full text-[13px] bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full">
           <thead className="border-b border-border bg-muted/40">
             <tr>
+              <th className="w-10 px-3 py-3" />
               <th className="w-10 px-3 py-3" />
               <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Launch Date</th>
               <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Finish Date</th>

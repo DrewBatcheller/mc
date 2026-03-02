@@ -13,7 +13,7 @@ export function RecentlyEndedTests() {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   const { data, isLoading } = useAirtable('experiments', {
     maxRecords: 8,
-    fields: ['Test Description', 'Brand Name (from Brand Name)', 'Test Status', 'End Date', 'Revenue Added (MRR) (K Format)'],
+    fields: ['Test Description', 'Brand Name (from Brand Name)', 'Test Status', 'End Date', 'Revenue Added (MRR)'],
     sort: [{ field: 'End Date', direction: 'desc' }],
     filterExtra: `AND(OR({Test Status} = "Successful", {Test Status} = "Unsuccessful", {Test Status} = "Inconclusive"), {End Date} >= "${thirtyDaysAgo}")`,
   })
@@ -40,7 +40,7 @@ export function RecentlyEndedTests() {
             const clientArr = r.fields['Brand Name (from Brand Name)']
             const client = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? '')
             const status = String(r.fields['Test Status'] ?? '')
-            const revenue = String(r.fields['Revenue Added (MRR) (K Format)'] ?? '$0')
+            const revenue = String(r.fields['Revenue Added (MRR)'] ?? '$0')
             return (
               <div key={r.id} className="px-4 py-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">

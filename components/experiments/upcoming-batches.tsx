@@ -7,7 +7,7 @@ export function UpcomingBatches() {
   const today = new Date().toISOString().split('T')[0]
   const { data, isLoading } = useAirtable('batches', {
     maxRecords: 6,
-    fields: ['Batch Key', 'Brand Name (from Client)', 'Launch Date', 'All Tests Status', 'Linked Test Names', 'Revenue Added (MRR)'],
+    fields: ['Batch Key', 'Brand Name', 'Launch Date', 'All Tests Status', 'Linked Test Names', 'Revenue Added (MRR)'],
     sort: [{ field: 'Launch Date', direction: 'asc' }],
     filterExtra: `{Launch Date} >= "${today}"`,
   })
@@ -34,7 +34,7 @@ export function UpcomingBatches() {
         ) : (
           (data ?? []).map(r => {
             const batchKey = String(r.fields['Batch Key'] ?? '')
-            const clientArr = r.fields['Brand Name (from Client)']
+            const clientArr = r.fields['Brand Name']
             const client = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? '')
             const launchDate = r.fields['Launch Date'] ? new Date(String(r.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
             const tests = Array.isArray(r.fields['Linked Test Names']) ? r.fields['Linked Test Names'].length : 0

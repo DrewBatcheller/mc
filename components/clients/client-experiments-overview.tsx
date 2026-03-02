@@ -84,8 +84,13 @@ const statusStyles: Record<string, string> = {
 }
 
 // Map all statuses to 4 main batch statuses
-const mapBatchStatus = (status: string): "Pending" | "In Progress" | "Live" | "Completed" => {
-  const statusLower = status.toLowerCase()
+const mapBatchStatus = (status: string | string[] | undefined): "Pending" | "In Progress" | "Live" | "Completed" => {
+  if (!status) return "Pending"
+  // Handle array of statuses - take first one or join
+  const statusStr = Array.isArray(status) ? status[0] : status
+  if (typeof statusStr !== 'string') return "Pending"
+  
+  const statusLower = statusStr.toLowerCase()
   if (statusLower === "in progress") return "In Progress"
   if (statusLower === "live") return "Live"
   if (statusLower === "completed" || statusLower === "successful" || statusLower === "unsuccessful" || statusLower === "inconclusive") return "Completed"

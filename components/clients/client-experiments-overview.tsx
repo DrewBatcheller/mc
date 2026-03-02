@@ -612,7 +612,6 @@ export function ClientExperimentsOverview() {
     </div>
   )
 }
-      {actionBatch && !confirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-background rounded-lg border border-border p-6 max-w-sm shadow-lg">
             <h3 className="text-base font-semibold text-foreground mb-3">Edit Launch Date</h3>

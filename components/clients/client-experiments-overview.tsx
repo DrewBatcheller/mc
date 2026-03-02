@@ -108,17 +108,42 @@ export function ClientExperimentsOverview() {
   // Transform Airtable data into component shape
   const batches: Batch[] = useMemo(() => {
     if (!batchesData) return []
-    return batchesData.map(batch => ({
-      id: batch.id,
-      client: user?.name || 'Unknown Client',
-      launchDate: batch.fields['Launch Date'] as string || '',
-      finishDate: '', // Would need to calculate or get from batch data
-      status: batch.fields['All Tests Status'] as string || 'No Tests',
-      tests: 0, // Would count from linked experiments
-      revenueImpact: batch.fields['Revenue Added (MRR)'] as string || '$0',
-      experiments: [],
-    }))
-  }, [batchesData, user])
+    return batchesData.map(batch => {
+      // Find all experiments linked to this batch
+      const batchExperiments = (experimentsData || []).filter(exp => {
+        const linkedBatches = exp.fields['Batch'] as string[] | undefined
+        return linkedBatches?.includes(batch.id)
+      }).map(exp => ({
+        name: exp.fields['Test Description'] as string || '',
+        description: '',
+        status: exp.fields['Test Status'] as string || 'Pending',
+        placement: exp.fields['Placement'] as string || '',
+        placementUrl: exp.fields['Placement URL'] as string,
+        devices: exp.fields['Devices'] as string || 'All Devices',
+        geos: Array.isArray(exp.fields['GEOs']) ? (exp.fields['GEOs'] as string[]).join(', ') : '',
+        variants: '-',
+        revenue: exp.fields['Revenue Added (MRR) (Regular Format)'] as string || '$0',
+        hypothesis: exp.fields['Hypothesis'] as string,
+        rationale: exp.fields['Rationale'] as string,
+        launchDate: exp.fields['Launch Date'] as string,
+        endDate: exp.fields['End Date'] as string,
+        deployed: exp.fields['Deployed'] as boolean || false,
+        whatHappened: exp.fields['Describe what happened & what we learned'] as string,
+        nextSteps: exp.fields['Next Steps (Action)'] as string,
+      }))
+
+      return {
+        id: batch.id,
+        client: user?.name || 'Unknown Client',
+        launchDate: batch.fields['Launch Date'] as string || '',
+        finishDate: '', // Would need to calculate or get from batch data
+        status: batch.fields['All Tests Status'] as string || 'No Tests',
+        tests: batchExperiments.length,
+        revenueImpact: batch.fields['Revenue Added (MRR)'] as string || '$0',
+        experiments: batchExperiments,
+      }
+    })
+  }, [batchesData, experimentsData, user])
 
   const allStatuses = ["All Statuses", "Pending", "In Progress", "Live", "Completed"]
   const [search, setSearch] = useState("")
@@ -240,6 +265,21 @@ export function ClientExperimentsOverview() {
     }, [search, statusFilter])
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((_, i) => selectedBatches.has(i))
+
+  // Calculate stats from actual client data
+  const trackerStats = useMemo(() => {
+    const totalBatches = batches.length
+    const totalExperiments = batches.reduce((sum, b) => sum + b.experiments.length, 0)
+    const liveNow = batches.filter(b => mapBatchStatus(b.status) === "Live").length
+    const successful = batches.reduce((sum, b) => sum + b.experiments.filter(e => e.status === "Successful").length, 0)
+    
+    return [
+      { label: "Total Batches", value: String(totalBatches), icon: Layers },
+      { label: "Total Experiments", value: String(totalExperiments), icon: FlaskConical },
+      { label: "Live Now", value: String(liveNow), icon: Zap },
+      { label: "Successful", value: String(successful), icon: CheckCircle2 },
+    ]
+  }, [batches])
 
   // Close launch menu dropdown when clicking outside
   useEffect(() => {

@@ -89,7 +89,12 @@ export function ClientIdeasTable() {
   }
 
   const handleCreateIdea = async () => {
+    setPendingIdeas([])
     await mutate()
+  }
+
+  const handleAddOptimisticIdea = (idea: any) => {
+    setPendingIdeas(prev => [...prev, idea])
   }
 
   const filtered = useMemo(() => {
@@ -313,6 +318,7 @@ export function ClientIdeasTable() {
         onSuccess={handleCreateIdea}
         clientName={user?.name || 'Unknown Client'}
         clientId={user?.clientId || ''}
+        onAddOptimistic={handleAddOptimisticIdea}
       />
 
       {syncIdea && (

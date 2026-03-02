@@ -13,6 +13,7 @@ interface NewIdeaModalProps {
   onSuccess?: () => void
   clientName: string
   clientId: string
+  onAddOptimistic?: (idea: any) => void
 }
 
 interface FormData {
@@ -35,7 +36,7 @@ const PRIMARY_GOALS = ['ATC', 'SCVR', 'CVR', 'AOV', 'RPV', 'APPV', 'PPV', 'CTR',
 const DEVICES = ['All Devices', 'Desktop', 'Mobile']
 const COUNTRIES = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Mexico', 'European Union', 'Germany', 'France', 'Spain', 'Italy', 'Japan', 'South Korea', 'India', 'Brazil', 'New Zealand', 'AU (Primary Focus)', 'All GEOs', 'International']
 
-export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId }: NewIdeaModalProps) {
+export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId, onAddOptimistic }: NewIdeaModalProps) {
   const { user } = useUser()
   const { toast } = useToast()
   const [showCountriesMenu, setShowCountriesMenu] = useState(false)
@@ -78,6 +79,23 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
     }
 
     setIsSubmitting(true)
+    
+    // Create optimistic idea object
+    const optimisticIdea = {
+      id: `temp-${Date.now()}`,
+      testDescription: formData.title,
+      hypothesis: formData.hypothesis,
+      rationale: formData.rationale,
+      placement: formData.placementLabel,
+      placementUrl: formData.placementUrl,
+      primaryGoals: formData.primaryGoals,
+      priority: '',
+      isPending: true,
+    }
+    
+    // Add optimistically to UI immediately
+    onAddOptimistic?.(optimisticIdea)
+    
     try {
       const airtableFields = {
         'Test Description': formData.title,
@@ -124,6 +142,8 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create idea'
       toast({ title: 'Error', description: message, variant: 'destructive' })
+      // On error, remove the optimistic idea by refreshing
+      onSuccess?.()
     } finally {
       setIsSubmitting(false)
     }

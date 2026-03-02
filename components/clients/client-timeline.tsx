@@ -37,6 +37,7 @@ const MONTHS = [
 function getDaysInMonth(y: number, m: number) {
   return new Date(y, m + 1, 0).getDate()
 }
+
 function getFirstDayOfMonth(y: number, m: number) {
   return new Date(y, m, 1).getDay()
 }
@@ -61,11 +62,17 @@ export function ClientTimeline() {
     if (month === 0) { setMonth(11); setYear(year - 1) }
     else setMonth(month - 1)
   }
+
   const next = () => {
     if (month === 11) { setMonth(0); setYear(year + 1) }
     else setMonth(month + 1)
   }
-  const goToday = () => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth()) }
+
+  const goToday = () => {
+    const n = new Date()
+    setYear(n.getFullYear())
+    setMonth(n.getMonth())
+  }
 
   const daysInMonth = getDaysInMonth(year, month)
   const firstDay = getFirstDayOfMonth(year, month)

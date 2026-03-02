@@ -64,7 +64,8 @@ export function buildRoleFilter(
         )
       }
       if (role === 'client' && clientId) {
-        return eq('Record ID (from Brand Name)', clientId)
+        // Check both the linked record ID and the formula field for backward compatibility
+        return `OR(FIND("${clientId}", CONCATENATE({Brand Name})) > 0, {Record ID (from Brand Name)} = "${clientId}")`
       }
       return null
     }
@@ -86,7 +87,8 @@ export function buildRoleFilter(
     case 'batches': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'client' && clientId) {
-        return eq('Record ID (from Client)', clientId)
+        // Check both the linked record ID and the formula field for backward compatibility
+        return `OR(FIND("${clientId}", CONCATENATE({Client})) > 0, {Record ID (from Client)} = "${clientId}")`
       }
       if (role === 'team') return ''  // team sees all batches they work on
       return null
@@ -161,7 +163,7 @@ export function buildRoleFilter(
       return null
     }
 
-    // ── Contacts ─────────────────────��────────────────────────────────────────
+    // ── Contacts ─────────────────────��───────────────────���────────────────────
     case 'contacts': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'client' && clientId) {

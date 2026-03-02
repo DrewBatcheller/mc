@@ -67,6 +67,11 @@ export async function GET(
       filterByFormula = extraFilter
     }
 
+    // Debug logging
+    if (filterByFormula) {
+      console.log(`[/api/airtable] Resource: ${resource}, Filter formula:`, filterByFormula)
+    }
+
     // ── Parse additional options from query params ────────────────────────────
     const options: Parameters<typeof listRecords>[1] = {}
     if (filterByFormula) options.filterByFormula = filterByFormula

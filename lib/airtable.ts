@@ -60,7 +60,10 @@ export async function listRecords<T = Record<string, unknown>>(
 ): Promise<AirtableListResponse<T>> {
   const params = new URLSearchParams()
 
-  if (options.filterByFormula) params.set('filterByFormula', options.filterByFormula)
+  // filterByFormula needs to be properly encoded
+  if (options.filterByFormula) {
+    params.set('filterByFormula', options.filterByFormula)
+  }
   if (options.maxRecords) params.set('maxRecords', String(options.maxRecords))
   if (options.pageSize) params.set('pageSize', String(options.pageSize))
   if (options.offset) params.set('offset', options.offset)

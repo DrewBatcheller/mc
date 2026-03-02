@@ -18,7 +18,9 @@ export interface FilterContext {
 
 // ─── Formula helpers ──────────────────────────────────────────────────────────
 function eq(field: string, value: string): string {
-  return `{${field}} = "${value}"`
+  // For field names with special characters, we need to quote them in Airtable formulas
+  const quotedField = field.includes('(') || field.includes(')') || field.includes(' ') ? `"{${field}}"` : `{${field}}`
+  return `${quotedField} = "${value}"`
 }
 
 function containsId(field: string, recordId: string): string {

@@ -65,17 +65,25 @@ export function ClientExperimentsOverview() {
     fields: ['Test Description', 'Test Status', 'Batch', 'Launch Date', 'End Date'],
   })
 
-  // Transform Airtable data into component shape
+  // Transform Airtable data into component shape with linked experiments
   const batches: Batch[] = useMemo(() => {
     if (!batchesData) return []
     return batchesData.map(batch => {
       const linkedTests = batch.fields['Linked Test Names']
-      // Handle both array and string types from Airtable
       const testCount = Array.isArray(linkedTests) 
         ? linkedTests.length 
         : typeof linkedTests === 'string' && linkedTests
         ? linkedTests.split(',').length
         : 0
+      
+      // Link experiments to this batch
+      const batchExperiments = (experimentsData || []).filter(exp => {
+        const linkedBatches = exp.fields['Batch'] as string[] | undefined
+        return linkedBatches?.includes(batch.id)
+      }).map(exp => ({
+        name: exp.fields['Test Description'] as string || 'Unnamed Test',
+        status: exp.fields['Test Status'] as string || 'Pending',
+      }))
       
       return {
         id: batch.id,
@@ -85,10 +93,10 @@ export function ClientExperimentsOverview() {
         status: batch.fields['All Tests Status'] as string || 'No Tests',
         tests: testCount,
         revenueImpact: batch.fields['Revenue Added (MRR)'] as string || '$0',
-        experiments: [],
+        experiments: batchExperiments,
       }
     })
-  }, [batchesData, user])
+  }, [batchesData, experimentsData, user])
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -193,6 +201,34 @@ export function ClientExperimentsOverview() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{batch.tests}</td>
                   </tr>
+                  
+                  {/* Nested experiments table */}
+                  {expandedIdx === idx && batch.experiments.length > 0 && (
+                    <tr className="bg-muted/10">
+                      <td colSpan={5} className="p-4">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50 border-b border-border">
+                            <tr>
+                              <th className="px-4 py-2 text-left font-medium text-xs">Test Name</th>
+                              <th className="px-4 py-2 text-left font-medium text-xs">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {batch.experiments.map((exp, expIdx) => (
+                              <tr key={expIdx} className="border-b border-border/50 last:border-0 hover:bg-muted/20">
+                                <td className="px-4 py-2 text-foreground">{exp.name}</td>
+                                <td className="px-4 py-2">
+                                  <span className={cn("text-xs font-medium px-2 py-1 rounded", statusStyles[mapBatchStatus(exp.status)])}>
+                                    {mapBatchStatus(exp.status)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
                 </Fragment>
               ))}
             </tbody>

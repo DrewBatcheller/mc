@@ -39,19 +39,8 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
   const [showCountriesMenu, setShowCountriesMenu] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<FormData>({
-    title: '',
-    placementLabel: '',
-    placementUrl: '',
-    hypothesis: '',
-    rationale: '',
-    primaryGoals: [],
-    devices: 'All Devices',
-    countries: [],
-    weighting: '',
-    designBrief: '',
-    developmentBrief: '',
-    mediaLinks: '',
-    walkthroughUrl: '',
+    title: '', placementLabel: '', placementUrl: '', hypothesis: '', rationale: '', primaryGoals: [],
+    devices: 'All Devices', countries: [], weighting: '', designBrief: '', developmentBrief: '', mediaLinks: '', walkthroughUrl: '',
   })
 
   const handleChange = (field: keyof FormData, value: any) => {
@@ -61,43 +50,34 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
   const togglePrimaryGoal = (goal: string) => {
     setFormData(prev => ({
       ...prev,
-      primaryGoals: prev.primaryGoals.includes(goal)
-        ? prev.primaryGoals.filter(g => g !== goal)
-        : [...prev.primaryGoals, goal]
+      primaryGoals: prev.primaryGoals.includes(goal) ? prev.primaryGoals.filter(g => g !== goal) : [...prev.primaryGoals, goal]
     }))
   }
 
   const toggleCountry = (country: string) => {
     setFormData(prev => ({
       ...prev,
-      countries: prev.countries.includes(country)
-        ? prev.countries.filter(c => c !== country)
-        : [...prev.countries, country]
+      countries: prev.countries.includes(country) ? prev.countries.filter(c => c !== country) : [...prev.countries, country]
     }))
   }
 
   const normalizeUrl = (url: string): string => {
     if (!url) return url
-    // If URL already has a protocol, return as-is
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url
-    }
-    // Otherwise prepend https://
+    if (url.startsWith('http://') || url.startsWith('https://')) return url
     return `https://${url}`
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[v0] Form submitted', formData)
+    console.log('[v0] Form submitted, clientId:', clientId)
     
     if (!formData.title || !formData.placementLabel || !formData.placementUrl || !formData.hypothesis || !formData.rationale || formData.primaryGoals.length === 0 || !formData.weighting || !formData.designBrief) {
-      console.log('[v0] Validation failed - missing fields')
+      console.log('[v0] Validation failed')
       toast({ title: 'Missing required fields', description: 'Please fill in all required fields', variant: 'destructive' })
       return
     }
 
     setIsSubmitting(true)
-    
     try {
       const airtableFields = {
         'Test Description': formData.title,
@@ -116,47 +96,32 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Brand Name': clientId,
       }
 
-      console.log('[v0] Sending to API:', airtableFields)
-
+      console.log('[v0] Sending POST to /api/airtable/experiment-ideas with clientId:', clientId)
       const response = await fetch('/api/airtable/experiment-ideas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields: airtableFields }),
       })
 
-      console.log('[v0] Response status:', response.status, response.ok)
-
+      console.log('[v0] Response status:', response.status)
       if (!response.ok) {
         const error = await response.json()
         console.log('[v0] API error:', error)
         throw new Error(error.error || 'Failed to create idea')
       }
 
-      const { record } = await response.json()
-      console.log('[v0] Success! Record created:', record)
-      
-      toast({ title: 'Success', description: 'Experiment idea created successfully' })
+      const result = await response.json()
+      console.log('[v0] Success:', result)
+      toast({ title: 'Success', description: 'Test idea created successfully' })
       
       setFormData({
-        title: '',
-        placementLabel: '',
-        placementUrl: '',
-        hypothesis: '',
-        rationale: '',
-        primaryGoals: [],
-        devices: 'All Devices',
-        countries: [],
-        weighting: '',
-        designBrief: '',
-        developmentBrief: '',
-        mediaLinks: '',
-        walkthroughUrl: '',
+        title: '', placementLabel: '', placementUrl: '', hypothesis: '', rationale: '', primaryGoals: [],
+        devices: 'All Devices', countries: [], weighting: '', designBrief: '', developmentBrief: '', mediaLinks: '', walkthroughUrl: '',
       })
-      
       onClose()
       onSuccess?.()
     } catch (err) {
-      console.error('[v0] Error during submission:', err)
+      console.error('[v0] Error:', err)
       const message = err instanceof Error ? err.message : 'Failed to create idea'
       toast({ title: 'Error', description: message, variant: 'destructive' })
     } finally {
@@ -178,62 +143,45 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
-            <label className="text-sm font-medium text-foreground block mb-1">
-              Test Description <span className="text-rose-600">*</span>
-            </label>
+            <label className="text-sm font-medium text-foreground block mb-1">Test Description <span className="text-rose-600">*</span></label>
             <p className="text-[12px] text-muted-foreground mb-3">A short, clear title describing the test</p>
-            <input type="text" value={formData.title} onChange={(e) => handleChange('title', e.target.value)} placeholder="e.g. 'Sticky Add to Cart on PDP'" required disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
+            <input type="text" value={formData.title} onChange={(e) => handleChange('title', e.target.value)} placeholder="e.g. Sticky Add to Cart" required disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1">
-                Placement <span className="text-rose-600">*</span>
-              </label>
-              <p className="text-[12px] text-muted-foreground mb-3">Enter the placement where the experiment will run. Separate with commas if multiple.</p>
+              <label className="text-sm font-medium text-foreground block mb-1">Placement <span className="text-rose-600">*</span></label>
+              <p className="text-[12px] text-muted-foreground mb-3">Where the test runs on the page</p>
               <input type="text" value={formData.placementLabel} onChange={(e) => handleChange('placementLabel', e.target.value)} placeholder="e.g. Below ATC" required disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1">
-                Placement URL <span className="text-rose-600">*</span>
-              </label>
-              <p className="text-[12px] text-muted-foreground mb-3">Enter the URL(s) where the test will run. https:// will be added automatically if not provided.</p>
-              <input
-                type="text"
-                value={formData.placementUrl}
-                onChange={(e) => handleChange('placementUrl', e.target.value)}
-                placeholder="e.g. www.store.com/product or https://store.com/product"
-                required
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-              />
+              <label className="text-sm font-medium text-foreground block mb-1">Placement URL <span className="text-rose-600">*</span></label>
+              <p className="text-[12px] text-muted-foreground mb-3">https:// added automatically</p>
+              <input type="text" value={formData.placementUrl} onChange={(e) => handleChange('placementUrl', e.target.value)} placeholder="e.g. www.store.com/product" required disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
             </div>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground block mb-1">
-              Hypothesis <span className="text-rose-600">*</span>
-            </label>
-            <p className="text-[12px] text-muted-foreground mb-3">State the expected outcome of the change and the reasoning behind it.</p>
-            <textarea value={formData.hypothesis} onChange={(e) => handleChange('hypothesis', e.target.value)} placeholder="If we change [X], then [Y] will happen because..." required disabled={isSubmitting} rows={4} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50" />
+            <label className="text-sm font-medium text-foreground block mb-1">Hypothesis <span className="text-rose-600">*</span></label>
+            <p className="text-[12px] text-muted-foreground mb-3">Expected outcome and reasoning</p>
+            <textarea value={formData.hypothesis} onChange={(e) => handleChange('hypothesis', e.target.value)} placeholder="If we change [X], then [Y] will happen because..." required disabled={isSubmitting} rows={3} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50" />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground block mb-1">
-              Rationale <span className="text-rose-600">*</span>
-            </label>
-            <p className="text-[12px] text-muted-foreground mb-3">Describe the evidence supporting your hypothesis and why this change is likely to improve performance.</p>
-            <textarea value={formData.rationale} onChange={(e) => handleChange('rationale', e.target.value)} placeholder="Based on [evidence], this change will..." required disabled={isSubmitting} rows={4} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50" />
+            <label className="text-sm font-medium text-foreground block mb-1">Rationale <span className="text-rose-600">*</span></label>
+            <p className="text-[12px] text-muted-foreground mb-3">Supporting evidence for this test</p>
+            <textarea value={formData.rationale} onChange={(e) => handleChange('rationale', e.target.value)} placeholder="Based on [evidence], this change will..." required disabled={isSubmitting} rows={3} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50" />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground block mb-1">
-              Primary Goals <span className="text-rose-600">*</span>
-            </label>
-            <p className="text-[12px] text-muted-foreground mb-3">Select the metrics this test aims to influence. You may select multiple.</p>
+            <label className="text-sm font-medium text-foreground block mb-1">Primary Goals <span className="text-rose-600">*</span></label>
+            <p className="text-[12px] text-muted-foreground mb-3">Select the metrics this test aims to improve (multi-select)</p>
             <div className="grid grid-cols-3 gap-2">
               {PRIMARY_GOALS.map(goal => (
-                <button key={goal} type="button" onClick={() => togglePrimaryGoal(goal)} disabled={isSubmitting} className={cn('px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50', formData.primaryGoals.includes(goal) ? 'bg-slate-700 border-slate-700 text-white' : 'bg-background border-border text-foreground hover:border-slate-400')}>
+                <button key={goal} type="button" onClick={() => togglePrimaryGoal(goal)} disabled={isSubmitting}
+                  className={cn('px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50',
+                    formData.primaryGoals.includes(goal) ? 'bg-slate-700 border-slate-700 text-white' : 'bg-background border-border text-foreground hover:border-slate-400')}
+                >
                   {goal}
                 </button>
               ))}
@@ -242,15 +190,13 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1">
-                Devices <span className="text-rose-600">*</span>
-              </label>
-              <p className="text-[12px] text-muted-foreground mb-3">Select which device types should be targeted.</p>
+              <label className="text-sm font-medium text-foreground block mb-1">Devices <span className="text-rose-600">*</span></label>
+              <p className="text-[12px] text-muted-foreground mb-3">Target device types</p>
               <SelectField value={formData.devices} onChange={(v) => handleChange('devices', v)} options={DEVICES} containerClassName="w-full" className="w-full disabled:opacity-50" disabled={isSubmitting} />
             </div>
             <div className="relative">
               <label className="text-sm font-medium text-foreground block mb-1">Countries</label>
-              <p className="text-[12px] text-muted-foreground mb-3">Select target countries (multi-select).</p>
+              <p className="text-[12px] text-muted-foreground mb-3">Target countries (multi-select)</p>
               <button type="button" onClick={() => setShowCountriesMenu(!showCountriesMenu)} disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-left text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50">
                 {formData.countries.length === 0 ? 'Select countries...' : `${formData.countries.length} selected`}
               </button>
@@ -268,43 +214,39 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground block mb-1">
-              Weighting <span className="text-rose-600">*</span>
-            </label>
-            <p className="text-[12px] text-muted-foreground mb-3">Define how traffic will be split between variants (e.g., 50/50, 33/33/33).</p>
+            <label className="text-sm font-medium text-foreground block mb-1">Weighting <span className="text-rose-600">*</span></label>
+            <p className="text-[12px] text-muted-foreground mb-3">Traffic split between variants</p>
             <input type="text" value={formData.weighting} onChange={(e) => handleChange('weighting', e.target.value)} placeholder="e.g. 50/50" required disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground block mb-1">
-              Design Brief <span className="text-rose-600">*</span>
-            </label>
-            <p className="text-[12px] text-muted-foreground mb-3">Link a Loom Video describing exactly how the test should be designed, including references, examples, and visual direction.</p>
+            <label className="text-sm font-medium text-foreground block mb-1">Design Brief <span className="text-rose-600">*</span></label>
+            <p className="text-[12px] text-muted-foreground mb-3">Loom video or detailed description for design</p>
             <textarea value={formData.designBrief} onChange={(e) => handleChange('designBrief', e.target.value)} placeholder="Paste Loom link or description..." required disabled={isSubmitting} rows={3} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50" />
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">Development Brief</label>
-            <p className="text-[12px] text-muted-foreground mb-3">Link a Loom Video describing technical requirements for implementing the test, including functionality and targeting rules.</p>
+            <p className="text-[12px] text-muted-foreground mb-3">Technical requirements for implementation</p>
             <textarea value={formData.developmentBrief} onChange={(e) => handleChange('developmentBrief', e.target.value)} placeholder="Paste Loom link or description..." disabled={isSubmitting} rows={3} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50" />
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">Media/Links</label>
-            <p className="text-[12px] text-muted-foreground mb-3">Add any supporting assets, references, screenshots, or external links that will help the team understand or execute the test.</p>
+            <p className="text-[12px] text-muted-foreground mb-3">Supporting assets and external links</p>
             <textarea value={formData.mediaLinks} onChange={(e) => handleChange('mediaLinks', e.target.value)} placeholder="Paste links or describe media..." disabled={isSubmitting} rows={3} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50" />
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">Walkthrough Video URL</label>
-            <input type="text" value={formData.walkthroughUrl} onChange={(e) => handleChange('walkthroughUrl', e.target.value)} placeholder="e.g. loom.com/share/... or https://loom.com/share/..." disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
+            <input type="text" value={formData.walkthroughUrl} onChange={(e) => handleChange('walkthroughUrl', e.target.value)} placeholder="e.g. loom.com/share/..." disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
           </div>
 
-          <div className="flex items-center justify-between pt-6 border-t border-border">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+          <div className="flex items-center gap-3 pt-4 border-t border-border">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted transition-colors text-sm font-medium disabled:opacity-50">
               Cancel
             </button>
-            <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800 transition-colors text-sm font-medium disabled:opacity-50">
               {isSubmitting ? 'Creating...' : 'Create Idea'}
             </button>
           </div>

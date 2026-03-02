@@ -111,10 +111,6 @@ export function RoleSidebar() {
     }
   }, [openSections])
 
-  if (isLoading || !user || collapsed === null || openSections === null) {
-    return <SidebarSkeleton />
-  }
-
   // Auto-expand sections that contain the current route
   const initialOpenSections = useMemo(() => {
     return accessibleSections
@@ -124,12 +120,17 @@ export function RoleSidebar() {
 
   // Update openSections if current route is in a new section
   useEffect(() => {
+    if (openSections === null) return
     const currentSectionIds = initialOpenSections
     const missingSection = currentSectionIds.find(id => !openSections.includes(id))
     if (missingSection) {
       setOpenSections(prev => [...new Set([...prev, ...currentSectionIds])])
     }
-  }, [pathname, accessibleSections])
+  }, [pathname, accessibleSections, initialOpenSections, openSections])
+
+  if (isLoading || !user || collapsed === null || openSections === null) {
+    return <SidebarSkeleton />
+  }
 
   function toggleSection(sectionId: string) {
     setOpenSections((prev) =>

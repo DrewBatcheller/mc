@@ -1,11 +1,25 @@
-'use client'
-
 import { FileText, Calendar } from 'lucide-react'
 import { useAirtable } from '@/hooks/use-airtable'
 import { ContentCard } from '@/components/shared/content-card'
 import { useMemo, useState } from 'react'
 import { ExperimentDetailsModal } from '@/components/experiments/experiment-details-modal'
-import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+
+type ExperimentStatus = 'Pending' | 'In Progress - Design' | 'In Progress - Development' | 'In Progress - QA' | 'Live - Collecting Data' | string
+
+function getStatusStyle(status: string): string {
+  if (status === 'Pending') return 'bg-amber-50 border-amber-200 text-amber-700'
+  if (status.includes('In Progress')) return 'bg-blue-50 border-blue-200 text-blue-700'
+  if (status.includes('Live')) return 'bg-blue-50 border-blue-200 text-blue-700'
+  return 'bg-gray-50 border-gray-200 text-gray-700'
+}
+
+function getCardBorder(status: string): string {
+  if (status === 'Pending') return 'border-l-amber-400'
+  if (status.includes('In Progress')) return 'border-l-blue-400'
+  if (status.includes('Live')) return 'border-l-blue-400'
+  return 'border-l-gray-400'
+}
 
 export function ClientUpcomingExperiments() {
   const [selectedExperiment, setSelectedExperiment] = useState<any>(null)
@@ -98,43 +112,58 @@ export function ClientUpcomingExperiments() {
               </p>
             </>
           ) : (
-            <div className="flex flex-col gap-3 w-full">
+            <div className="flex flex-col gap-3">
               {upcomingExperiments.map(exp => {
-                const hypothesis = String(exp.fields['Hypothesis'] || '')
-                const rationale = String(exp.fields['Rationale'] || '')
-                const combined = [hypothesis, rationale].filter(Boolean).join(' • ')
                 const status = String(exp.fields['Test Status'] || '')
                 
                 return (
-                  <button
+                  <div
                     key={exp.id}
                     onClick={() => handleExperimentClick(exp)}
-                    className="p-4 border border-border rounded-lg hover:border-foreground/30 hover:bg-accent/50 transition-all text-left"
-                  >
-                    {/* Header with title and status badge */}
-                    <div className="flex justify-between items-start gap-2 mb-2">
-                      <h4 className="font-medium text-sm text-foreground line-clamp-2">{exp.fields['Test Description']}</h4>
-                      <Badge variant="outline" className="whitespace-nowrap text-[11px]">{status}</Badge>
-                    </div>
-
-                    {/* Hypothesis and Rationale combined */}
-                    {combined && (
-                      <p className="text-[12px] text-muted-foreground mb-2 line-clamp-2">{combined}</p>
+                    className={cn(
+                      'rounded-lg border border-border p-4 border-l-[3px] flex flex-col gap-2 cursor-pointer hover:shadow-md transition-all',
+                      getCardBorder(status)
                     )}
-
-                    {/* Footer with dates */}
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground/70">
-                      {exp.fields['Launch Date'] && (
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>Launch: {String(exp.fields['Launch Date'])}</span>
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-foreground">{exp.fields['Test Description']}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-[12px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span
+                          className={cn(
+                            'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border',
+                            getStatusStyle(status)
+                          )}
+                        >
+                          {status}
+                        </span>
+                      </div>
+                      {exp.fields['Hypothesis'] && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">Hypothesis:</span>
+                          <span className="text-foreground line-clamp-1">{String(exp.fields['Hypothesis'] || '')}</span>
                         </div>
                       )}
+                      {exp.fields['Rationale'] && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">Rationale:</span>
+                          <span className="text-foreground line-clamp-1">{String(exp.fields['Rationale'] || '')}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">Launch Date:</span>
+                        <span className="text-foreground font-medium">{exp.fields['Launch Date']}</span>
+                      </div>
                       {exp.fields['End Date'] && (
-                        <span className="text-right">End: {String(exp.fields['End Date'])}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">End Date:</span>
+                          <span className="text-foreground font-medium">{String(exp.fields['End Date'])}</span>
+                        </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>

@@ -1,6 +1,7 @@
 "use client"
 
-import { Fragment, useState, useMemo, useEffect, useRef } from "react"
+import { Fragment, useState, useMemo } from "react"
+import { useAirtable } from "@/hooks/use-airtable"
 import {
   ChevronDown,
   ChevronRight,
@@ -295,15 +296,80 @@ const trackerStats = [
 /* ── Component ── */
 export function ClientExperimentsOverview() {
   const { user } = useUser()
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(0)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("All Statuses")
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(0)
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  
-  // Client view - no admin actions needed
   const [selectedBatches, setSelectedBatches] = useState<Set<number>>(new Set())
+
+  // Fetch batches for this client
+  const { data: rawBatches } = useAirtable('batches', {
+    fields: ['Batch Key', 'Brand Name', 'Launch Date', 'Finish Date', 'All Tests Status', 'Linked Test Names', 'Revenue Added (MRR)'],
+    filterByFormula: user?.role === 'client' ? `{Brand Name} = "${user.name}"` : undefined,
+    sort: [{ field: 'Launch Date', direction: 'desc' }],
+  })
+
+  // Fetch all experiments
+  const { data: rawExperiments } = useAirtable('experiments', {
+    fields: [
+      'Test Description', 'Test Status', 'Batch', 'Brand Name', 'Placement', 'Placement URL',
+      'Devices', 'GEOs', 'Variants', 'Revenue Added (MRR)', 'Launch Date', 'End Date'
+    ],
+  })
+
+  const batches = useMemo(() => {
+    if (!rawBatches) return []
+    
+    return rawBatches.map(batchRecord => {
+      const batchKey = String(batchRecord.fields['Batch Key'] ?? '')
+      const client = Array.isArray(batchRecord.fields['Brand Name'])
+        ? String(batchRecord.fields['Brand Name'][0] ?? '')
+        : String(batchRecord.fields['Brand Name'] ?? '')
+      const launchDate = batchRecord.fields['Launch Date']
+        ? new Date(String(batchRecord.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : ''
+      const finishDate = batchRecord.fields['Finish Date']
+        ? new Date(String(batchRecord.fields['Finish Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : ''
+      const status = String(batchRecord.fields['All Tests Status'] ?? 'Pending')
+      const linkedTests = Array.isArray(batchRecord.fields['Linked Test Names']) ? batchRecord.fields['Linked Test Names'] : []
+      
+      // Find experiments linked to this batch
+      const batchExperiments = (rawExperiments ?? [])
+        .filter(exp => {
+          const expBatches = exp.fields['Batch']
+          if (Array.isArray(expBatches)) {
+            return expBatches.includes(batchKey)
+          }
+          return String(expBatches ?? '') === batchKey
+        })
+        .map(exp => ({
+          id: exp.id,
+          name: String(exp.fields['Test Description'] ?? ''),
+          description: '',
+          status: String(exp.fields['Test Status'] ?? 'Pending'),
+          placement: String(exp.fields['Placement'] ?? ''),
+          placementUrl: exp.fields['Placement URL'] ? String(exp.fields['Placement URL']) : undefined,
+          devices: String(exp.fields['Devices'] ?? ''),
+          geos: String(exp.fields['GEOs'] ?? ''),
+          variants: String(exp.fields['Variants'] ?? '-'),
+          revenue: exp.fields['Revenue Added (MRR)'] ? String(exp.fields['Revenue Added (MRR)']) : '-',
+        }))
+
+      return {
+        id: batchRecord.id,
+        client,
+        launchDate,
+        finishDate,
+        status,
+        tests: linkedTests.length,
+        revenueImpact: '$0',
+        experiments: batchExperiments,
+      }
+    })
+  }, [rawBatches, rawExperiments])
 
   const toggleSelectAll = () => {
     if (allFilteredSelected) {
@@ -321,7 +387,8 @@ export function ClientExperimentsOverview() {
     })
   }
 
-  const exportCSV = () => {
+  const allStatuses = useMemo(() => ['All Statuses', 'Pending', 'In Progress', 'Live', 'Completed'], [])
+  const allFilteredSelected = batches.length > 0 && filtered.every((_, i) => selectedBatches.has(i))
     const selected = filtered.filter((_, i) => selectedBatches.has(i))
     if (selected.length === 0) return
 

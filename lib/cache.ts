@@ -27,6 +27,16 @@ export const TTL = {
   auth: 60 * 30,    // Auth lookups — 30 min
 } as const
 
+// ─── Permission-to-Resource Mapping ───────────────────────────────────────────
+// Used for permission-aware cache invalidation
+const PERMISSION_RESOURCE_MAP: Record<string, string[]> = {
+  'finances': ['revenue', 'expenses', 'pnl'],
+  'sales': ['accounts', 'contacts', 'clients', 'leads'],
+  'experiments': ['experiments', 'tests', 'variants'],
+  'team': ['team-members', 'documents', 'projects'],
+  'affiliates': ['affiliates', 'partnerships'],
+}
+
 // ─── getOrSet ─────────────────────────────────────────────────────────────────
 // The main cache primitive. Checks cache first, falls back to fetcher, stores result.
 export async function getOrSet<T>(
@@ -76,8 +86,35 @@ export async function invalidatePattern(pattern: string): Promise<void> {
   } while (cursor !== 0)
 }
 
+// ─── invalidateByPermission ───────────────────────────────────────────────────
+// Invalidate all cache keys related to a permission group
+// Usage: When user permissions change, call this to clear affected caches
+export async function invalidateByPermission(permission: string): Promise<void> {
+  const resources = PERMISSION_RESOURCE_MAP[permission]
+  
+  if (!resources) {
+    console.warn(`[cache] Unknown permission: ${permission}`)
+    return
+  }
+
+  // Invalidate all patterns for this permission's resources
+  const patterns = resources.map(r => `${r}:*`)
+  
+  for (const pattern of patterns) {
+    await invalidatePattern(pattern)
+  }
+
+  console.log(`[cache] Invalidated ${patterns.length} patterns for permission: ${permission}`)
+}
+
+// ─── invalidateByResource ────────────────────────────────────────────────────
+// Invalidate all caches for a specific resource across all roles and users
+export async function invalidateByResource(resource: string): Promise<void> {
+  await invalidatePattern(`${resource}:*`)
+}
+
 // ─── Cache key builders ───────────────────────────────────────────────────────
-// Consistent key format: resource:role:entityId
+// Consistent key format: resource:role:entityId:extras
 export function cacheKey(
   resource: string,
   role: string,

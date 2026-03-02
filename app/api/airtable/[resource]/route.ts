@@ -24,11 +24,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { listRecords, AirtableError } from '@/lib/airtable'
+import { listRecords, AirtableError, createRecord } from '@/lib/airtable'
 import { buildRoleFilter, extractQueryContext } from '@/lib/role-filter'
 import { getOrSet, cacheKey, invalidatePattern, TTL } from '@/lib/cache'
 import { TABLE_NAMES } from '@/lib/types'
 import type { ResourceSlug } from '@/lib/types'
+import { broadcastMutation } from '@/lib/websocket-server'
 
 export async function GET(
   request: NextRequest,
@@ -150,11 +151,14 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { createRecord } = await import('@/lib/airtable')
-    const record = await createRecord(tableName, body.fields ?? body)
+    const { createRecord: createRecordFn } = await import('@/lib/airtable')
+    const record = await createRecordFn(tableName, body.fields ?? body)
 
     // Invalidate cache for this resource
     await invalidatePattern(`${resource}:*`)
+    
+    // Broadcast mutation to all connected users with permission
+    await broadcastMutation(resource, 'create', record.id, record)
 
     return NextResponse.json({ record }, { status: 201 })
 

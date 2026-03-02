@@ -9,6 +9,7 @@ import { extractQueryContext } from '@/lib/role-filter'
 import { TABLE_NAMES } from '@/lib/types'
 import type { ResourceSlug } from '@/lib/types'
 import { invalidatePattern } from '@/lib/cache'
+import { broadcastMutation } from '@/lib/websocket-server'
 
 export async function GET(
   request: NextRequest,
@@ -53,6 +54,10 @@ export async function PATCH(
     const record = await updateRecord(tableName, id, body.fields ?? body)
 
     await invalidatePattern(`${resource}:*`)
+    
+    // Broadcast mutation to all connected users with permission
+    await broadcastMutation(resource, 'update', id, record)
+    
     return NextResponse.json({ record })
   } catch (err) {
     if (err instanceof AirtableError) {

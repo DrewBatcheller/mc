@@ -1,10 +1,40 @@
 /**
  * useAirtableMutation — create/update Airtable records with auth headers.
+ * 
+ * Supports optimistic updates with automatic rollback on error.
+ * When you provide onMutate, the cache is updated immediately with optimistic data.
+ * On success, the actual server response is used. On error, cache is rolled back.
  *
  * Usage:
  *   const { mutate, isLoading, error } = useAirtableMutation('leads')
- *   await mutate({ fields: { Email: '...', Stage: 'Open' } })           // POST (create)
- *   await mutate({ fields: { Stage: 'Closed' } }, recordId)             // PATCH (update)
+ *   
+ *   // Without optimistic updates
+ *   await mutate({ fields: { Email: '...', Stage: 'Open' } })
+ *   
+ *   // With optimistic updates and SWR
+ *   const { data, mutate: revalidate } = useSWR('leads', fetcher)
+ *   const { mutate: submitMutation } = useAirtableMutation('leads', {
+ *     onMutate: async (body) => {
+ *       // Save previous data for rollback
+ *       const previousData = data
+ *       
+ *       // Optimistically update cache
+ *       const optimisticData = { ...data, ...body.fields }
+ *       mutate(optimisticData, false)
+ *       
+ *       return { previousData }
+ *     },
+ *     onSuccess: (data) => {
+ *       // Actual server response received, update with real data
+ *       mutate(data, false)
+ *     },
+ *     onError: (error, context) => {
+ *       // Rollback to previous data on error
+ *       if (context?.previousData) {
+ *         mutate(context.previousData, false)
+ *       }
+ *     }
+ *   })
  */
 
 'use client'
@@ -12,9 +42,14 @@
 import { useState, useCallback } from 'react'
 import { useUser } from '@/contexts/UserContext'
 
+interface MutationContext {
+  [key: string]: any
+}
+
 interface MutationOptions {
+  onMutate?: (body: Record<string, unknown>, recordId?: string) => Promise<MutationContext> | MutationContext
   onSuccess?: (data: unknown) => void
-  onError?: (error: Error) => void
+  onError?: (error: Error, context?: MutationContext) => void
 }
 
 export function useAirtableMutation(resource: string, options: MutationOptions = {}) {
@@ -36,13 +71,20 @@ export function useAirtableMutation(resource: string, options: MutationOptions =
     setIsLoading(true)
     setError(null)
 
-    const url = recordId
-      ? `/api/airtable/${resource}/${recordId}`
-      : `/api/airtable/${resource}`
-
-    const method = recordId ? 'PATCH' : 'POST'
+    let mutationContext: MutationContext | undefined
 
     try {
+      // Call onMutate hook to allow optimistic updates
+      if (options.onMutate) {
+        mutationContext = await options.onMutate(body, recordId)
+      }
+
+      const url = recordId
+        ? `/api/airtable/${resource}/${recordId}`
+        : `/api/airtable/${resource}`
+
+      const method = recordId ? 'PATCH' : 'POST'
+
       const res = await fetch(url, {
         method,
         headers: getHeaders(),
@@ -60,7 +102,7 @@ export function useAirtableMutation(resource: string, options: MutationOptions =
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err))
       setError(e)
-      options.onError?.(e)
+      options.onError?.(e, mutationContext)
       throw e
     } finally {
       setIsLoading(false)

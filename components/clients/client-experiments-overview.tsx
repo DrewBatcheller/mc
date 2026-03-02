@@ -24,7 +24,6 @@ interface Experiment {
 interface Batch {
   id: string
   launchDate: string
-  finishDate: string
   status: string
   tests: number
   experiments: Experiment[]
@@ -61,13 +60,13 @@ export function ClientExperimentsOverview() {
 
   // Fetch batches for this client
   const { data: rawBatches } = useAirtable('batches', {
-    fields: ['Batch Key', 'Brand Name', 'Launch Date', 'Finish Date', 'All Tests Status', 'Linked Test Names'],
+    fields: ['Batch Key', 'Brand Name', 'Launch Date', 'All Tests Status', 'Linked Test Names'],
     filterByFormula: user?.role === 'client' ? `{Brand Name} = "${user.name}"` : undefined,
   })
 
   // Fetch experiments
   const { data: rawExperiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Test Status', 'Batch', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Variants', 'Revenue Added (MRR)'],
+    fields: ['Test Description', 'Test Status', 'Batch', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Variants', 'Revenue Added (MRR) (Regular Format)'],
   })
 
   const batches = useMemo(() => {
@@ -75,7 +74,6 @@ export function ClientExperimentsOverview() {
     return rawBatches.map(b => {
       const batchKey = String(b.fields['Batch Key'] ?? '')
       const launchDate = b.fields['Launch Date'] ? new Date(String(b.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
-      const finishDate = b.fields['Finish Date'] ? new Date(String(b.fields['Finish Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
       const status = String(b.fields['All Tests Status'] ?? 'Pending')
       const linkedTests = Array.isArray(b.fields['Linked Test Names']) ? b.fields['Linked Test Names'] : []
       
@@ -94,13 +92,12 @@ export function ClientExperimentsOverview() {
           devices: String(exp.fields['Devices'] ?? ''),
           geos: String(exp.fields['GEOs'] ?? ''),
           variants: String(exp.fields['Variants'] ?? '-'),
-          revenue: String(exp.fields['Revenue Added (MRR)'] ?? '-'),
+          revenue: String(exp.fields['Revenue Added (MRR) (Regular Format)'] ?? '-'),
         }))
 
       return {
         id: b.id,
         launchDate,
-        finishDate,
         status,
         tests: linkedTests.length,
         experiments: batchExperiments,
@@ -147,9 +144,8 @@ export function ClientExperimentsOverview() {
               <tr className="border-b border-border">
                 <th className="w-10 px-3 py-3"><input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="h-3.5 w-3.5 rounded" /></th>
                 <th className="w-10 px-3 py-3" />
-                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Launch Date</th>
-                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Finish Date</th>
-                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Status</th>
+                  <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Launch Date</th>
+                  <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Status</th>
                 <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Tests</th>
               </tr>
             </thead>
@@ -162,13 +158,12 @@ export function ClientExperimentsOverview() {
                       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedBatches.has(i)} onChange={() => toggleBatch(i)} className="h-3.5 w-3.5 rounded" /></td>
                       <td className="px-3 py-3">{isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</td>
                       <td className="px-4 py-3 text-[13px] font-medium">{batch.launchDate}</td>
-                      <td className="px-4 py-3 text-[13px] text-muted-foreground">{batch.finishDate}</td>
                       <td className="px-4 py-3"><span className={cn("text-[12px] font-medium px-2.5 py-1 rounded-md", statusStyles[mapBatchStatus(batch.status)] || "bg-accent")}>{mapBatchStatus(batch.status)}</span></td>
                       <td className="px-4 py-3 text-[13px]">{batch.tests}</td>
                     </tr>
                     {isExpanded && batch.experiments.length > 0 && (
                       <tr>
-                        <td colSpan={6} className="p-0">
+                        <td colSpan={5} className="p-0">
                           <div className="bg-accent/10 border-b border-border">
                             <table className="w-full text-[12px]">
                               <thead>

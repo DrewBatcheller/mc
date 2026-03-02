@@ -168,25 +168,14 @@ export async function POST(
     const body = await request.json()
     let fields = body.fields ?? body
 
-    console.log(`[API] POST /airtable/${resource}`, { 
-      role: ctx.role, 
-      userId: ctx.userId, 
-      clientId: ctx.clientId,
-      fieldsCount: Object.keys(fields).length,
-      fieldNames: Object.keys(fields)
-    })
-
     // For clients creating experiment ideas, enforce client data isolation
     if (resource === 'experiment-ideas' && ctx.role === 'client' && ctx.clientId) {
-      console.log(`[API] Setting Client field to ${ctx.clientId} for client role`)
+      // Client can only create ideas for their own client record
       fields['Client'] = ctx.clientId
     }
 
-    console.log(`[API] Creating record in ${tableName}`)
     const { createRecord: createRecordFn } = await import('@/lib/airtable')
     const record = await createRecordFn(tableName, fields)
-    
-    console.log(`[API] Record created successfully with ID: ${record.id}`)
 
     // Invalidate cache for this resource
     await invalidatePattern(`${resource}:*`)

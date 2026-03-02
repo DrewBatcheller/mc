@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import { SelectField } from '@/components/shared/select-field'
 import { useToast } from '@/hooks/use-toast'
 import { useUser } from '@/contexts/UserContext'
-import { logger } from '@/lib/logger'
 
 interface NewIdeaModalProps {
   isOpen: boolean
@@ -72,10 +71,8 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    logger.info('Form submit initiated', { clientId, formDataTitle: formData.title })
     
     if (!formData.title || !formData.placementLabel || !formData.placementUrl || !formData.hypothesis || !formData.rationale || formData.primaryGoals.length === 0 || !formData.weighting || !formData.designBrief) {
-      logger.warn('Validation failed - missing required fields')
       toast({ title: 'Missing required fields', description: 'Please fill in all required fields', variant: 'destructive' })
       return
     }
@@ -99,8 +96,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Walkthrough Video URL': normalizeUrl(formData.walkthroughUrl) || '',
       }
 
-      logger.debug('Posting to Airtable', { airtableFields })
-
       const response = await fetch('/api/airtable/experiment-ideas', {
         method: 'POST',
         headers: {
@@ -112,16 +107,12 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         body: JSON.stringify({ fields: airtableFields }),
       })
 
-      logger.info('API response received', { status: response.status, ok: response.ok })
-
       if (!response.ok) {
         const error = await response.json()
-        logger.error('API error response', error)
         throw new Error(error.error || 'Failed to create idea')
       }
 
       const result = await response.json()
-      logger.info('Test idea created successfully', { recordId: result.id })
       toast({ title: 'Success', description: 'Test idea created successfully' })
       
       setFormData({
@@ -132,7 +123,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
       onSuccess?.()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create idea'
-      logger.error('Submit error', { message, error: err })
       toast({ title: 'Error', description: message, variant: 'destructive' })
     } finally {
       setIsSubmitting(false)

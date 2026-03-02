@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { UserContextProvider } from '@/contexts/UserContext'
-import { DebugPanel } from '@/components/debug/debug-panel'
 
 import './globals.css'
 
@@ -29,7 +28,6 @@ export default function RootLayout({
       <body className="font-sans">
         <UserContextProvider>
           {children}
-          <DebugPanel />
         </UserContextProvider>
       </body>
     </html>

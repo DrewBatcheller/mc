@@ -237,8 +237,6 @@ export function ClientExperimentsOverview() {
     URL.revokeObjectURL(url)
   }
   
-  const launchMenuRef = useRef<HTMLDivElement>(null)
-
   const filtered = useMemo(() => {
     let result = [...batches]
     if (search) {
@@ -272,20 +270,6 @@ export function ClientExperimentsOverview() {
       { label: "Successful", value: String(successful), icon: CheckCircle2 },
     ]
   }, [batches])
-
-  // Close launch menu dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (launchMenuRef.current && !launchMenuRef.current.contains(event.target as Node)) {
-        setLaunchMenuOpen(false)
-      }
-    }
-    
-    if (launchMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [launchMenuOpen])
 
   return (
     <div className="flex flex-col gap-4">
@@ -474,8 +458,6 @@ export function ClientExperimentsOverview() {
           </table>
         </div>
       </div>
-      
-      {/* Experiment Details Modal */}
     </div>
   )
 }

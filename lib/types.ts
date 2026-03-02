@@ -1,3 +1,5 @@
+import type { UserPermissions } from './permission-types'
+
 // ─── User Roles ──────────────────────────────────────────────────────────────
 // Derived from Permissions table: Management, Strategy, Sales, Team, Client
 export type UserRole = 'management' | 'strategy' | 'sales' | 'team' | 'client'
@@ -11,6 +13,7 @@ export interface AuthUser {
   department?: string  // Team members: "Management", "Strategy", etc.
   clientId?: string    // Set when role === 'client'
   avatarInitials?: string
+  permissions?: UserPermissions  // Fetched from Airtable Permissions table
 }
 
 // ─── Stored Session ───────────────────────────────────────────────────────────

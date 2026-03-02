@@ -11,7 +11,7 @@ export function ClientUpcomingExperiments() {
   const [selectedExperiment, setSelectedExperiment] = useState<any>(null)
   
   const { data: experiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Test Status', 'Launch Date', 'End Date', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Revenue Added (MRR) (Regular Format)', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)', 'Category Primary Goals', 'Batch (Linked)', 'Record ID (from Brand Name)'],
+    fields: ['Test Description', 'Test Status', 'Launch Date', 'End Date', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Revenue Added (MRR) (Regular Format)', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)', 'Category Primary Goals', 'Record ID (from Brand Name)'],
   })
 
   const upcomingExperiments = useMemo(() => {

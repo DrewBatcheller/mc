@@ -292,7 +292,6 @@ export function ClientExperimentsOverview() {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(0)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("All Statuses")
-  const [clientFilter, setClientFilter] = useState("All Clients")
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -405,10 +404,9 @@ export function ClientExperimentsOverview() {
           b.experiments.some((e) => e.name.toLowerCase().includes(q))
       )
     }
-    if (statusFilter !== "All Statuses") result = result.filter((b) => mapBatchStatus(b.status) === statusFilter)
-    if (clientFilter !== "All Clients") result = result.filter((b) => b.client === clientFilter)
+      if (statusFilter !== "All Statuses") result = result.filter((b) => mapBatchStatus(b.status) === statusFilter)
     return result
-  }, [search, statusFilter, clientFilter])
+    }, [search, statusFilter])
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((_, i) => selectedBatches.has(i))
 
@@ -449,7 +447,6 @@ export function ClientExperimentsOverview() {
         <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 border-b border-border">
           <div className="flex items-center gap-2">
             <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
-            <SelectField value={clientFilter} onChange={setClientFilter} options={allClients} />
           </div>
           <div className="relative flex-1 w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />

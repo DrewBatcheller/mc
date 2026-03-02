@@ -15,26 +15,47 @@ export function ClientUpcomingExperiments() {
   })
 
   const upcomingExperiments = useMemo(() => {
-    if (!experiments) return []
+    if (!experiments) {
+      console.log("[v0] No experiments data received")
+      return []
+    }
+    console.log("[v0] Total experiments fetched:", experiments.length)
+    console.log("[v0] Sample experiments:", experiments.slice(0, 3).map(e => ({
+      name: e.fields['Test Description'],
+      status: e.fields['Test Status'],
+      launch: e.fields['Launch Date'],
+      end: e.fields['End Date']
+    })))
+    
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
-    return experiments
-      .filter(e => {
-        const status = String(e.fields['Test Status'] || '')
-        const launchDate = e.fields['Launch Date'] ? new Date(String(e.fields['Launch Date'])) : null
-        
-        if (launchDate) {
-          launchDate.setHours(0, 0, 0, 0)
-        }
-        
-        const isPending = status === 'Pending'
-        const isInProgress = status.includes('In Progress')
-        const hasFutureLaunchDate = launchDate && launchDate > today
-        
-        return isPending || isInProgress || hasFutureLaunchDate
-      })
-      .slice(0, 5)
+    const filtered = experiments.filter(e => {
+      const status = String(e.fields['Test Status'] || '')
+      const launchDate = e.fields['Launch Date'] ? new Date(String(e.fields['Launch Date'])) : null
+      const endDate = e.fields['End Date'] ? new Date(String(e.fields['End Date'])) : null
+      
+      if (launchDate) {
+        launchDate.setHours(0, 0, 0, 0)
+      }
+      if (endDate) {
+        endDate.setHours(0, 0, 0, 0)
+      }
+      
+      // Include: Pending, In Progress (any variant), or tests that haven't reached final status yet
+      const isPending = status === 'Pending'
+      const isInProgress = status.includes('In Progress')
+      const isLiveOrCollecting = status.includes('Live')
+      const hasFutureLaunchDate = launchDate && launchDate > today
+      const isFinalStatus = ['Successful', 'Unsuccessful', 'Inconclusive'].includes(status)
+      
+      // Upcoming = Pending OR In Progress OR Live (actively collecting) OR future launch OR not yet completed
+      const isUpcoming = isPending || isInProgress || isLiveOrCollecting || hasFutureLaunchDate || !isFinalStatus
+      return isUpcoming
+    })
+    
+    console.log("[v0] Filtered upcoming experiments:", filtered.length)
+    return filtered.slice(0, 5)
   }, [experiments])
 
   function getImageUrl(field: any): string | undefined {

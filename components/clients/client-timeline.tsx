@@ -54,15 +54,14 @@ export function ClientTimeline() {
 
   const phases = useMemo(() => {
     if (!tasks) return []
-    console.log("[v0] Timeline tasks data:", tasks)
     return tasks
       .filter(t => t.fields['Start Date'] && t.fields['Due Date'])
       .map(t => ({
         label: String(t.fields['Client Facing Name'] || 'Task'),
         startDate: String(t.fields['Start Date']),
         endDate: String(t.fields['Due Date']),
-        color: phaseStyles[String(t.fields['Status'] || 'Strategy Submitted')]?.bg || 'bg-gray-100',
-        textColor: phaseStyles[String(t.fields['Status'] || 'Strategy Submitted')]?.text || 'text-gray-700',
+        color: phaseStyles[String(t.fields['Client Facing Name'] || 'Strategy Submitted')]?.bg || 'bg-gray-100',
+        textColor: phaseStyles[String(t.fields['Client Facing Name'] || 'Strategy Submitted')]?.text || 'text-gray-700',
       }))
   }, [tasks])
 

@@ -43,6 +43,8 @@ export function ClientIdeasTable() {
   const { user } = useUser()
   const { data: rawIdeas, mutate } = useAirtable('experiment-ideas', {
     fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Primary Goals', 'Priority'],
+    // Add client filter if user is logged in with a client role
+    filterByFormula: user?.role === 'client' ? `{Client} = "${user.name}"` : undefined,
   })
   const { toast } = useToast()
 

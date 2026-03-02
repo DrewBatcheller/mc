@@ -21,12 +21,29 @@ export function ClientDashboardStats() {
     }
 
     const totalExperiments = experiments.length
-    const liveExperiments = experiments.filter(e => {
-      const status = String(e.fields['Test Status'] || '')
-      return status.includes('Live') || status === 'Live - Collecting Data'
-    }).length
     
-    // Scheduled experiments are those with 'Pending' or 'Scheduled' status  
+    // Live/In Progress experiments - find the active batch status
+    let liveExperiments = 0
+    let liveStatus = 'No Active Tests'
+    const activeStatuses = experiments.filter(e => {
+      const status = String(e.fields['Test Status'] || '')
+      return status.includes('In Progress') || status.includes('Live')
+    })
+    
+    if (activeStatuses.length > 0) {
+      liveExperiments = activeStatuses.length
+      // Get the most common/current status
+      const statusCounts: Record<string, number> = {}
+      activeStatuses.forEach(e => {
+        const status = String(e.fields['Test Status'] || '')
+        statusCounts[status] = (statusCounts[status] || 0) + 1
+      })
+      const mostCommonStatus = Object.entries(statusCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
+      if (mostCommonStatus) {
+        liveStatus = mostCommonStatus
+      }
+    }
+    
     const scheduledExperiments = experiments.filter(e => {
       const status = String(e.fields['Test Status'] || '')
       return status === 'Pending' || status === 'Scheduled'
@@ -55,6 +72,7 @@ export function ClientDashboardStats() {
       totalExperiments,
       scheduledExperiments,
       liveExperiments,
+      liveStatus,
       unsuccessfulExperiments,
       successfulExperiments,
       totalRevenueAdded,
@@ -75,9 +93,9 @@ export function ClientDashboardStats() {
       className: 'border-l-[3px] border-l-emerald-400',
     },
     {
-      label: 'Live Experiments',
+      label: stats.liveStatus,
       value: String(stats.liveExperiments),
-      sub: 'Tests currently active and collecting data on the site.',
+      sub: stats.liveStatus === 'No Active Tests' ? 'No tests currently active.' : 'Tests actively collecting data or in development pipeline.',
       className: 'border-l-[3px] border-l-emerald-400',
     },
   ]

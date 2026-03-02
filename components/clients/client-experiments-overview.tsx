@@ -95,7 +95,10 @@ export function ClientExperimentsOverview() {
     const totalBatches = batches.length
     const totalTests = batches.reduce((sum, b) => sum + b.tests, 0)
     const liveNow = batches.filter(b => mapBatchStatus(b.status) === "Live").length
-    const successful = batches.filter(b => b.status?.toLowerCase().includes('successful')).length
+    const successful = batches.filter(b => {
+      const statusStr = Array.isArray(b.status) ? b.status.join('').toLowerCase() : String(b.status || '').toLowerCase()
+      return statusStr.includes('successful')
+    }).length
     
     return [
       { label: "Total Batches", value: String(totalBatches), icon: Layers },

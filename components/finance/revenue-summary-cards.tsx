@@ -75,14 +75,23 @@ export function TopClientsByRevenue({ dateRange = "All Time" }: { dateRange?: st
 
 export function RevenueByCategoryList({ dateRange = "All Time" }: { dateRange?: string }) {
   const { data: rawRevenue } = useAirtable('revenue', {
-    fields: ['Amount USD', 'Category'],
+    fields: ['Amount USD', 'Category (from Category)'],
   })
 
   const categoryTotals = useMemo(() => {
     if (!rawRevenue) return []
     const totals: Record<string, number> = {}
     for (const r of rawRevenue) {
-      const cat = String(r.fields['Category'] ?? 'Other')
+      // Handle linked field - could be array or string
+      let catValue = r.fields['Category (from Category)']
+      let cat = 'Other'
+      
+      if (Array.isArray(catValue)) {
+        cat = String(catValue[0] ?? 'Other')
+      } else if (catValue) {
+        cat = String(catValue)
+      }
+      
       totals[cat] = (totals[cat] ?? 0) + parseCurrency(r.fields['Amount USD'] as string)
     }
     return Object.entries(totals)

@@ -120,6 +120,8 @@ const batches: Batch[] = useMemo(() => {
     }
   })
 }, [batchesData, experimentsData, user])
+
+const statusStyles: Record<string, string> = {
   "In Progress": "bg-sky-50 text-sky-700",
   Live: "bg-emerald-50 text-emerald-700",
   Mixed: "bg-amber-50 text-amber-700",

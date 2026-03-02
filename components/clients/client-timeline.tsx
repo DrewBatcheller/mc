@@ -54,6 +54,7 @@ export function ClientTimeline() {
 
   const phases = useMemo(() => {
     if (!tasks) return []
+    console.log("[v0] Timeline tasks data:", tasks)
     return tasks
       .filter(t => t.fields['Start Date'] && t.fields['Due Date'])
       .map(t => ({

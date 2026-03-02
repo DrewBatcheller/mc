@@ -108,7 +108,9 @@ export function buildRoleFilter(
       if (role === 'team' && userId) {
         return eq('Assigned To (Record ID)', userId)
       }
-      if (role === 'client') return null  // clients don't see tasks
+      if (role === 'client' && clientId) {
+        return eq('Record ID (from Client)', clientId)
+      }
       return null
     }
 

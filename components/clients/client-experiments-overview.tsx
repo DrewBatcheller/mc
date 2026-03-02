@@ -69,8 +69,13 @@ export function ClientExperimentsOverview() {
   const batches: Batch[] = useMemo(() => {
     if (!batchesData) return []
     return batchesData.map(batch => {
-      const linkedTests = (batch.fields['Linked Test Names'] as string) || ''
-      const testCount = linkedTests ? linkedTests.split(',').length : 0
+      const linkedTests = batch.fields['Linked Test Names']
+      // Handle both array and string types from Airtable
+      const testCount = Array.isArray(linkedTests) 
+        ? linkedTests.length 
+        : typeof linkedTests === 'string' && linkedTests
+        ? linkedTests.split(',').length
+        : 0
       
       return {
         id: batch.id,

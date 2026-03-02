@@ -309,7 +309,6 @@ export function ClientIdeasTable() {
           </table>
         </div>
       </div>
-    </div>
 
       <NewIdeaModal
         isOpen={isModalOpen}
@@ -332,12 +331,6 @@ export function ClientIdeasTable() {
     </>
   )
 }
-
-  return (
-    <>
-      <div className="flex flex-col gap-4">
-        {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
           <div className="flex-1 relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input

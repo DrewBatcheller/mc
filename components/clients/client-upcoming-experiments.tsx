@@ -23,7 +23,7 @@ function getCardBorder(status: string): string {
   return 'border-l-gray-400'
 }
 
-export function ClientUpcomingExperiments() {
+export function ClientUpcomingLiveExperiments() {
   const [selectedExperiment, setSelectedExperiment] = useState<any>(null)
   
   const { data: experiments } = useAirtable('experiments', {
@@ -102,7 +102,7 @@ export function ClientUpcomingExperiments() {
 
   return (
     <>
-      <ContentCard title="Upcoming Experiments">
+      <ContentCard title="Upcoming & Live Experiments">
         <div className="flex flex-col">
           {upcomingExperiments.length === 0 ? (
             <div className="px-5 py-10 flex flex-col items-center justify-center gap-3">

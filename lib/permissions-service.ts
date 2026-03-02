@@ -54,12 +54,21 @@ async function lookupPermissionsByView(viewName: string): Promise<UserPermission
   try {
     const records = await listAllRecords<AirtablePermissionsRow>(PERMISSIONS_TABLE)
     
+    console.log(`[v0] Fetched ${records.length} records from Permissions table`)
+    console.log(`[v0] Looking for view: "${viewName}"`)
+    console.log(`[v0] Available views:`, records.map(r => ({ view: r.fields['View'], id: r.id })))
+    
     const record = records.find(r => {
       const view = (r.fields)['View']
-      return view?.toLowerCase() === viewName.toLowerCase()
+      const matches = view?.toLowerCase() === viewName.toLowerCase()
+      console.log(`[v0] Comparing "${view}" (type: ${typeof view}) with "${viewName}" (type: ${typeof viewName}) => ${matches}`)
+      return matches
     })
     
-    if (!record) return null
+    if (!record) {
+      console.log(`[v0] No record found for view "${viewName}"`)
+      return null
+    }
     
     const fields = record.fields
     

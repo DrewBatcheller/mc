@@ -45,7 +45,7 @@ export function ClientIdeasTable() {
     fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Primary Goals', 'Priority'],
   })
   const { toast } = useToast()
-  
+
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("testDescription")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
@@ -89,8 +89,6 @@ export function ClientIdeasTable() {
   }
 
   const handleCreateIdea = async () => {
-    // This is called when the modal closes successfully
-    // Invalidate the SWR cache to refetch fresh data
     await mutate()
   }
 
@@ -142,171 +140,170 @@ export function ClientIdeasTable() {
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-border">
-                {columns.map((col, i) => (
-                  <th
-                    key={i}
-                    className={cn(
-                      "px-4 py-3 text-[12px] font-medium text-muted-foreground whitespace-nowrap text-left",
-                      i === 0 && "w-10 px-0 pl-4"
-                    )}
-                  >
-                    {col.key ? (
-                      <button
-                        onClick={() => handleSort(col.key!)}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors group"
-                      >
-                        {col.label}
-                        <ArrowUpDown
-                          className={cn(
-                            "h-3 w-3 transition-colors",
-                            sortKey === col.key
-                              ? "text-foreground"
-                              : "text-muted-foreground/30 group-hover:text-muted-foreground"
-                          )}
-                        />
-                      </button>
-                    ) : (
-                      col.label
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((idea) => {
-                const isExpanded = expandedRows.has(idea._idx)
-                return (
-                  <Fragment key={idea.id || `pending-${idea._idx}`}>
-                    {/* Main row */}
-                    <tr
-                      onClick={() => toggleRow(idea._idx)}
+              <thead>
+                <tr className="border-b border-border">
+                  {columns.map((col, i) => (
+                    <th
+                      key={i}
                       className={cn(
-                        "border-b border-border last:border-b-0 cursor-pointer transition-colors",
-                        idea.isPending ? "bg-amber-50/50 hover:bg-amber-50/70" : "hover:bg-accent/30"
+                        "px-4 py-3 text-[12px] font-medium text-muted-foreground whitespace-nowrap text-left",
+                        i === 0 && "w-10 px-0 pl-4"
                       )}
                     >
-                      <td className="w-10 px-0 pl-4 py-3.5 align-middle">
-                        {idea.isPending ? (
-                          <Loader className="h-4 w-4 text-amber-600 animate-spin" />
-                        ) : (
-                          <ChevronDown
+                      {col.key ? (
+                        <button
+                          onClick={() => handleSort(col.key!)}
+                          className="inline-flex items-center gap-1 hover:text-foreground transition-colors group"
+                        >
+                          {col.label}
+                          <ArrowUpDown
                             className={cn(
-                              "h-4 w-4 text-muted-foreground transition-transform",
-                              isExpanded && "rotate-180"
+                              "h-3 w-3 transition-colors",
+                              sortKey === col.key
+                                ? "text-foreground"
+                                : "text-muted-foreground/30 group-hover:text-muted-foreground"
                             )}
                           />
+                        </button>
+                      ) : (
+                        col.label
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((idea) => {
+                  const isExpanded = expandedRows.has(idea._idx)
+                  return (
+                    <Fragment key={idea.id || `pending-${idea._idx}`}>
+                      <tr
+                        onClick={() => toggleRow(idea._idx)}
+                        className={cn(
+                          "border-b border-border last:border-b-0 cursor-pointer transition-colors",
+                          idea.isPending ? "bg-amber-50/50 hover:bg-amber-50/70" : "hover:bg-accent/30"
                         )}
-                      </td>
-                      <td className="px-4 py-3.5 text-[13px] font-medium text-foreground align-middle max-w-[260px]">
-                        <div className="flex items-center gap-2">
-                          <span className="block truncate">{idea.testDescription}</span>
-                          {idea.isPending && (
-                            <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
-                              Pending
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-[13px] text-foreground whitespace-nowrap align-middle">
-                        {idea.placement}
-                      </td>
-                      <td className="px-4 py-3.5 align-middle">
-                        <div className="flex flex-wrap gap-1">
-                          {idea.primaryGoals.map((g) => (
-                            <span
-                              key={g}
+                      >
+                        <td className="w-10 px-0 pl-4 py-3.5 align-middle">
+                          {idea.isPending ? (
+                            <Loader className="h-4 w-4 text-amber-600 animate-spin" />
+                          ) : (
+                            <ChevronDown
                               className={cn(
-                                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border",
-                                goalColors[g] ?? "bg-accent text-foreground border-border"
+                                "h-4 w-4 text-muted-foreground transition-transform",
+                                isExpanded && "rotate-180"
                               )}
-                            >
-                              {g}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 align-middle">
-                        {idea.priority ? (
-                          <div className="flex items-center gap-0.5">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <div
-                                key={i}
+                            />
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-[13px] font-medium text-foreground align-middle max-w-[260px]">
+                          <div className="flex items-center gap-2">
+                            <span className="block truncate">{idea.testDescription}</span>
+                            {idea.isPending && (
+                              <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
+                                Pending
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-[13px] text-foreground whitespace-nowrap align-middle">
+                          {idea.placement}
+                        </td>
+                        <td className="px-4 py-3.5 align-middle">
+                          <div className="flex flex-wrap gap-1">
+                            {idea.primaryGoals.map((g) => (
+                              <span
+                                key={g}
                                 className={cn(
-                                  "h-2 w-4 rounded-sm",
-                                  i < Number(idea.priority)
-                                    ? Number(idea.priority) >= 4
-                                      ? "bg-emerald-500"
-                                      : Number(idea.priority) >= 3
-                                        ? "bg-amber-400"
-                                        : "bg-rose-400"
-                                    : "bg-muted"
+                                  "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border",
+                                  goalColors[g] ?? "bg-accent text-foreground border-border"
                                 )}
-                              />
-                            ))}
-                            <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">{idea.priority}/5</span>
-                          </div>
-                        ) : (
-                          <span className="text-[12px] text-muted-foreground">-</span>
-                        )}
-                      </td>
-                    </tr>
-
-                    {/* Expanded detail panel */}
-                    {isExpanded && (
-                      <tr className="border-b border-border">
-                        <td colSpan={columns.length} className={cn("px-5 py-4", idea.isPending ? "bg-amber-50/30" : "bg-accent/20")}>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl pl-6">
-                            <div className="flex flex-col gap-1.5">
-                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                Hypothesis
-                              </span>
-                              <p className="text-[13px] text-foreground leading-relaxed">
-                                {idea.hypothesis}
-                              </p>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                Rationale
-                              </span>
-                              <p className="text-[13px] text-foreground leading-relaxed">
-                                {idea.rationale}
-                              </p>
-                            </div>
-                          </div>
-                          {idea.placementUrl && (
-                            <div className="mt-4 pl-6 flex items-center gap-1.5">
-                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                URL
-                              </span>
-                              <a
-                                href={idea.placementUrl.startsWith("http") ? idea.placementUrl : `https://${idea.placementUrl}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[12px] text-sky-600 hover:text-sky-700 hover:underline transition-colors inline-flex items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
                               >
-                                {idea.placementUrl}
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
+                                {g}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 align-middle">
+                          {idea.priority ? (
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <div
+                                  key={i}
+                                  className={cn(
+                                    "h-2 w-4 rounded-sm",
+                                    i < Number(idea.priority)
+                                      ? Number(idea.priority) >= 4
+                                        ? "bg-emerald-500"
+                                        : Number(idea.priority) >= 3
+                                          ? "bg-amber-400"
+                                          : "bg-rose-400"
+                                      : "bg-muted"
+                                  )}
+                                />
+                              ))}
+                              <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">{idea.priority}/5</span>
                             </div>
+                          ) : (
+                            <span className="text-[12px] text-muted-foreground">-</span>
                           )}
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                )
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={columns.length} className="px-4 py-10 text-center text-[13px] text-muted-foreground">
-                    No test ideas found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+
+                      {isExpanded && (
+                        <tr className="border-b border-border">
+                          <td colSpan={columns.length} className={cn("px-5 py-4", idea.isPending ? "bg-amber-50/30" : "bg-accent/20")}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl pl-6">
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                  Hypothesis
+                                </span>
+                                <p className="text-[13px] text-foreground leading-relaxed">
+                                  {idea.hypothesis}
+                                </p>
+                              </div>
+                              <div className="flex flex-col gap-1.5">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                  Rationale
+                                </span>
+                                <p className="text-[13px] text-foreground leading-relaxed">
+                                  {idea.rationale}
+                                </p>
+                              </div>
+                            </div>
+                            {idea.placementUrl && (
+                              <div className="mt-4 pl-6 flex items-center gap-1.5">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                  URL
+                                </span>
+                                <a
+                                  href={idea.placementUrl.startsWith("http") ? idea.placementUrl : `https://${idea.placementUrl}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[12px] text-sky-600 hover:text-sky-700 hover:underline transition-colors inline-flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {idea.placementUrl}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={columns.length} className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+                      No test ideas found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

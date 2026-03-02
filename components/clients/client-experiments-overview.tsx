@@ -70,10 +70,8 @@ export function ClientExperimentsOverview() {
   })
   
   const { data: experiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'Revenue Added (MRR) (Regular Format)', 'Batch (Linked)', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Launch Date', 'End Date', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Variants (Link)', 'Variants', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
+    fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'Revenue Added (MRR) (Regular Format)', 'Batch', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Launch Date', 'End Date', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Variants (Link)', 'Variants', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
   })
-
-  console.log('[v0] ClientExperimentsOverview - batches:', batches?.length || 0, 'experiments:', experiments?.length || 0)
 
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
   const [selectedExperiment, setSelectedExperiment] = useState<any>(null)
@@ -83,7 +81,7 @@ export function ClientExperimentsOverview() {
     
     return batches.map(batch => {
       const batchExperiments = experiments.filter(exp => {
-        const linkedBatches = exp.fields['Batch (Linked)'] as string[] | undefined
+        const linkedBatches = exp.fields['Batch'] as string[] | undefined
         return linkedBatches?.includes(batch.id)
       }).map(exp => ({
         id: exp.id,

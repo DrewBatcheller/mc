@@ -76,7 +76,8 @@ export function buildRoleFilter(
         return containsId('Assigned To', userId)
       }
       if (role === 'client' && clientId) {
-        return containsId('Client', clientId)
+        // Check both the new Client field and old Record ID (from Brand Name) field for backward compatibility
+        return `OR(FIND("${clientId}", CONCATENATE({Client})) > 0, {Record ID (from Brand Name)} = "${clientId}")`
       }
       return null
     }

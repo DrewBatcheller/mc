@@ -69,7 +69,7 @@ export async function GET(
 
     // Debug logging
     if (filterByFormula) {
-      console.log(`[/api/airtable] Resource: ${resource}, Role: ${ctx.role}, ClientId: ${ctx.clientId}, Filter formula:`, filterByFormula)
+      console.log(`[/api/airtable] Resource: ${resource}, Filter formula:`, filterByFormula)
     }
 
     // ── Parse additional options from query params ────────────────────────────

@@ -106,6 +106,8 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         },
         body: JSON.stringify({ fields: airtableFields }),
       })
+      
+      console.log('[v0] Fields type check:', typeof airtableFields['Primary Goals'], Array.isArray(airtableFields['Primary Goals']), airtableFields['Primary Goals'])
 
       if (!response.ok) {
         const error = await response.json()

@@ -26,6 +26,7 @@ export interface SectionDefinition {
   icon: string  // Icon name for UI
   label: string  // Display name
   routes: string[]  // Accessible route prefixes (e.g. ['/finances', '/finances/pnl'])
+  isFlat?: boolean  // If true, render as flat list of links instead of expandable section
 }
 
 export interface DynamicNavItem {

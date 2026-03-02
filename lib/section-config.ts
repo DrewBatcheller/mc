@@ -36,18 +36,19 @@ export const SECTION_DEFINITIONS: Record<string, SectionDefinition> = {
     icon: 'KanbanSquare',
     label: 'Client Dashboard',
     routes: ['/clients/client-dashboard', '/clients/client-ideas', '/clients/experiments-overview', '/clients/client-live-tests', '/clients/client-results'],
+    isFlat: true,  // Special flag for flat sidebar rendering
   },
   management: {
     id: 'management',
     icon: 'UserCircle',
     label: 'Management',
-    routes: ['/management', '/management/team-directory', '/management/team-dashboard', '/management/schedule'],
+    routes: ['/management', '/management/team-directory', '/management/team-dashboard'],
   },
   team: {
     id: 'team',
     icon: 'Users',
     label: 'Team',
-    routes: ['/team', '/team/dashboard', '/team/directory'],
+    routes: ['/team', '/team/dashboard', '/team/directory', '/team/team-dashboard'],
   },
   affiliates: {
     id: 'affiliates',

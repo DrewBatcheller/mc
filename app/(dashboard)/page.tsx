@@ -1,9 +1,55 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useUser } from '@/contexts/UserContext'
 import { StatCards } from "@/components/dashboard/stat-cards"
 import { RecentExperiments } from "@/components/dashboard/recent-experiments"
 import { UpcomingTasks } from "@/components/dashboard/upcoming-tasks"
 import { ActivityChart } from "@/components/dashboard/activity-chart"
 
+// Role-specific homescreen routes
+const ROLE_HOMESCREENS: Record<string, string> = {
+  management: '/',        // Show main dashboard
+  strategy: '/',          // Show main dashboard
+  sales: '/sales/overview',
+  team: '/team/team-dashboard',
+  client: '/clients/client-dashboard',
+}
+
 export default function DashboardPage() {
+  const { user, isLoading } = useUser()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isLoading || !user) return
+    
+    // Team members should go to their team dashboard
+    if (user.role === 'team') {
+      router.replace('/team/team-dashboard')
+      return
+    }
+    
+    // Sales should go to sales overview
+    if (user.role === 'sales') {
+      router.replace('/sales/overview')
+      return
+    }
+    
+    // Clients should go to their dashboard
+    if (user.role === 'client') {
+      router.replace('/clients/client-dashboard')
+      return
+    }
+    
+    // Management and Strategy see the main dashboard (this page)
+  }, [user, isLoading, router])
+
+  // Only show dashboard content for management/strategy users
+  if (user?.role === 'team' || user?.role === 'sales' || user?.role === 'client') {
+    return null
+  }
+
   return (
     <>
       <div>

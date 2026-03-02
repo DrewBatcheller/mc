@@ -23,14 +23,19 @@ export function ClientDashboardStats() {
     const totalExperiments = experiments.length
     const liveExperiments = experiments.filter(e => e.fields['Test Status'] === 'Live').length
     const scheduledExperiments = experiments.filter(e => e.fields['Test Status'] === 'Scheduled').length
-    const completedExperiments = experiments.filter(e => e.fields['Test Status'] === 'Completed')
-    const successfulExperiments = completedExperiments.filter(e => {
-      const outcome = e.fields['Outcome'] || e.fields['Test Status']
-      return outcome === 'Successful' || outcome === 'Win'
+    
+    // Successful experiments are those with Test Status of 'Successful' or Outcome field of 'Successful'/'Win'
+    const successfulExperiments = experiments.filter(e => {
+      const testStatus = String(e.fields['Test Status'] || '')
+      const outcome = String(e.fields['Outcome'] || '')
+      return testStatus === 'Successful' || outcome === 'Successful' || outcome === 'Win'
     }).length
+    
+    // Unsuccessful are those with 'Unsuccessful', 'Loss', or 'Inconclusive'
     const unsuccessfulExperiments = experiments.filter(e => {
-      const outcome = e.fields['Outcome'] || e.fields['Test Status']
-      return outcome === 'Unsuccessful' || outcome === 'Loss' || outcome === 'Inconclusive'
+      const testStatus = String(e.fields['Test Status'] || '')
+      const outcome = String(e.fields['Outcome'] || '')
+      return testStatus === 'Unsuccessful' || testStatus === 'Inconclusive' || outcome === 'Unsuccessful' || outcome === 'Loss' || outcome === 'Inconclusive'
     }).length
 
     const totalRevenueAdded = experiments.reduce((sum, exp) => {

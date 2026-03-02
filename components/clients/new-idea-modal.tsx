@@ -81,6 +81,7 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
     try {
       const airtableFields = {
         'Test Description': formData.title,
+        'Client': clientId,
         'Placement': formData.placementLabel,
         'Placement URL': normalizeUrl(formData.placementUrl),
         'Hypothesis': formData.hypothesis,
@@ -93,7 +94,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Development Brief': formData.developmentBrief || '',
         'Media/Links': formData.mediaLinks || '',
         'Walkthrough Video URL': normalizeUrl(formData.walkthroughUrl) || '',
-        'Brand Name': clientId,
       }
 
       const response = await fetch('/api/airtable/experiment-ideas', {

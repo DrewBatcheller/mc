@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useState, useMemo, useRef, useEffect } from "react"
-import { ChevronDown, ChevronRight, Search, Layers, FlaskConical, Zap, CheckCircle2, ExternalLink } from "lucide-react"
+import { ChevronDown, ChevronRight, Search, Layers, FlaskConical, Zap, CheckCircle2, ExternalLink, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
@@ -125,12 +125,64 @@ export function ClientExperimentsOverview() {
 
   const allStatuses = ["All Statuses", "Pending", "In Progress", "Live", "Completed"]
 
+  // Export selected batches to CSV
+  const exportCSV = () => {
+    const selected = filtered.filter((_, i) => selectedBatches.has(i))
+    if (selected.length === 0) return
+
+    const rows: string[][] = []
+    rows.push([
+      "Launch Date", "Finish Date", "Status", "Tests",
+      "Test Name", "Description", "Test Status", "Placement", "Placement URL",
+      "Devices", "GEOs", "Variants", "Revenue"
+    ])
+
+    for (const batch of selected) {
+      if (batch.experiments.length === 0) {
+        rows.push([
+          batch.launchDate, batch.finishDate, mapBatchStatus(batch.status),
+          String(batch.tests),
+          ...Array(9).fill("")
+        ])
+        continue
+      }
+      for (const exp of batch.experiments) {
+        rows.push([
+          batch.launchDate, batch.finishDate, mapBatchStatus(batch.status),
+          String(batch.tests),
+          exp.name, exp.description, exp.status, exp.placement, exp.placementUrl ?? "",
+          exp.devices, exp.geos, exp.variants, exp.revenue,
+        ])
+      }
+    }
+
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `batch-export-${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const filtered = useMemo(() => {
     let result = batches
     if (search) result = result.filter((b) => b.launchDate.toLowerCase().includes(search.toLowerCase()))
     if (statusFilter !== "All Statuses") result = result.filter((b) => mapBatchStatus(b.status) === statusFilter)
     return result
   }, [search, statusFilter, batches])
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((_, i) => selectedBatches.has(i))
+  
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedBatches(new Set())
+    } else {
+      const all = new Set(filtered.map((_, i) => i))
+      setSelectedBatches(all)
+    }
+  }
 
   const stats = useMemo(() => {
     const totalBatches = batches.length
@@ -174,26 +226,43 @@ export function ClientExperimentsOverview() {
       {/* Table with integrated filters */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="border-b border-border p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
+              </div>
+              <div className="relative flex-1 w-full sm:w-auto">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search by date..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full text-[13px] bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
             </div>
-            <div className="relative flex-1 w-full sm:w-auto">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search by date..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-[13px] bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
+            <button
+              onClick={exportCSV}
+              disabled={selectedBatches.size === 0}
+              className="inline-flex items-center gap-1.5 h-9 rounded-lg border border-border hover:bg-accent text-foreground px-3 text-[13px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </button>
           </div>
         </div>
         <table className="w-full">
           <thead className="border-b border-border bg-muted/40">
             <tr>
-              <th className="w-10 px-3 py-3" />
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  onChange={toggleSelectAll}
+                  className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+                />
+              </th>
               <th className="w-10 px-3 py-3" />
               <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Launch Date</th>
               <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Finish Date</th>

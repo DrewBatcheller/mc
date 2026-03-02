@@ -1,3 +1,5 @@
+'use client'
+
 import { FileText, Calendar } from 'lucide-react'
 import { useAirtable } from '@/hooks/use-airtable'
 import { ContentCard } from '@/components/shared/content-card'

@@ -1,20 +1,42 @@
 "use client"
 
-import { Fragment, useState, useMemo } from "react"
+import { Fragment, useState, useMemo, useRef, useEffect } from "react"
 import { ChevronDown, ChevronRight, Search, Layers, FlaskConical, Zap, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
+import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
 import { useUser } from "@/contexts/UserContext"
 import { useAirtable } from "@/hooks/use-airtable"
 
+type Experiment = {
+  id?: string
+  name: string
+  description: string
+  status: string
+  placement: string
+  placementUrl?: string
+  devices: string
+  geos: string
+  variants: string
+  revenue: string
+  hypothesis?: string
+  rationale?: string
+  launchDate?: string
+  endDate?: string
+  deployed?: boolean
+  whatHappened?: string
+  nextSteps?: string
+}
+
 type Batch = {
+  id?: string
   client: string
   launchDate: string
   finishDate: string
   status: string | string[]
   tests: number
   revenueImpact: string
-  experiments: { name: string; status: string }[]
+  experiments: Experiment[]
 }
 
 const statusStyles: Record<string, string> = {
@@ -51,6 +73,9 @@ export function ClientExperimentsOverview() {
   const [statusFilter, setStatusFilter] = useState("All Statuses")
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
   const [selectedBatches, setSelectedBatches] = useState<Set<number>>(new Set())
+  const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const launchMenuRef = useRef<HTMLDivElement>(null)
 
   const batches: Batch[] = useMemo(() => {
     if (!batchesData) return []
@@ -66,11 +91,27 @@ export function ClientExperimentsOverview() {
         const linkedBatches = exp.fields['Batch'] as string[] | undefined
         return linkedBatches?.includes(batch.id)
       }).map(exp => ({
+        id: exp.id,
         name: exp.fields['Test Description'] as string || 'Unnamed Test',
+        description: '',
         status: exp.fields['Test Status'] as string || 'Pending',
+        placement: exp.fields['Placement'] as string || '',
+        placementUrl: exp.fields['Placement URL'] as string,
+        devices: exp.fields['Devices'] as string || 'All Devices',
+        geos: Array.isArray(exp.fields['GEOs']) ? (exp.fields['GEOs'] as string[]).join(', ') : '',
+        variants: '-',
+        revenue: '$0',
+        hypothesis: exp.fields['Hypothesis'] as string,
+        rationale: exp.fields['Rationale'] as string,
+        launchDate: exp.fields['Launch Date'] as string,
+        endDate: exp.fields['End Date'] as string,
+        deployed: exp.fields['Deployed'] as boolean || false,
+        whatHappened: exp.fields['Describe what happened & what we learned'] as string,
+        nextSteps: exp.fields['Next Steps (Action)'] as string,
       }))
       
       return {
+        id: batch.id,
         client: user?.name || 'Unknown Client',
         launchDate: batch.fields['Launch Date'] as string || '',
         finishDate: batch.fields['PTA Due Date'] as string || '',
@@ -132,19 +173,19 @@ export function ClientExperimentsOverview() {
 
       {/* Filters */}
       <div className="bg-card rounded-xl border border-border p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
+          </div>
+          <div className="relative flex-1 w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search by date..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full text-[13px] bg-card border border-border rounded-lg pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
           </div>
         </div>
       </div>
@@ -214,17 +255,30 @@ export function ClientExperimentsOverview() {
                             <tr>
                               <th className="px-4 py-2 text-left font-medium text-xs">Test Name</th>
                               <th className="px-4 py-2 text-left font-medium text-xs">Status</th>
+                              <th className="px-4 py-2 text-left font-medium text-xs">Placement</th>
+                              <th className="px-4 py-2 text-left font-medium text-xs">Devices</th>
+                              <th className="px-4 py-2 text-left font-medium text-xs">GEOs</th>
                             </tr>
                           </thead>
                           <tbody>
                             {batch.experiments.map((exp, ei) => (
-                              <tr key={ei} className="border-b border-border/50 last:border-0 hover:bg-muted/20">
+                              <tr 
+                                key={ei} 
+                                className="border-b border-border/50 last:border-0 hover:bg-accent/20 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  setSelectedExperiment(exp)
+                                  setIsModalOpen(true)
+                                }}
+                              >
                                 <td className="px-4 py-2 text-foreground">{exp.name}</td>
                                 <td className="px-4 py-2">
                                   <span className={cn("text-xs font-medium px-2 py-1 rounded", statusStyles[mapBatchStatus(exp.status)])}>
                                     {mapBatchStatus(exp.status)}
                                   </span>
                                 </td>
+                                <td className="px-4 py-2 text-xs text-muted-foreground">{exp.placement || '-'}</td>
+                                <td className="px-4 py-2 text-xs text-muted-foreground">{exp.devices}</td>
+                                <td className="px-4 py-2 text-xs text-muted-foreground">{exp.geos || '-'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -238,6 +292,13 @@ export function ClientExperimentsOverview() {
           </tbody>
         </table>
       </div>
+
+      {/* Experiment Details Modal */}
+      <ExperimentDetailsModal 
+        isOpen={isModalOpen}
+        experiment={selectedExperiment}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   )
 }

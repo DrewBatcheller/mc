@@ -45,7 +45,7 @@ function parseDate(s: string) {
 
 export function ClientTimeline() {
   const { data: tasks } = useAirtable('tasks', {
-    fields: ['Task', 'Start Date', 'End Date', 'Status'],
+    fields: ['Client Facing Name', 'Start Date', 'Due Date', 'Status'],
   })
 
   const [year, setYear] = useState(2026)
@@ -55,11 +55,11 @@ export function ClientTimeline() {
   const phases = useMemo(() => {
     if (!tasks) return []
     return tasks
-      .filter(t => t.fields['Start Date'] && t.fields['End Date'])
+      .filter(t => t.fields['Start Date'] && t.fields['Due Date'])
       .map(t => ({
-        label: String(t.fields['Task'] || 'Task'),
+        label: String(t.fields['Client Facing Name'] || 'Task'),
         startDate: String(t.fields['Start Date']),
-        endDate: String(t.fields['End Date']),
+        endDate: String(t.fields['Due Date']),
         color: phaseStyles[String(t.fields['Status'] || 'Strategy Submitted')]?.bg || 'bg-gray-100',
         textColor: phaseStyles[String(t.fields['Status'] || 'Strategy Submitted')]?.text || 'text-gray-700',
       }))

@@ -76,7 +76,7 @@ export function buildRoleFilter(
         return containsId('Assigned To', userId)
       }
       if (role === 'client' && clientId) {
-        return eq('Record ID (from Brand Name)', clientId)
+        return containsId('Client', clientId)
       }
       return null
     }

@@ -64,7 +64,7 @@ export function buildRoleFilter(
         )
       }
       if (role === 'client' && clientId) {
-        return eq('Client (Record ID)', clientId)
+        return eq('Record ID (from Brand Name)', clientId)
       }
       return null
     }
@@ -76,7 +76,7 @@ export function buildRoleFilter(
         return containsId('Assigned To', userId)
       }
       if (role === 'client' && clientId) {
-        return eq('Client (Record ID)', clientId)
+        return eq('Record ID (from Brand Name)', clientId)
       }
       return null
     }
@@ -85,7 +85,7 @@ export function buildRoleFilter(
     case 'batches': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'client' && clientId) {
-        return eq('Client (Record ID)', clientId)
+        return eq('Record ID (from Client)', clientId)
       }
       if (role === 'team') return ''  // team sees all batches they work on
       return null
@@ -166,7 +166,7 @@ export function buildRoleFilter(
       return null
     }
 
-    // ── Team ──────────────────────────────────────────────────────────────────
+    // ── Team ──���───────────────────────────────────────────────────────────────
     case 'team': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'team' && userId) {

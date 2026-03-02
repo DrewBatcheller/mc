@@ -62,7 +62,7 @@ function convertResultToExperiment(result: RecentResult): any {
 
 export function ClientRecentResults() {
   const { data: experiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Result', 'Placement', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date'],
+    fields: ['Test Description', 'Test Status', 'Placement', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date'],
   })
   
   const [currentPage, setCurrentPage] = useState(0)
@@ -71,11 +71,11 @@ export function ClientRecentResults() {
   const results = useMemo(() => {
     if (!experiments) return []
     return experiments
-      .filter(e => e.fields['Result'] && ['Successful', 'Unsuccessful', 'Inconclusive'].includes(String(e.fields['Result'])))
+      .filter(e => e.fields['Test Status'] && ['Successful', 'Unsuccessful', 'Inconclusive'].includes(String(e.fields['Test Status'])))
       .map(e => ({
         id: e.id,
         name: String(e.fields['Test Description'] || ''),
-        status: String(e.fields['Result']) as TestStatus,
+        status: String(e.fields['Test Status']) as TestStatus,
         placement: String(e.fields['Placement'] || ''),
         endDate: String(e.fields['End Date'] || ''),
         revenueAdded: typeof e.fields['Revenue Added (MRR) (Regular Format)'] === 'number' ? e.fields['Revenue Added (MRR) (Regular Format)'] : 0,

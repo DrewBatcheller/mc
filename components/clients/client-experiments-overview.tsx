@@ -248,7 +248,7 @@ export function ClientExperimentsOverview() {
                   {/* Nested experiments */}
                   {isExpanded && batch.experiments.length > 0 && (
                     <tr className="bg-muted/5">
-                      <td colSpan={5} className="p-4">
+                      <td colSpan={6} className="p-4">
                         <table className="w-full text-sm">
                           <thead className="bg-muted/50 border-b border-border">
                             <tr>

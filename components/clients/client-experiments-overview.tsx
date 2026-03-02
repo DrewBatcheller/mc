@@ -14,7 +14,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
-import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
 import { useUser } from "@/contexts/UserContext"
 import { useAirtable } from "@/hooks/use-airtable"
 
@@ -153,22 +152,7 @@ export function ClientExperimentsOverview() {
   const allStatuses = ["All Statuses", "Pending", "In Progress", "Live", "Completed"]
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("All Statuses")
-  const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
-  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  
-  // Action modals state
-  const [actionBatch, setActionBatch] = useState<Batch | null>(null)
-  const [launchMenuBatch, setLaunchMenuBatch] = useState<Batch | null>(null)
-  const [launchMenuOpen, setLaunchMenuOpen] = useState(false)
-  const [editingLaunchDate, setEditingLaunchDate] = useState<string>("")
-  const [confirmAction, setConfirmAction] = useState<{ type: string; batch: Batch } | null>(null)
-  const [deleteTestsModal, setDeleteTestsModal] = useState<Batch | null>(null)
-  const [selectBatchModal, setSelectBatchModal] = useState<Batch | null>(null)
-  const [convertExperimentModal, setConvertExperimentModal] = useState<Experiment | null>(null)
-  const [isCreatingNewBatch, setIsCreatingNewBatch] = useState(false)
-  const [newBatchDate, setNewBatchDate] = useState("")
-  const [showThankYou, setShowThankYou] = useState(false)
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(0)
   const [selectedBatches, setSelectedBatches] = useState<Set<number>>(new Set())
 
   const toggleSelectAll = () => {
@@ -436,12 +420,7 @@ export function ClientExperimentsOverview() {
                                 {batch.experiments.map((exp, ei) => (
                                   <tr 
                                     key={ei} 
-                                    className="border-b border-border/40 last:border-0 hover:bg-accent/20 transition-colors cursor-pointer"
-                                    onClick={() => {
-                                      setSelectedExperiment(exp)
-                                      setSelectedBatch(batch)
-                                      setIsModalOpen(true)
-                                    }}
+                                    className="border-b border-border/40 last:border-0 hover:bg-accent/20 transition-colors"
                                   >
                                     <td className="px-6 py-3 pl-14">
                                       <div className="flex flex-col gap-0.5">
@@ -497,75 +476,9 @@ export function ClientExperimentsOverview() {
       </div>
       
       {/* Experiment Details Modal */}
-      <ExperimentDetailsModal 
-        isOpen={isModalOpen}
-        experiment={selectedExperiment}
-        batchKey={selectedBatch ? `${selectedBatch.client} | ${selectedBatch.launchDate}` : undefined}
-        onClose={() => setIsModalOpen(false)}
-      />
-
-      {/* Edit Launch Date Modal */}
-      {actionBatch && !confirmAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-background rounded-lg border border-border p-6 max-w-sm shadow-lg">
-            <h3 className="text-base font-semibold text-foreground mb-3">Edit Launch Date</h3>
-            <p className="text-[13px] text-muted-foreground mb-4">Batch: <span className="font-medium text-foreground">{actionBatch.client}</span></p>
-            <input
-              type="date"
-              value={editingLaunchDate}
-              onChange={(e) => setEditingLaunchDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring mb-4"
-            />
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setActionBatch(null)}
-                className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setActionBatch(null)
-                  // Handle save logic here
-                }}
-                className="px-3 py-2 text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 rounded transition-colors"
-              >
-                Save Date
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Action Confirmation Modal */}
-      {confirmAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-background rounded-lg border border-border p-6 max-w-sm shadow-lg">
-            <h3 className="text-base font-semibold text-foreground mb-2">
-              {confirmAction.type === 'delete' ? 'Delete Batch?' : `Confirm ${confirmAction.type}?`}
-            </h3>
-            <p className="text-[13px] text-muted-foreground mb-4">
-              {confirmAction.type === 'delete' 
-                ? `Are you sure you want to delete the "${confirmAction.batch.client}" batch? This action cannot be undone.`
-                : `Proceed with ${confirmAction.type.toLowerCase()} for the "${confirmAction.batch.client}" batch?`}
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (confirmAction.type === 'delete') {
-                    setDeleteTestsModal(confirmAction.batch)
-                    setConfirmAction(null)
-                  } else {
-                    setConfirmAction(null)
-                    // Handle other action logic here
-                  }
+    </div>
+  )
+}
                 }}
                 className={cn(
                   "px-3 py-2 text-sm font-medium text-white rounded transition-colors",

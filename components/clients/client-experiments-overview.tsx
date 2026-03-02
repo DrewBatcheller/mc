@@ -612,21 +612,6 @@ export function ClientExperimentsOverview() {
     </div>
   )
 }
-                }}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium text-white rounded transition-colors",
-                  confirmAction.type === 'delete' ? "bg-destructive hover:bg-destructive/90" : "bg-sky-600 hover:bg-sky-700"
-                )}
-              >
-                {confirmAction.type === 'delete' ? 'Delete' : 'Confirm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Tests Modal - What to do with existing tests */}
-      {deleteTestsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-background rounded-lg border border-border p-6 max-w-md shadow-lg">
             <h3 className="text-base font-semibold text-foreground mb-2">What to do with existing tests?</h3>

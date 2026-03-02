@@ -103,18 +103,18 @@ export function ClientUpcomingExperiments() {
   return (
     <>
       <ContentCard title="Upcoming Experiments">
-        <div className="px-5 py-10 flex flex-col items-center justify-center gap-3">
+        <div className="flex flex-col">
           {upcomingExperiments.length === 0 ? (
-            <>
+            <div className="px-5 py-10 flex flex-col items-center justify-center gap-3">
               <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center">
                 <FileText className="h-10 w-10 text-muted-foreground/40" />
               </div>
               <p className="text-[13px] text-muted-foreground">
                 No upcoming experiments
               </p>
-            </>
+            </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-0 divide-y divide-border">
               {upcomingExperiments.map(exp => {
                 const status = String(exp.fields['Test Status'] || '')
                 
@@ -123,47 +123,46 @@ export function ClientUpcomingExperiments() {
                     key={exp.id}
                     onClick={() => handleExperimentClick(exp)}
                     className={cn(
-                      'rounded-lg border border-border p-4 border-l-[3px] flex flex-col gap-2 cursor-pointer hover:shadow-md transition-all',
+                      'rounded-none border-none border-l-[3px] p-4 flex flex-col gap-2 cursor-pointer hover:bg-muted/50 transition-all',
                       getCardBorder(status)
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-[13px] font-semibold text-foreground">{exp.fields['Test Description']}</span>
+                      <span className="text-[13px] font-semibold text-foreground flex-1">{exp.fields['Test Description']}</span>
+                      <span
+                        className={cn(
+                          'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap',
+                          getStatusStyle(status)
+                        )}
+                      >
+                        {status}
+                      </span>
                     </div>
                     <div className="flex flex-col gap-1 text-[12px]">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-muted-foreground">Status:</span>
-                        <span
-                          className={cn(
-                            'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border',
-                            getStatusStyle(status)
-                          )}
-                        >
-                          {status}
-                        </span>
-                      </div>
                       {exp.fields['Hypothesis'] && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-muted-foreground">Hypothesis:</span>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-muted-foreground shrink-0">Hypothesis:</span>
                           <span className="text-foreground line-clamp-1">{String(exp.fields['Hypothesis'] || '')}</span>
                         </div>
                       )}
                       {exp.fields['Rationale'] && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-muted-foreground">Rationale:</span>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-muted-foreground shrink-0">Rationale:</span>
                           <span className="text-foreground line-clamp-1">{String(exp.fields['Rationale'] || '')}</span>
                         </div>
                       )}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-muted-foreground">Launch Date:</span>
-                        <span className="text-foreground font-medium">{exp.fields['Launch Date']}</span>
-                      </div>
-                      {exp.fields['End Date'] && (
+                      <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-muted-foreground">End Date:</span>
-                          <span className="text-foreground font-medium">{String(exp.fields['End Date'])}</span>
+                          <span className="text-muted-foreground">Launch:</span>
+                          <span className="text-foreground font-medium">{exp.fields['Launch Date']}</span>
                         </div>
-                      )}
+                        {exp.fields['End Date'] && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-muted-foreground">End:</span>
+                            <span className="text-foreground font-medium">{String(exp.fields['End Date'])}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )

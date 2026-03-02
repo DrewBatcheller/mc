@@ -3,7 +3,7 @@
  * Server-side utility to look up a user's permissions based on their Department.
  */
 
-import { listRecords } from './airtable'
+import { listAllRecords } from './airtable'
 import type { UserPermissions, PermissionsRecord } from './permission-types'
 import type { AirtableRecord } from './types'
 
@@ -52,16 +52,16 @@ export async function fetchUserPermissions(department: string): Promise<UserPerm
  */
 async function lookupPermissionsByView(viewName: string): Promise<UserPermissions | null> {
   try {
-    const records = await listRecords(PERMISSIONS_TABLE)
+    const records = await listAllRecords<AirtablePermissionsRow>(PERMISSIONS_TABLE)
     
     const record = records.find(r => {
-      const view = (r.fields as AirtablePermissionsRow)['View']
+      const view = (r.fields)['View']
       return view?.toLowerCase() === viewName.toLowerCase()
     })
     
     if (!record) return null
     
-    const fields = record.fields as AirtablePermissionsRow
+    const fields = record.fields
     
     return {
       finances: fields['Finances'] ?? false,
@@ -84,19 +84,19 @@ async function lookupPermissionsByView(viewName: string): Promise<UserPermission
  */
 export async function getAllPermissionViews(): Promise<PermissionsRecord[]> {
   try {
-    const records = await listRecords(PERMISSIONS_TABLE)
+    const records = await listAllRecords<AirtablePermissionsRow>(PERMISSIONS_TABLE)
     
     return records.map(r => ({
-      view: (r.fields as AirtablePermissionsRow)['View'] || 'Unknown',
+      view: r.fields['View'] || 'Unknown',
       permissions: {
-        finances: (r.fields as AirtablePermissionsRow)['Finances'] ?? false,
-        sales: (r.fields as AirtablePermissionsRow)['Sales'] ?? false,
-        experiments: (r.fields as AirtablePermissionsRow)['Experiments'] ?? false,
-        clients: (r.fields as AirtablePermissionsRow)['Clients'] ?? false,
-        clientDashboard: (r.fields as AirtablePermissionsRow)['Client Dashboard'] ?? false,
-        management: (r.fields as AirtablePermissionsRow)['Management'] ?? false,
-        team: (r.fields as AirtablePermissionsRow)['Team'] ?? false,
-        affiliates: (r.fields as AirtablePermissionsRow)['Affiliates'] ?? false,
+        finances: r.fields['Finances'] ?? false,
+        sales: r.fields['Sales'] ?? false,
+        experiments: r.fields['Experiments'] ?? false,
+        clients: r.fields['Clients'] ?? false,
+        clientDashboard: r.fields['Client Dashboard'] ?? false,
+        management: r.fields['Management'] ?? false,
+        team: r.fields['Team'] ?? false,
+        affiliates: r.fields['Affiliates'] ?? false,
       },
       recordId: r.id,
     }))

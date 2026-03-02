@@ -305,9 +305,6 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
     </div>
   )
 }
-  }
-
-  const sortedData = useMemo(() => {
     return [...data].sort((a, b) => {
       let aVal: number
       let bVal: number

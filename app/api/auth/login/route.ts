@@ -2,8 +2,8 @@
  * POST /api/auth/login
  *
  * Validates email + password against Airtable Team and Clients tables.
- * Fetches permissions from Permissions table based on Department.
- * Returns an AuthUser object with permissions on success.
+ * Returns an AuthUser object on success WITHOUT waiting for permissions.
+ * Permissions are fetched separately by the client after login succeeds.
  *
  * Role logic:
  *   Team table match:
@@ -12,14 +12,10 @@
  *     Department = "Sales"       → role: "sales"
  *     else                       → role: "team"
  *   Clients table match          → role: "client"
- *
- * Permissions: Fetched from Airtable Permissions table based on Department.
- * If Department doesn't have unique entry, defaults to "Team" permissions.
  */
 
 import { NextResponse } from 'next/server'
 import { findOneRecord } from '@/lib/airtable'
-import { fetchUserPermissions } from '@/lib/permissions-service'
 import type { AuthUser, UserRole } from '@/lib/types'
 
 interface TeamRecord {
@@ -76,9 +72,7 @@ export async function POST(request: Request) {
         .join('')
         .toUpperCase()
 
-      // Fetch permissions based on Department
-      const permissions = await fetchUserPermissions(teamRecord.fields['Department'] || 'Team')
-
+      // Return immediately - permissions will be fetched by client after auth
       const user: AuthUser = {
         id: teamRecord.id,
         email: normalizedEmail,
@@ -86,7 +80,6 @@ export async function POST(request: Request) {
         role,
         department: teamRecord.fields['Department'],
         avatarInitials: initials,
-        permissions: permissions || undefined,
       }
 
       return NextResponse.json({ user })
@@ -101,9 +94,7 @@ export async function POST(request: Request) {
     if (clientRecord) {
       const brandName = clientRecord.fields['Brand Name'] ?? email
 
-      // Fetch Client permissions
-      const permissions = await fetchUserPermissions('Client')
-
+      // Return immediately - permissions will be fetched by client after auth
       const user: AuthUser = {
         id: clientRecord.id,
         email: normalizedEmail,
@@ -111,7 +102,6 @@ export async function POST(request: Request) {
         role: 'client',
         clientId: clientRecord.id,
         avatarInitials: brandName.slice(0, 2).toUpperCase(),
-        permissions: permissions || undefined,
       }
 
       return NextResponse.json({ user })

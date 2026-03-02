@@ -1,20 +1,17 @@
 'use client'
 
 /**
- * ProtectedRoute — enforces auth + permission-based access using dynamic Airtable permissions.
+ * ProtectedRoute — enforces auth + basic role checks.
  *
- * - While loading: shows nothing (layout skeleton handles this)
+ * - While loading: shows nothing
  * - If not authenticated: redirects to /login
- * - If authenticated but unauthorized for this route: redirects to default route
- * - Otherwise: renders children
- *
- * Permissions are fetched from Airtable and checked against current route.
+ * - If role required but user doesn't match: redirects to role's default route
+ * - Otherwise: renders children (detailed permissions enforced elsewhere)
  */
 
 import { useEffect, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
-import { usePermissions } from '@/hooks/use-permissions'
 import type { UserRole } from '@/lib/types'
 
 interface ProtectedRouteProps {
@@ -22,7 +19,6 @@ interface ProtectedRouteProps {
   requiredRole?: UserRole
 }
 
-// Default fallback routes per role (used if no permissions available)
 const FALLBACK_ROUTES: Record<UserRole, string> = {
   management: '/',
   strategy: '/experiments/dashboard',
@@ -33,15 +29,12 @@ const FALLBACK_ROUTES: Record<UserRole, string> = {
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user, isLoading, isAuthenticated } = useUser()
-  const { canAccess, permissions } = usePermissions()
   const router = useRouter()
-  const pathname = usePathname()
   const redirectedRef = useRef(false)
 
   useEffect(() => {
     if (isLoading) return
 
-    // If not authenticated, redirect to login
     if (!isAuthenticated) {
       if (!redirectedRef.current) {
         redirectedRef.current = true
@@ -50,33 +43,17 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
       return
     }
 
-    if (!user) return
-
-    // Check specific role requirement
-    if (requiredRole && user.role !== requiredRole) {
+    if (requiredRole && user?.role !== requiredRole) {
       if (!redirectedRef.current) {
         redirectedRef.current = true
         router.replace(FALLBACK_ROUTES[user.role])
       }
-      return
     }
-
-    // Only check route access if we have permissions loaded
-    // This prevents redirect loops while permissions are loading
-    if (permissions && Object.keys(permissions).length > 0) {
-      if (!canAccess(pathname)) {
-        if (!redirectedRef.current) {
-          redirectedRef.current = true
-          router.replace(FALLBACK_ROUTES[user.role])
-        }
-      }
-    }
-  }, [isLoading, isAuthenticated, user, router, pathname, requiredRole, canAccess, permissions])
+  }, [isLoading, isAuthenticated, user, router, requiredRole])
 
   if (isLoading) return null
   if (!isAuthenticated) return null
   if (requiredRole && user?.role !== requiredRole) return null
-  if (user && permissions && Object.keys(permissions).length > 0 && !canAccess(pathname)) return null
 
   return <>{children}</>
 }

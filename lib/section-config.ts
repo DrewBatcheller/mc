@@ -35,7 +35,7 @@ export const SECTION_DEFINITIONS: Record<string, SectionDefinition> = {
     id: 'clientDashboard',
     icon: 'KanbanSquare',
     label: 'Client Dashboard',
-    routes: ['/clients/client-dashboard', '/clients/test-ideas', '/clients/experiments-overview', '/clients/live-tests', '/clients/results'],
+    routes: ['/clients/dashboard', '/clients/test-ideas', '/clients/experiments-overview', '/clients/live-tests', '/clients/results'],
     isFlat: true,  // Special flag for flat sidebar rendering
   },
   management: {

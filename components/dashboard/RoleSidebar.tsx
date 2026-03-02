@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { usePermissions } from '@/hooks/use-permissions'
 
@@ -83,9 +83,35 @@ export function RoleSidebar() {
   const { accessibleSections } = usePermissions()
   const pathname = usePathname()
   const router = useRouter()
-  const [collapsed, setCollapsed] = useState(false)
+  
+  // Initialize collapsed state from localStorage
+  const [collapsed, setCollapsed] = useState<boolean | null>(null)
+  const [openSections, setOpenSections] = useState<string[] | null>(null)
 
-  if (isLoading || !user) {
+  // Hydrate state from localStorage on mount
+  useEffect(() => {
+    const savedCollapsed = localStorage.getItem('sidebar-collapsed')
+    setCollapsed(savedCollapsed ? JSON.parse(savedCollapsed) : false)
+    
+    const savedOpenSections = localStorage.getItem('sidebar-open-sections')
+    setOpenSections(savedOpenSections ? JSON.parse(savedOpenSections) : [])
+  }, [])
+
+  // Persist collapsed state to localStorage
+  useEffect(() => {
+    if (collapsed !== null) {
+      localStorage.setItem('sidebar-collapsed', JSON.stringify(collapsed))
+    }
+  }, [collapsed])
+
+  // Persist open sections to localStorage
+  useEffect(() => {
+    if (openSections !== null) {
+      localStorage.setItem('sidebar-open-sections', JSON.stringify(openSections))
+    }
+  }, [openSections])
+
+  if (isLoading || !user || collapsed === null || openSections === null) {
     return <SidebarSkeleton />
   }
 
@@ -96,7 +122,14 @@ export function RoleSidebar() {
       .map(section => section.id)
   }, [accessibleSections, pathname])
 
-  const [openSections, setOpenSections] = useState<string[]>(initialOpenSections)
+  // Update openSections if current route is in a new section
+  useEffect(() => {
+    const currentSectionIds = initialOpenSections
+    const missingSection = currentSectionIds.find(id => !openSections.includes(id))
+    if (missingSection) {
+      setOpenSections(prev => [...new Set([...prev, ...currentSectionIds])])
+    }
+  }, [pathname, accessibleSections])
 
   function toggleSection(sectionId: string) {
     setOpenSections((prev) =>

@@ -407,18 +407,6 @@ export function ClientExperimentsOverview() {
   const allFilteredSelected = filtered.length > 0 && filtered.every((_, i) => selectedBatches.has(i))
 
   // Close launch menu dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (launchMenuRef.current && !launchMenuRef.current.contains(event.target as Node)) {
-        setLaunchMenuOpen(false)
-      }
-    }
-    
-    if (launchMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [launchMenuOpen])
 
   return (
     <div className="flex flex-col gap-4">

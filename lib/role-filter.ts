@@ -48,7 +48,14 @@ export function buildRoleFilter(
   ctx: FilterContext
 ): string | null {
   const { role, userId, clientId } = ctx
+  console.log('[role-filter] buildRoleFilter:', { resource, role, userId, clientId })
 
+  const result = buildFilterSwitch(resource, role, userId, clientId)
+  console.log('[role-filter] result:', result)
+  return result
+}
+
+function buildFilterSwitch(resource: string, role: string, userId?: string, clientId?: string): string | null {
   switch (resource) {
     // ── Experiments ─────────────────────────────────────────────────────────
     case 'experiments': {
@@ -204,6 +211,8 @@ export function extractQueryContext(headers: Headers): FilterContext | null {
   const role = headers.get('x-user-role') as UserRole | null
   const userId = headers.get('x-user-id') ?? undefined
   const clientId = headers.get('x-client-id') ?? undefined
+
+  console.log('[role-filter] extractQueryContext:', { role, userId, clientId })
 
   if (!role) return null
 

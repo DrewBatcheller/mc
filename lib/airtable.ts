@@ -62,6 +62,7 @@ export async function listRecords<T = Record<string, unknown>>(
 
   // filterByFormula needs to be properly encoded
   if (options.filterByFormula) {
+    console.log('[airtable] filterByFormula before encoding:', options.filterByFormula)
     params.set('filterByFormula', options.filterByFormula)
   }
   if (options.maxRecords) params.set('maxRecords', String(options.maxRecords))
@@ -79,6 +80,7 @@ export async function listRecords<T = Record<string, unknown>>(
   }
 
   const url = `${BASE_URL}/${encodeURIComponent(tableName)}?${params.toString()}`
+  console.log('[airtable] Final URL:', url)
   const res = await airtableFetch(url)
   return res.json()
 }

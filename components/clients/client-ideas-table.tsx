@@ -41,15 +41,10 @@ const columns: { key: SortKey | null; label: string }[] = [
 
 export function ClientIdeasTable() {
   const { user } = useUser()
-  console.log("[v0] ClientIdeasTable user:", user)
   
   const { data: rawIdeas, mutate } = useAirtable('experiment-ideas', {
     fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Primary Goals', 'Priority', 'Client'],
-    // Temporarily remove filter to debug - fetch all ideas
   })
-  
-  console.log("[v0] rawIdeas:", rawIdeas)
-  console.log("[v0] filter formula:", user?.role === 'client' ? `{Client} = "${user.name}"` : "NO FILTER")
   
   const { toast } = useToast()
 
@@ -65,24 +60,17 @@ export function ClientIdeasTable() {
   // Transform Airtable records to ClientIdea format
   const ideas = useMemo(() => {
     if (!rawIdeas) return []
-    console.log("[v0] Transform: rawIdeas count =", rawIdeas.length)
-    const transformed = rawIdeas.map(record => {
-      const idea = {
-        id: record.id,
-        testDescription: record.fields['Test Description'] as string || '',
-        hypothesis: record.fields['Hypothesis'] as string || '',
-        rationale: record.fields['Rationale'] as string || '',
-        placement: record.fields['Placement'] as string || '',
-        placementUrl: record.fields['Placement URL'] as string,
-        primaryGoals: (record.fields['Primary Goals'] as string[]) || [],
-        priority: String(record.fields['Priority'] || ''),
-        isPending: false,
-        clientName: record.fields['Client'] as string || 'unknown', // debug
-      }
-      console.log("[v0] Transformed idea:", idea.testDescription, "client:", idea.clientName)
-      return idea
-    })
-    return transformed
+    return rawIdeas.map(record => ({
+      id: record.id,
+      testDescription: record.fields['Test Description'] as string || '',
+      hypothesis: record.fields['Hypothesis'] as string || '',
+      rationale: record.fields['Rationale'] as string || '',
+      placement: record.fields['Placement'] as string || '',
+      placementUrl: record.fields['Placement URL'] as string,
+      primaryGoals: (record.fields['Primary Goals'] as string[]) || [],
+      priority: String(record.fields['Priority'] || ''),
+      isPending: false,
+    }))
   }, [rawIdeas])
 
   // Combine pending and persisted ideas

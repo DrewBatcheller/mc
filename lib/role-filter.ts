@@ -87,12 +87,9 @@ export function buildRoleFilter(
     case 'batches': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'client' && clientId) {
-        // Use the formula field that extracts record ID from Client
-        return eq('Record ID (from Client)', clientId)
+        // Check both the linked record ID and the formula field for backward compatibility
+        return `OR(FIND("${clientId}", CONCATENATE({Client})) > 0, {Record ID (from Client)} = "${clientId}")`
       }
-      if (role === 'team') return ''  // team sees all batches they work on
-      return null
-    }
       if (role === 'team') return ''  // team sees all batches they work on
       return null
     }

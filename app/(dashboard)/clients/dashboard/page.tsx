@@ -2,7 +2,7 @@
 
 import { useUser } from '@/contexts/UserContext'
 import { ClientDashboardStats } from '@/components/clients/client-dashboard-stats'
-import { ClientUpcomingExperiments } from '@/components/clients/client-upcoming-experiments'
+import { ClientUpcomingLiveExperiments } from '@/components/clients/client-upcoming-experiments'
 import { ClientRecentResults } from '@/components/clients/client-recent-results'
 import { ClientTimeline } from '@/components/clients/client-timeline'
 
@@ -24,7 +24,7 @@ export default function ClientCRODashboardPage() {
       <ClientDashboardStats />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ClientUpcomingExperiments />
+        <ClientUpcomingLiveExperiments />
         <ClientRecentResults />
       </div>
 

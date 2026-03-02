@@ -307,7 +307,7 @@ export function ExperimentDetailsModal({
                         "text-[15px] font-semibold mt-0.5 tabular-nums",
                         experiment.revenueAddedMrr && experiment.revenueAddedMrr !== "$0" ? "text-emerald-600" : "text-muted-foreground"
                       )}>
-                        {formatRevenue(experiment.revenueAddedMrr)}
+                        {experiment.revenueAddedMrr || "$0"}
                       </p>
                     </div>
                     <div>

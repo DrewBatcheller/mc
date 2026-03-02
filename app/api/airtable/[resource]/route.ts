@@ -145,9 +145,19 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only management can create records via API for now
-    if (ctx.role !== 'management' && ctx.role !== 'strategy') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Allow clients to create experiment ideas
+    // All other resources require management/strategy
+    const canCreateIdeas = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'client')
+    const canCreateOthers = (ctx.role === 'management' || ctx.role === 'strategy')
+
+    if (resource === 'experiment-ideas') {
+      if (!canCreateIdeas) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else {
+      if (!canCreateOthers) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const tableName = TABLE_NAMES[resource as ResourceSlug]
@@ -156,8 +166,16 @@ export async function POST(
     }
 
     const body = await request.json()
+    let fields = body.fields ?? body
+
+    // For clients creating experiment ideas, enforce client data isolation
+    if (resource === 'experiment-ideas' && ctx.role === 'client' && ctx.clientId) {
+      // Client can only create ideas for their own client record
+      fields['Brand Name'] = ctx.clientId
+    }
+
     const { createRecord: createRecordFn } = await import('@/lib/airtable')
-    const record = await createRecordFn(tableName, body.fields ?? body)
+    const record = await createRecordFn(tableName, fields)
 
     // Invalidate cache for this resource
     await invalidatePattern(`${resource}:*`)

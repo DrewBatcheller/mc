@@ -4,11 +4,14 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SelectField } from '@/components/shared/select-field'
+import { useUser } from '@/contexts/UserContext'
+import { useToast } from '@/hooks/use-toast'
+import useSWR from 'swr'
 
 interface NewIdeaModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: FormData) => void
+  onSuccess?: () => void
 }
 
 interface FormData {
@@ -28,18 +31,19 @@ interface FormData {
   walkthroughUrl: string
 }
 
-const clients = ['The Ayurveda Experience', 'Vita Hustle', 'Cosara', 'Fake Brand', 'Dr Woof Apparel', 'Shop Noble', 'Perfect White Tee', 'Goose Creek Candles', 'Live Love Locks LLC']
-
 const PRIMARY_GOALS = ['ATC', 'SCVR', 'CVR', 'AOV', 'RPV', 'APPV', 'PPV', 'CTR', 'Other', 'LTV', 'Bounce Rate', 'Session Depth', 'Search Usage', 'Units per Order', 'Add to Cart Rate', 'Trust Score', 'Bundle CTR']
 
 const DEVICES = ['All Devices', 'Desktop', 'Mobile']
 
 const COUNTRIES = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Mexico', 'European Union', 'Germany', 'France', 'Spain', 'Italy', 'Japan', 'South Korea', 'India', 'Brazil', 'New Zealand', 'AU (Primary Focus)', 'All GEOs', 'International']
 
-export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
+export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) {
+  const { user } = useUser()
+  const { toast } = useToast()
   const [showCountriesMenu, setShowCountriesMenu] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<FormData>({
-    client: '',
+    client: user?.brandName || '',
     title: '',
     placementLabel: '',
     placementUrl: '',
@@ -55,6 +59,7 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
     walkthroughUrl: '',
   })
 
+  // Auto-set client when user context changes
   const handleChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -77,33 +82,81 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
     // Validate all required fields
     if (!formData.client || !formData.title || !formData.placementLabel || !formData.placementUrl || 
         !formData.hypothesis || !formData.rationale || formData.primaryGoals.length === 0 || 
         !formData.weighting || !formData.designBrief) {
-      alert('Please fill in all required fields')
+      toast({ title: 'Missing required fields', description: 'Please fill in all required fields', variant: 'destructive' })
       return
     }
-    onSubmit(formData)
-    setFormData({
-      client: '',
-      title: '',
-      placementLabel: '',
-      placementUrl: '',
-      hypothesis: '',
-      rationale: '',
-      primaryGoals: [],
-      devices: 'All Devices',
-      countries: [],
-      weighting: '',
-      designBrief: '',
-      developmentBrief: '',
-      mediaLinks: '',
-      walkthroughUrl: '',
-    })
-    onClose()
+
+    setIsSubmitting(true)
+    
+    try {
+      // Map form data to Airtable field names
+      const airtableFields = {
+        'Test Description': formData.title,
+        'Placement': formData.placementLabel,
+        'Placement URL': formData.placementUrl,
+        'Hypothesis': formData.hypothesis,
+        'Rationale': formData.rationale,
+        'Primary Goals': formData.primaryGoals.join(', '),
+        'Devices': formData.devices,
+        'GEOs': formData.countries.join(', '),
+        'Weighting': formData.weighting,
+        'Design Brief': formData.designBrief,
+        'Development Brief': formData.developmentBrief,
+        'Media/Links': formData.mediaLinks,
+        'Walkthrough Video URL': formData.walkthroughUrl,
+        'Brand Name': formData.client,
+      }
+
+      const response = await fetch('/api/airtable/experiment-ideas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fields: airtableFields }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create idea')
+      }
+
+      const { record } = await response.json()
+      
+      toast({ title: 'Success', description: 'Experiment idea created successfully' })
+      
+      // Reset form
+      setFormData({
+        client: user?.brandName || '',
+        title: '',
+        placementLabel: '',
+        placementUrl: '',
+        hypothesis: '',
+        rationale: '',
+        primaryGoals: [],
+        devices: 'All Devices',
+        countries: [],
+        weighting: '',
+        designBrief: '',
+        developmentBrief: '',
+        mediaLinks: '',
+        walkthroughUrl: '',
+      })
+      
+      onClose()
+      onSuccess?.()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create idea'
+      toast({ title: 'Error', description: message, variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (!isOpen) return null
@@ -117,6 +170,7 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
           <button
             onClick={onClose}
             className="p-1 hover:bg-muted rounded-md transition-colors"
+            disabled={isSubmitting}
           >
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -130,14 +184,10 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
             <label className="text-sm font-medium text-foreground block mb-1">
               Client <span className="text-rose-600">*</span>
             </label>
-            <p className="text-[12px] text-muted-foreground mb-3">Select the brand this experiment idea belongs to.</p>
-            <SelectField
-              value={formData.client || "Select a client..."}
-              onChange={(v) => handleChange('client', v === "Select a client..." ? "" : v)}
-              options={["Select a client...", ...clients]}
-              containerClassName="w-full"
-              className="w-full"
-            />
+            <p className="text-[12px] text-muted-foreground mb-3">Your experiment ideas will be submitted for {user?.brandName}.</p>
+            <div className="px-3 py-2 border border-border rounded-lg bg-muted text-foreground text-sm">
+              {user?.brandName || 'Loading...'}
+            </div>
           </div>
 
           {/* Experiment Title */}
@@ -152,7 +202,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               onChange={(e) => handleChange('title', e.target.value)}
               placeholder="e.g. 'Sticky Add to Cart on PDF'"
               required
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             />
           </div>
 
@@ -169,7 +220,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
                 onChange={(e) => handleChange('placementLabel', e.target.value)}
                 placeholder="e.g. Below ATC"
                 required
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
               />
             </div>
             <div>
@@ -183,7 +235,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
                 onChange={(e) => handleChange('placementUrl', e.target.value)}
                 placeholder="e.g. https://store.com/product"
                 required
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
               />
             </div>
           </div>
@@ -204,8 +257,9 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               onChange={(e) => handleChange('hypothesis', e.target.value)}
               placeholder="If we change [X], then [Y] will happen because..."
               required
+              disabled={isSubmitting}
               rows={4}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50"
             />
           </div>
 
@@ -225,8 +279,9 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               onChange={(e) => handleChange('rationale', e.target.value)}
               placeholder="Based on [evidence], this change will..."
               required
+              disabled={isSubmitting}
               rows={4}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50"
             />
           </div>
 
@@ -242,8 +297,9 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
                   key={goal}
                   type="button"
                   onClick={() => togglePrimaryGoal(goal)}
+                  disabled={isSubmitting}
                   className={cn(
-                    'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+                    'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50',
                     formData.primaryGoals.includes(goal)
                       ? 'bg-slate-700 border-slate-700 text-white'
                       : 'bg-background border-border text-foreground hover:border-slate-400'
@@ -267,7 +323,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
                 onChange={(v) => handleChange('devices', v)}
                 options={DEVICES}
                 containerClassName="w-full"
-                className="w-full"
+                className="w-full disabled:opacity-50"
+                disabled={isSubmitting}
               />
             </div>
             <div className="relative">
@@ -278,7 +335,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               <button
                 type="button"
                 onClick={() => setShowCountriesMenu(!showCountriesMenu)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-left text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-left text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
               >
                 {formData.countries.length === 0 ? 'Select countries...' : `${formData.countries.length} selected`}
               </button>
@@ -290,7 +348,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
                         type="checkbox"
                         checked={formData.countries.includes(country)}
                         onChange={() => toggleCountry(country)}
-                        className="mr-2 cursor-pointer"
+                        disabled={isSubmitting}
+                        className="mr-2 cursor-pointer disabled:opacity-50"
                       />
                       <span className="text-sm text-foreground">{country}</span>
                     </label>
@@ -312,7 +371,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               onChange={(e) => handleChange('weighting', e.target.value)}
               placeholder="e.g. 50/50"
               required
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             />
           </div>
 
@@ -327,8 +387,9 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               onChange={(e) => handleChange('designBrief', e.target.value)}
               placeholder="Paste Loom link or description..."
               required
+              disabled={isSubmitting}
               rows={3}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50"
             />
           </div>
 
@@ -342,8 +403,9 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               value={formData.developmentBrief}
               onChange={(e) => handleChange('developmentBrief', e.target.value)}
               placeholder="Paste Loom link or description..."
+              disabled={isSubmitting}
               rows={3}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50"
             />
           </div>
 
@@ -357,8 +419,9 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               value={formData.mediaLinks}
               onChange={(e) => handleChange('mediaLinks', e.target.value)}
               placeholder="Paste links or describe media..."
+              disabled={isSubmitting}
               rows={3}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50"
             />
           </div>
 
@@ -372,7 +435,8 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
               value={formData.walkthroughUrl}
               onChange={(e) => handleChange('walkthroughUrl', e.target.value)}
               placeholder="e.g. https://loom.com/share/..."
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             />
           </div>
 
@@ -381,15 +445,17 @@ export function NewIdeaModal({ isOpen, onClose, onSubmit }: NewIdeaModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted transition-colors text-sm font-medium"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted transition-colors text-sm font-medium disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800 transition-colors text-sm font-medium"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800 transition-colors text-sm font-medium disabled:opacity-50"
             >
-              Create Idea
+              {isSubmitting ? 'Creating...' : 'Create Idea'}
             </button>
           </div>
         </form>

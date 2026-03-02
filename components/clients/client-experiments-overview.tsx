@@ -479,64 +479,6 @@ export function ClientExperimentsOverview() {
     </div>
   )
 }
-                }}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium text-white rounded transition-colors",
-                  confirmAction.type === 'delete' ? "bg-destructive hover:bg-destructive/90" : "bg-sky-600 hover:bg-sky-700"
-                )}
-              >
-                {confirmAction.type === 'delete' ? 'Delete' : 'Confirm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Tests Modal - What to do with existing tests */}
-      {deleteTestsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-background rounded-lg border border-border p-6 max-w-md shadow-lg">
-            <h3 className="text-base font-semibold text-foreground mb-2">What to do with existing tests?</h3>
-            <p className="text-[13px] text-muted-foreground mb-4">
-              The "{deleteTestsModal.client}" batch contains {deleteTestsModal.tests} test{deleteTestsModal.tests === 1 ? '' : 's'}. Choose what to do with them:
-            </p>
-            <div className="flex flex-col gap-2 mb-4">
-              <button
-                onClick={() => {
-                  setDeleteTestsModal(null)
-                  // Handle desync logic - convert tests back to ideas
-                }}
-                className="w-full px-4 py-3 rounded-lg border border-border bg-card text-left hover:bg-accent transition-colors"
-              >
-                <div className="font-medium text-foreground text-sm">Desync</div>
-                <div className="text-[12px] text-muted-foreground mt-0.5">Convert tests back into test ideas</div>
-              </button>
-              <button
-                onClick={() => {
-                  setSelectBatchModal(deleteTestsModal)
-                  setDeleteTestsModal(null)
-                }}
-                className="w-full px-4 py-3 rounded-lg border border-border bg-card text-left hover:bg-accent transition-colors"
-              >
-                <div className="font-medium text-foreground text-sm">Select Batch</div>
-                <div className="text-[12px] text-muted-foreground mt-0.5">Move tests to another batch</div>
-              </button>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteTestsModal(null)}
-                className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Select Batch Modal */}
-      {selectBatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-background rounded-lg border border-border p-6 max-w-md shadow-lg">
             {!isCreatingNewBatch ? (
               <>

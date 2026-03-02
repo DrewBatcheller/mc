@@ -9,8 +9,26 @@ import { ExperimentDetailsModal } from "@/components/experiments/experiment-deta
 interface Experiment {
   id: string
   name: string
+  description?: string
   status: string
   placement: string
+  placementUrl?: string
+  hypothesis?: string
+  rationale?: string
+  primaryGoals?: string[]
+  devices?: string
+  geos?: string
+  launchDate?: string
+  endDate?: string
+  deployed?: boolean
+  whatHappened?: string
+  nextSteps?: string
+  controlImage?: string
+  variantImage?: string
+  resultImage?: string
+  resultVideo?: string
+  revenueAddedMrr?: string
+  variantData?: any[]
   revenue: number
 }
 
@@ -31,13 +49,28 @@ const statusStyles: Record<string, string> = {
   Inconclusive: "bg-amber-50 text-amber-700",
 }
 
+function formatMrr(value: number | undefined): string {
+  if (value === undefined || value === 0) return "$0"
+  if (value >= 1000000) return "$" + (value / 1000000).toFixed(1) + "M"
+  if (value >= 1000) return "$" + (value / 1000).toFixed(1) + "K"
+  return "$" + value.toLocaleString()
+}
+
+function getImageUrl(field: any): string | undefined {
+  if (Array.isArray(field) && field.length > 0) {
+    return field[0].url || field[0]
+  }
+  if (typeof field === 'string') return field
+  return undefined
+}
+
 export function ClientExperimentsOverview() {
   const { data: batches } = useAirtable('batches', {
     fields: ['Batch Key', 'Launch Date', 'All Tests Status', 'Linked Test Names', 'Revenue Added (MRR)'],
   })
   
   const { data: experiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Test Status', 'Placement', 'Revenue Added (MRR) (Regular Format)', 'Batch (Linked)'],
+    fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'Revenue Added (MRR) (Regular Format)', 'Batch (Linked)', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Launch Date', 'End Date', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Variants (Link)', 'Variants', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
   })
 
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
@@ -53,8 +86,25 @@ export function ClientExperimentsOverview() {
       }).map(exp => ({
         id: exp.id,
         name: String(exp.fields['Test Description'] || ''),
+        description: String(exp.fields['Test Description'] || ''),
         status: String(exp.fields['Test Status'] || 'Unknown'),
         placement: String(exp.fields['Placement'] || ''),
+        placementUrl: String(exp.fields['Placement URL'] || ''),
+        hypothesis: String(exp.fields['Hypothesis'] || ''),
+        rationale: String(exp.fields['Rationale'] || ''),
+        primaryGoals: exp.fields['Category Primary Goals'] ? String(exp.fields['Category Primary Goals']).split(',').map(g => g.trim()) : [],
+        devices: String(exp.fields['Devices'] || ''),
+        geos: String(exp.fields['GEOs'] || ''),
+        launchDate: String(exp.fields['Launch Date'] || ''),
+        endDate: String(exp.fields['End Date'] || ''),
+        deployed: exp.fields['Deployed'] === true,
+        whatHappened: String(exp.fields['Describe what happened & what we learned'] || ''),
+        nextSteps: String(exp.fields['Next Steps (Action)'] || ''),
+        controlImage: getImageUrl(exp.fields['Control ImageE']),
+        variantImage: getImageUrl(exp.fields['Variant ImageE']),
+        resultImage: getImageUrl(exp.fields['PTA Result Image']),
+        resultVideo: getImageUrl(exp.fields['Post-Test Analysis (Loom)']),
+        revenueAddedMrr: formatMrr(typeof exp.fields['Revenue Added (MRR) (Regular Format)'] === 'number' ? exp.fields['Revenue Added (MRR) (Regular Format)'] : 0),
         revenue: typeof exp.fields['Revenue Added (MRR) (Regular Format)'] === 'number' ? exp.fields['Revenue Added (MRR) (Regular Format)'] : 0,
       }))
 

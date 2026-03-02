@@ -63,6 +63,10 @@ interface Experiment {
   nextSteps?: string
   launchDate?: string
   endDate?: string
+  controlImage?: string
+  variantImage?: string
+  resultImage?: string
+  resultVideo?: string
   variantData?: {
     name: string
     visitors: number
@@ -235,14 +239,22 @@ export function ExperimentDetailsModal({
                       <span className="text-[12px] font-medium text-muted-foreground">Control</span>
                       <p className="text-[12px] text-muted-foreground/70 mb-2">Original Page</p>
                       <div className="h-44 rounded-lg border border-border overflow-hidden bg-accent/30">
-                        <img src={RESULT_IMG} alt="Control" className="h-full w-full object-cover object-top" />
+                        {experiment.controlImage ? (
+                          <img src={experiment.controlImage} alt="Control" className="h-full w-full object-cover object-top" />
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No image</div>
+                        )}
                       </div>
                     </div>
                     <div>
                       <span className="text-[12px] font-medium text-muted-foreground">Variant</span>
                       <p className="text-[12px] text-muted-foreground/70 mb-2">Variant Page</p>
                       <div className="h-44 rounded-lg border border-border overflow-hidden bg-accent/30">
-                        <img src={RESULT_IMG} alt="Variant" className="h-full w-full object-cover object-top" />
+                        {experiment.variantImage ? (
+                          <img src={experiment.variantImage} alt="Variant" className="h-full w-full object-cover object-top" />
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No image</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -342,20 +354,26 @@ export function ExperimentDetailsModal({
                 <div>
                   <span className="text-[12px] text-muted-foreground font-medium">Results Breakdown (Image)</span>
                   <div className="mt-2 h-52 rounded-lg border border-border overflow-hidden bg-accent/30">
-                    <img src={RESULT_IMG} alt="Results breakdown" className="h-full w-full object-contain" />
+                    {experiment.resultImage ? (
+                      <img src={experiment.resultImage} alt="Results breakdown" className="h-full w-full object-contain" />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No image</div>
+                    )}
                   </div>
                 </div>
 
                 {/* Results Video */}
-                <div>
-                  <span className="text-[12px] text-muted-foreground font-medium">Results (Video)</span>
-                  <div className="mt-2">
-                    <button className="inline-flex items-center gap-1.5 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 text-[12px] font-medium transition-colors">
-                      <Play className="h-3 w-3" />
-                      Watch Video
-                    </button>
+                {experiment.resultVideo && (
+                  <div>
+                    <span className="text-[12px] text-muted-foreground font-medium">Results (Video)</span>
+                    <div className="mt-2">
+                      <a href={experiment.resultVideo} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 text-[12px] font-medium transition-colors">
+                        <Play className="h-3 w-3" />
+                        Watch Video
+                      </a>
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
 

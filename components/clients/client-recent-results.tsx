@@ -14,11 +14,22 @@ interface RecentResult {
   name: string
   status: TestStatus
   placement: string
+  placementUrl?: string
   endDate: string
   revenueAdded: number
   launchDate?: string
   rationale?: string
+  hypothesis?: string
   goals?: string[]
+  devices?: string
+  geos?: string
+  deployed?: boolean
+  whatHappened?: string
+  nextSteps?: string
+  controlImage?: string
+  variantImage?: string
+  resultImage?: string
+  resultVideo?: string
 }
 
 const statusStyles: Record<TestStatus, string> = {
@@ -41,28 +52,49 @@ function formatRevenue(n: number) {
   return `$${n.toLocaleString()}`
 }
 
+function formatMrr(value: number | undefined): string {
+  if (value === undefined || value === 0) return "$0"
+  if (value >= 1000000) return "$" + (value / 1000000).toFixed(1) + "M"
+  if (value >= 1000) return "$" + (value / 1000).toFixed(1) + "K"
+  return "$" + value.toLocaleString()
+}
+
+function getImageUrl(field: any): string | undefined {
+  if (Array.isArray(field) && field.length > 0) {
+    return field[0].url || field[0]
+  }
+  if (typeof field === 'string') return field
+  return undefined
+}
+
 function convertResultToExperiment(result: RecentResult): any {
   return {
     name: result.name,
     description: result.rationale || '',
     status: result.status,
     placement: result.placement,
-    devices: 'All Devices',
-    geos: 'US',
-    variants: "2",
-    revenue: formatRevenue(result.revenueAdded),
+    placementUrl: result.placementUrl,
+    devices: result.devices || 'All Devices',
+    geos: result.geos || 'US',
     primaryGoals: result.goals || [],
+    hypothesis: result.hypothesis || '',
     rationale: result.rationale || '',
-    revenueAddedMrr: formatRevenue(result.revenueAdded),
-    deployed: true,
+    revenueAddedMrr: formatMrr(result.revenueAdded),
+    deployed: result.deployed,
     launchDate: result.launchDate || '',
     endDate: result.endDate,
+    whatHappened: result.whatHappened || '',
+    nextSteps: result.nextSteps || '',
+    controlImage: result.controlImage,
+    variantImage: result.variantImage,
+    resultImage: result.resultImage,
+    resultVideo: result.resultVideo,
   }
 }
 
 export function ClientRecentResults() {
   const { data: experiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Test Status', 'Placement', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date'],
+    fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
   })
   
   const [currentPage, setCurrentPage] = useState(0)
@@ -77,9 +109,22 @@ export function ClientRecentResults() {
         name: String(e.fields['Test Description'] || ''),
         status: String(e.fields['Test Status']) as TestStatus,
         placement: String(e.fields['Placement'] || ''),
+        placementUrl: String(e.fields['Placement URL'] || ''),
         endDate: String(e.fields['End Date'] || ''),
         revenueAdded: typeof e.fields['Revenue Added (MRR) (Regular Format)'] === 'number' ? e.fields['Revenue Added (MRR) (Regular Format)'] : 0,
         launchDate: String(e.fields['Launch Date'] || ''),
+        hypothesis: String(e.fields['Hypothesis'] || ''),
+        rationale: String(e.fields['Rationale'] || ''),
+        goals: e.fields['Category Primary Goals'] ? String(e.fields['Category Primary Goals']).split(',').map(g => g.trim()) : [],
+        devices: String(e.fields['Devices'] || ''),
+        geos: String(e.fields['GEOs'] || ''),
+        deployed: e.fields['Deployed'] === true,
+        whatHappened: String(e.fields['Describe what happened & what we learned'] || ''),
+        nextSteps: String(e.fields['Next Steps (Action)'] || ''),
+        controlImage: getImageUrl(e.fields['Control ImageE']),
+        variantImage: getImageUrl(e.fields['Variant ImageE']),
+        resultImage: getImageUrl(e.fields['PTA Result Image']),
+        resultVideo: getImageUrl(e.fields['Post-Test Analysis (Loom)']),
       }))
       .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
   }, [experiments])

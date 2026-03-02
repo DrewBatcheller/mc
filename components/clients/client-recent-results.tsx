@@ -157,7 +157,7 @@ export function ClientRecentResults() {
           >
             <div className="flex items-start justify-between gap-2">
               <span className="text-[13px] font-semibold text-foreground">{result.name}</span>
-              {result.revenueAdded > 0 && (
+              {result.status === 'Successful' && result.revenueAdded > 0 && (
                 <span className="text-[12px] font-semibold text-emerald-600 whitespace-nowrap">
                   {formatRevenue(result.revenueAdded)}
                 </span>

@@ -331,16 +331,6 @@ export function ClientIdeasTable() {
     </>
   )
 }
-          <div className="flex-1 relative w-full sm:w-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search test ideas..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
           <button
             onClick={() => setIsModalOpen(true)}
             className="h-9 rounded-lg bg-foreground text-card px-4 text-[13px] font-medium hover:bg-foreground/90 transition-colors flex items-center gap-1.5 shrink-0"

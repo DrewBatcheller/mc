@@ -15,7 +15,7 @@ export function UpcomingTasks() {
   const today = new Date().toISOString().split('T')[0]
   const { data, isLoading } = useAirtable('tasks', {
     maxRecords: 8,
-    fields: ['Team Facing Name', 'Department', 'Brand Name (from Client)', 'Due Date', 'Status'],
+    fields: ['Team Facing Name', 'Department', 'Client', 'Due Date', 'Status'],
     sort: [{ field: 'Due Date', direction: 'asc' }],
     filterExtra: `AND({Status} != "Completed", {Due Date} >= "${today}")`,
   })
@@ -43,7 +43,7 @@ export function UpcomingTasks() {
           (data ?? []).map((r) => {
             const name = String(r.fields['Team Facing Name'] ?? '')
             const dept = String(r.fields['Department'] ?? '')
-            const clientArr = r.fields['Brand Name (from Client)']
+            const clientArr = r.fields['Client']
             const client = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? 'N/A')
             const dueDate = r.fields['Due Date'] ? new Date(String(r.fields['Due Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'
             const due = r.fields['Due Date'] ? new Date(String(r.fields['Due Date'])) : null

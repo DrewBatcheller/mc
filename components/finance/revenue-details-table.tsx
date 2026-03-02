@@ -65,7 +65,7 @@ export function RevenueDetailsTable({
 
   // Fetch revenue data from Airtable
   const { data: rawRevenue, isLoading: revLoading } = useAirtable('revenue', {
-    fields: ['Entry', 'Brand Name (from Client)', 'Date', 'Amount USD', 'Fees USD', 'Conversion Rate (USD>CAD)', 'Amount CAD', 'Fees CAD'],
+    fields: ['Entry', 'Brand Name', 'Date', 'Amount USD', 'Fees USD', 'Conversion Rate (USD>CAD)', 'Amount CAD', 'Fees CAD'],
     sort: [{ field: 'Date', direction: 'desc' }],
   })
 
@@ -87,7 +87,7 @@ export function RevenueDetailsTable({
   useEffect(() => {
     if (rawRevenue) {
       const transformed = rawRevenue.map(r => {
-        const clientValue = r.fields['Brand Name (from Client)']
+        const clientValue = r.fields['Brand Name']
         let client = ''
         if (Array.isArray(clientValue)) {
           client = String(clientValue[0] ?? '')

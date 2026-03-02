@@ -146,7 +146,24 @@ export function RoleSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 flex flex-col justify-between overflow-y-auto">
-        <div className="flex flex-col py-2 px-2.5">
+        <div className="flex flex-col py-2 px-2.5 gap-0.5">
+          {/* Dashboard link - always visible */}
+          <button
+            onClick={() => router.push('/')}
+            className={cn(
+              'w-full flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors',
+              collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2',
+              pathname === '/'
+                ? 'bg-accent text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+            )}
+            title={collapsed ? 'Dashboard' : undefined}
+          >
+            <NavIcon name="LayoutDashboard" className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Dashboard</span>}
+          </button>
+
+          {/* Permission-based sections */}
           {accessibleSections.map((section) => {
             const isOpen = openSections.includes(section.id)
             const hasMultipleRoutes = section.routes.length > 1

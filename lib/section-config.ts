@@ -11,7 +11,7 @@ export const SECTION_DEFINITIONS: Record<string, SectionDefinition> = {
     id: 'finances',
     icon: 'DollarSign',
     label: 'Finances',
-    routes: ['/finances', '/finances/pnl', '/finances/revenue', '/finances/expenses'],
+    routes: ['/finances', '/finances/overview', '/finances/monthly-drilldown', '/finances/pnl', '/finances/dividends', '/finances/reserves', '/finances/revenue', '/finances/expenses'],
   },
   sales: {
     id: 'sales',

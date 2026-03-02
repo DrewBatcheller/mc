@@ -109,6 +109,7 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
       if (!response.ok) {
         const error = await response.json()
+        console.log('[v0] 422 Error details:', error)
         throw new Error(error.error || 'Failed to create idea')
       }
 

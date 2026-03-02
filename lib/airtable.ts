@@ -58,29 +58,46 @@ export async function listRecords<T = Record<string, unknown>>(
   tableName: string,
   options: ListOptions = {}
 ): Promise<AirtableListResponse<T>> {
-  const params = new URLSearchParams()
+  const params: Record<string, string | string[]> = {}
 
-  // filterByFormula needs to be properly encoded
-  if (options.filterByFormula) {
-    console.log('[airtable] filterByFormula before encoding:', options.filterByFormula)
-    params.set('filterByFormula', options.filterByFormula)
-  }
-  if (options.maxRecords) params.set('maxRecords', String(options.maxRecords))
-  if (options.pageSize) params.set('pageSize', String(options.pageSize))
-  if (options.offset) params.set('offset', options.offset)
-  if (options.view) params.set('view', options.view)
+  if (options.filterByFormula) params.filterByFormula = options.filterByFormula
+  if (options.maxRecords) params.maxRecords = String(options.maxRecords)
+  if (options.pageSize) params.pageSize = String(options.pageSize)
+  if (options.offset) params.offset = options.offset
+  if (options.view) params.view = options.view
+  
+  // Build URL with manual parameter encoding
+  let url = `${BASE_URL}/${encodeURIComponent(tableName)}`
+  const queryParts: string[] = []
+  
+  // Handle simple params
+  Object.entries(params).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      queryParts.push(`${key}=${encodeURIComponent(value)}`)
+    }
+  })
+  
+  // Handle fields array
   if (options.fields) {
-    options.fields.forEach((f) => params.append('fields[]', f))
-  }
-  if (options.sort) {
-    options.sort.forEach((s, i) => {
-      params.append(`sort[${i}][field]`, s.field)
-      if (s.direction) params.append(`sort[${i}][direction]`, s.direction)
+    options.fields.forEach(f => {
+      queryParts.push(`fields[]=${encodeURIComponent(f)}`)
     })
   }
-
-  const url = `${BASE_URL}/${encodeURIComponent(tableName)}?${params.toString()}`
-  console.log('[airtable] Final URL:', url)
+  
+  // Handle sort array
+  if (options.sort) {
+    options.sort.forEach((s, i) => {
+      queryParts.push(`sort[${i}][field]=${encodeURIComponent(s.field)}`)
+      if (s.direction) {
+        queryParts.push(`sort[${i}][direction]=${encodeURIComponent(s.direction)}`)
+      }
+    })
+  }
+  
+  if (queryParts.length > 0) {
+    url += '?' + queryParts.join('&')
+  }
+  
   const res = await airtableFetch(url)
   return res.json()
 }

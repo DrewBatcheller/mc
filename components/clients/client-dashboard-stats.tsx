@@ -21,8 +21,16 @@ export function ClientDashboardStats() {
     }
 
     const totalExperiments = experiments.length
-    const liveExperiments = experiments.filter(e => e.fields['Test Status'] === 'Live').length
-    const scheduledExperiments = experiments.filter(e => e.fields['Test Status'] === 'Scheduled').length
+    const liveExperiments = experiments.filter(e => {
+      const status = String(e.fields['Test Status'] || '')
+      return status.includes('Live') || status === 'Live - Collecting Data'
+    }).length
+    
+    // Scheduled experiments are those with 'Pending' or 'Scheduled' status  
+    const scheduledExperiments = experiments.filter(e => {
+      const status = String(e.fields['Test Status'] || '')
+      return status === 'Pending' || status === 'Scheduled'
+    }).length
     
     // Successful experiments are those with Test Status of 'Successful' or Outcome field of 'Successful'/'Win'
     const successfulExperiments = experiments.filter(e => {

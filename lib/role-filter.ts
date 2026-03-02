@@ -163,7 +163,7 @@ export function buildRoleFilter(
       return null
     }
 
-    // ── Contacts ─────────────────────��───────────────────���────────────────────
+    // ── Contacts ──────────────────────────────────────────────────────────────
     case 'contacts': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'client' && clientId) {
@@ -172,7 +172,7 @@ export function buildRoleFilter(
       return null
     }
 
-    // ── Team ──���───────────────────────────────────────────────────────────────
+    // ── Team ──────────────────────────────────────────────────────────────────
     case 'team': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'team' && userId) {

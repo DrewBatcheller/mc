@@ -18,8 +18,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
-import { ExperimentDetailsModal } from "./experiment-details-modal"
-import { ThankYouAnimation } from "@/components/shared/thank-you-animation"
+import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
+import { useUser } from "@/contexts/UserContext"
 
 /* ── Types ── */
 interface Experiment {

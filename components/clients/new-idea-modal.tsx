@@ -86,9 +86,9 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Placement URL': normalizeUrl(formData.placementUrl),
         'Hypothesis': formData.hypothesis,
         'Rationale': formData.rationale,
-        'Primary Goals': formData.primaryGoals.join(', '),
+        'Primary Goals': formData.primaryGoals,
         'Devices': formData.devices,
-        'GEOs': formData.countries.length > 0 ? formData.countries.join(', ') : '',
+        'GEOs': formData.countries,
         'Variants Weight': formData.weighting,
         'Design Brief': formData.designBrief,
         'Development Brief': formData.developmentBrief || '',
@@ -109,7 +109,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
       if (!response.ok) {
         const error = await response.json()
-        console.log('[v0] 422 Error details:', error)
         throw new Error(error.error || 'Failed to create idea')
       }
 

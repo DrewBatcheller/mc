@@ -874,13 +874,6 @@ export function ClientExperimentsOverview() {
           </div>
         </div>
       )}
-
-      {/* Thank You Animation */}
-      <ThankYouAnimation 
-        isVisible={showThankYou}
-        message="Your test is converting to Test Idea"
-        onComplete={() => setShowThankYou(false)}
-      />
     </div>
   )
 }

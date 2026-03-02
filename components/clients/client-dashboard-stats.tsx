@@ -23,9 +23,15 @@ export function ClientDashboardStats() {
     const totalExperiments = experiments.length
     const liveExperiments = experiments.filter(e => e.fields['Test Status'] === 'Live').length
     const scheduledExperiments = experiments.filter(e => e.fields['Test Status'] === 'Scheduled').length
-    const endedExperiments = experiments.filter(e => e.fields['Test Status'] === 'Completed' || e.fields['Test Status'] === 'Paused')
-    const successfulExperiments = endedExperiments.filter(e => e.fields['Test Status'] === 'Completed' && e.fields['Result'] === 'Successful').length
-    const unsuccessfulExperiments = endedExperiments.filter(e => e.fields['Result'] === 'Unsuccessful' || e.fields['Result'] === 'Inconclusive').length
+    const completedExperiments = experiments.filter(e => e.fields['Test Status'] === 'Completed')
+    const successfulExperiments = completedExperiments.filter(e => {
+      const outcome = e.fields['Outcome'] || e.fields['Test Status']
+      return outcome === 'Successful' || outcome === 'Win'
+    }).length
+    const unsuccessfulExperiments = experiments.filter(e => {
+      const outcome = e.fields['Outcome'] || e.fields['Test Status']
+      return outcome === 'Unsuccessful' || outcome === 'Loss' || outcome === 'Inconclusive'
+    }).length
 
     const totalRevenueAdded = experiments.reduce((sum, exp) => {
       const revenue = exp.fields['Revenue Added (MRR) (Regular Format)']

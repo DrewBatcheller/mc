@@ -95,7 +95,7 @@ export function buildRoleFilter(
     case 'variants': {
       if (role === 'management' || role === 'strategy' || role === 'team') return ''
       if (role === 'client' && clientId) {
-        return eq('Client (Record ID)', clientId)
+        return eq('Record ID (from Brand Name)', clientId)
       }
       return null
     }
@@ -161,7 +161,7 @@ export function buildRoleFilter(
     case 'contacts': {
       if (role === 'management' || role === 'strategy') return ''
       if (role === 'client' && clientId) {
-        return eq('Client (Record ID)', clientId)
+        return eq('Record ID (from Client)', clientId)
       }
       return null
     }

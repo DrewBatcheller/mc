@@ -1,6 +1,6 @@
 // ─── User Roles ──────────────────────────────────────────────────────────────
-// Derived from Permissions table: Management, Strategy, Team, Client
-export type UserRole = 'management' | 'strategy' | 'team' | 'client'
+// Derived from Permissions table: Management, Strategy, Sales, Team, Client
+export type UserRole = 'management' | 'strategy' | 'sales' | 'team' | 'client'
 
 // ─── Authenticated User ───────────────────────────────────────────────────────
 export interface AuthUser {

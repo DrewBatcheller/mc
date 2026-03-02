@@ -35,6 +35,16 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     team: false,
     affiliates: true,
   },
+  sales: {
+    finances: false,
+    sales: true,
+    experiments: false,
+    clients: false,
+    clientDashboard: false,
+    management: false,
+    team: true,
+    affiliates: false,
+  },
   team: {
     finances: false,
     sales: false,
@@ -194,6 +204,27 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
     { icon: 'Handshake', label: 'Affiliates', href: '/affiliates' },
   ],
 
+  sales: [
+    {
+      icon: 'Target',
+      label: 'Sales',
+      subItems: [
+        { label: 'Overview', href: '/sales/overview' },
+        { label: 'Leads', href: '/sales/leads' },
+        { label: 'Kanban', href: '/sales/kanban' },
+        { label: 'Tasks', href: '/sales/tasks' },
+      ],
+    },
+    {
+      icon: 'UserCircle',
+      label: 'Team',
+      subItems: [
+        { label: 'My Dashboard', href: '/team/dashboard' },
+        { label: 'Directory', href: '/team/directory' },
+      ],
+    },
+  ],
+
   team: [
     {
       icon: 'FlaskConical',
@@ -235,6 +266,7 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
 export const DEFAULT_ROUTE: Record<UserRole, string> = {
   management: '/',
   strategy: '/experiments/dashboard',
+  sales: '/sales/overview',
   team: '/team/dashboard',
   client: '/clients/client-dashboard',
 }
@@ -250,6 +282,7 @@ export const ACCESSIBLE_PREFIXES: Record<UserRole, string[]> = {
     '/affiliates',
     '/management',
   ],
+  sales: ['/sales', '/team'],
   team: ['/experiments', '/team'],
   client: ['/clients/client-dashboard', '/clients/client-ideas', '/clients/experiments-overview', '/clients/client-live-tests', '/clients/client-results'],
 }

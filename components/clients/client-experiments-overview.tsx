@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useState, useMemo, useRef, useEffect } from "react"
-import { ChevronDown, ChevronRight, Search, Layers, FlaskConical, Zap, CheckCircle2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Search, Layers, FlaskConical, Zap, CheckCircle2, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
@@ -247,41 +247,65 @@ export function ClientExperimentsOverview() {
 
                   {/* Nested experiments */}
                   {isExpanded && batch.experiments.length > 0 && (
-                    <tr className="bg-muted/5">
-                      <td colSpan={6} className="p-4">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/50 border-b border-border">
-                            <tr>
-                              <th className="px-4 py-2 text-left font-medium text-xs">Test Name</th>
-                              <th className="px-4 py-2 text-left font-medium text-xs">Status</th>
-                              <th className="px-4 py-2 text-left font-medium text-xs">Placement</th>
-                              <th className="px-4 py-2 text-left font-medium text-xs">Devices</th>
-                              <th className="px-4 py-2 text-left font-medium text-xs">GEOs</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {batch.experiments.map((exp, ei) => (
-                              <tr 
-                                key={ei} 
-                                className="border-b border-border/50 last:border-0 hover:bg-accent/20 transition-colors cursor-pointer"
-                                onClick={() => {
-                                  setSelectedExperiment(exp)
-                                  setIsModalOpen(true)
-                                }}
-                              >
-                                <td className="px-4 py-2 text-foreground">{exp.name}</td>
-                                <td className="px-4 py-2">
-                                  <span className={cn("text-xs font-medium px-2 py-1 rounded", statusStyles[mapBatchStatus(exp.status)])}>
-                                    {mapBatchStatus(exp.status)}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2 text-xs text-muted-foreground">{exp.placement || '-'}</td>
-                                <td className="px-4 py-2 text-xs text-muted-foreground">{exp.devices}</td>
-                                <td className="px-4 py-2 text-xs text-muted-foreground">{exp.geos || '-'}</td>
+                    <tr>
+                      <td colSpan={6} className="p-0">
+                        <div className="bg-accent/10 border-b border-border">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b border-border/60">
+                                <th className="px-6 py-2.5 text-[12px] font-medium text-muted-foreground text-left pl-14">Experiment</th>
+                                <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Status</th>
+                                <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Placement</th>
+                                <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Devices</th>
+                                <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">GEOs</th>
+                                <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Variants</th>
+                                <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-right">Revenue</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {batch.experiments.map((exp, ei) => (
+                                <tr 
+                                  key={ei} 
+                                  className="border-b border-border/40 last:border-0 hover:bg-accent/20 transition-colors cursor-pointer"
+                                  onClick={() => {
+                                    setSelectedExperiment(exp)
+                                    setIsModalOpen(true)
+                                  }}
+                                >
+                                  <td className="px-6 py-3 pl-14">
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-[13px] font-medium text-foreground">{exp.name}</span>
+                                      <span className="text-[11px] text-muted-foreground">{exp.description}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <span className={cn(
+                                      "text-[11px] font-medium px-2 py-0.5 rounded-md",
+                                      statusStyles[mapBatchStatus(exp.status)] || "bg-accent text-foreground"
+                                    )}>
+                                      {mapBatchStatus(exp.status)}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-[12px] text-foreground">{exp.placement}</span>
+                                      {exp.placementUrl && (
+                                        <span className="text-[11px] text-sky-600 flex items-center gap-0.5">
+                                          <ExternalLink className="h-2.5 w-2.5" />
+                                          {exp.placementUrl}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">{exp.devices}</td>
+                                  <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">{exp.geos}</td>
+                                  <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">{exp.variants}</td>
+                                  <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap text-right">{exp.revenue}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </td>
                     </tr>
                   )}

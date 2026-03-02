@@ -76,6 +76,16 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
     }))
   }
 
+  const normalizeUrl = (url: string): string => {
+    if (!url) return url
+    // If URL already has a protocol, return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url
+    }
+    // Otherwise prepend https://
+    return `https://${url}`
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title || !formData.placementLabel || !formData.placementUrl || !formData.hypothesis || !formData.rationale || formData.primaryGoals.length === 0 || !formData.weighting || !formData.designBrief) {
@@ -89,7 +99,7 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
       const airtableFields = {
         'Test Description': formData.title,
         'Placement': formData.placementLabel,
-        'Placement URL': formData.placementUrl,
+        'Placement URL': normalizeUrl(formData.placementUrl),
         'Hypothesis': formData.hypothesis,
         'Rationale': formData.rationale,
         'Primary Goals': formData.primaryGoals.join(', '),
@@ -99,7 +109,7 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Design Brief': formData.designBrief,
         'Development Brief': formData.developmentBrief,
         'Media/Links': formData.mediaLinks,
-        'Walkthrough Video URL': formData.walkthroughUrl,
+        'Walkthrough Video URL': normalizeUrl(formData.walkthroughUrl),
         'Brand Name': clientId,
       }
 
@@ -175,8 +185,16 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
               <label className="text-sm font-medium text-foreground block mb-1">
                 Placement URL <span className="text-rose-600">*</span>
               </label>
-              <p className="text-[12px] text-muted-foreground mb-3">Enter the URL(s) where the test will run.</p>
-              <input type="text" value={formData.placementUrl} onChange={(e) => handleChange('placementUrl', e.target.value)} placeholder="e.g. https://store.com/product" required disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
+              <p className="text-[12px] text-muted-foreground mb-3">Enter the URL(s) where the test will run. https:// will be added automatically if not provided.</p>
+              <input
+                type="text"
+                value={formData.placementUrl}
+                onChange={(e) => handleChange('placementUrl', e.target.value)}
+                placeholder="e.g. www.store.com/product or https://store.com/product"
+                required
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+              />
             </div>
           </div>
 
@@ -267,7 +285,7 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">Walkthrough Video URL</label>
-            <input type="url" value={formData.walkthroughUrl} onChange={(e) => handleChange('walkthroughUrl', e.target.value)} placeholder="e.g. https://loom.com/share/..." disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
+            <input type="text" value={formData.walkthroughUrl} onChange={(e) => handleChange('walkthroughUrl', e.target.value)} placeholder="e.g. loom.com/share/... or https://loom.com/share/..." disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50" />
           </div>
 
           <div className="flex items-center justify-between pt-6 border-t border-border">

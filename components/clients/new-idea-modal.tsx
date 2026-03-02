@@ -85,14 +85,14 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Placement URL': normalizeUrl(formData.placementUrl),
         'Hypothesis': formData.hypothesis,
         'Rationale': formData.rationale,
-        'Primary Goals': formData.primaryGoals,
+        'Primary Goals': formData.primaryGoals.join(', '),
         'Devices': formData.devices,
-        'GEOs': formData.countries.length > 0 ? formData.countries : undefined,
-        'Weighting': formData.weighting,
+        'GEOs': formData.countries.length > 0 ? formData.countries.join(', ') : '',
+        'Variants Weight': formData.weighting,
         'Design Brief': formData.designBrief,
-        'Development Brief': formData.developmentBrief,
-        'Media/Links': formData.mediaLinks || undefined,
-        'Walkthrough Video URL': normalizeUrl(formData.walkthroughUrl) || undefined,
+        'Development Brief': formData.developmentBrief || '',
+        'Media/Links': formData.mediaLinks || '',
+        'Walkthrough Video URL': normalizeUrl(formData.walkthroughUrl) || '',
         'Brand Name': clientId,
       }
 
@@ -106,8 +106,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         },
         body: JSON.stringify({ fields: airtableFields }),
       })
-      
-      console.log('[v0] Fields type check:', typeof airtableFields['Primary Goals'], Array.isArray(airtableFields['Primary Goals']), airtableFields['Primary Goals'])
 
       if (!response.ok) {
         const error = await response.json()

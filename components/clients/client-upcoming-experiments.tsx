@@ -1,11 +1,13 @@
 'use client'
 
-import { FileText, Calendar } from 'lucide-react'
+import { FileText, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAirtable } from '@/hooks/use-airtable'
 import { ContentCard } from '@/components/shared/content-card'
 import { useMemo, useState } from 'react'
 import { ExperimentDetailsModal } from '@/components/experiments/experiment-details-modal'
 import { cn } from '@/lib/utils'
+
+const RESULTS_PER_PAGE = 2
 
 type ExperimentStatus = 'Pending' | 'In Progress - Design' | 'In Progress - Development' | 'In Progress - QA' | 'Live - Collecting Data' | string
 
@@ -25,6 +27,7 @@ function getCardBorder(status: string): string {
 
 export function ClientUpcomingLiveExperiments() {
   const [selectedExperiment, setSelectedExperiment] = useState<any>(null)
+  const [currentPage, setCurrentPage] = useState(0)
   
   const { data: experiments } = useAirtable('experiments', {
     fields: ['Test Description', 'Test Status', 'Launch Date', 'End Date', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Revenue Added (MRR) (Regular Format)', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)', 'Category Primary Goals', 'Record ID (from Brand Name)'],
@@ -54,8 +57,22 @@ export function ClientUpcomingLiveExperiments() {
       return isUpcoming
     })
     
-    return filtered.slice(0, 5)
+    return filtered
   }, [experiments])
+
+  const totalPages = Math.ceil(upcomingExperiments.length / RESULTS_PER_PAGE)
+  const paginatedExperiments = useMemo(() => {
+    const start = currentPage * RESULTS_PER_PAGE
+    return upcomingExperiments.slice(start, start + RESULTS_PER_PAGE)
+  }, [currentPage, upcomingExperiments])
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(0, prev - 1))
+  }
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))
+  }
 
   function getImageUrl(field: any): string | undefined {
     if (Array.isArray(field) && field.length > 0) {
@@ -114,60 +131,87 @@ export function ClientUpcomingLiveExperiments() {
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-0 divide-y divide-border">
-              {upcomingExperiments.map(exp => {
-                const status = String(exp.fields['Test Status'] || '')
-                
-                return (
-                  <div
-                    key={exp.id}
-                    onClick={() => handleExperimentClick(exp)}
-                    className={cn(
-                      'rounded-none border-none border-l-[3px] p-4 flex flex-col gap-2 cursor-pointer hover:bg-muted/50 transition-all',
-                      getCardBorder(status)
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-[13px] font-semibold text-foreground flex-1">{exp.fields['Test Description']}</span>
-                      <span
-                        className={cn(
-                          'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap',
-                          getStatusStyle(status)
-                        )}
-                      >
-                        {status}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1 text-[12px]">
-                      {exp.fields['Hypothesis'] && (
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-muted-foreground shrink-0">Hypothesis:</span>
-                          <span className="text-foreground line-clamp-1">{String(exp.fields['Hypothesis'] || '')}</span>
-                        </div>
+            <>
+              <div className="flex-1 px-5 py-4 flex flex-col gap-3">
+                {paginatedExperiments.map(exp => {
+                  const status = String(exp.fields['Test Status'] || '')
+                  
+                  return (
+                    <div
+                      key={exp.id}
+                      onClick={() => handleExperimentClick(exp)}
+                      className={cn(
+                        'rounded-lg border border-border border-l-[3px] p-4 flex flex-col gap-2 cursor-pointer hover:shadow-md transition-all',
+                        getCardBorder(status)
                       )}
-                      {exp.fields['Rationale'] && (
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-muted-foreground shrink-0">Rationale:</span>
-                          <span className="text-foreground line-clamp-1">{String(exp.fields['Rationale'] || '')}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-muted-foreground">Launch:</span>
-                          <span className="text-foreground font-medium">{exp.fields['Launch Date']}</span>
-                        </div>
-                        {exp.fields['End Date'] && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-muted-foreground">End:</span>
-                            <span className="text-foreground font-medium">{String(exp.fields['End Date'])}</span>
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[13px] font-semibold text-foreground flex-1">{exp.fields['Test Description']}</span>
+                        <span
+                          className={cn(
+                            'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap',
+                            getStatusStyle(status)
+                          )}
+                        >
+                          {status}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1 text-[12px]">
+                        {exp.fields['Hypothesis'] && (
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-muted-foreground shrink-0">Hypothesis:</span>
+                            <span className="text-foreground line-clamp-1">{String(exp.fields['Hypothesis'] || '')}</span>
                           </div>
                         )}
+                        {exp.fields['Rationale'] && (
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-muted-foreground shrink-0">Rationale:</span>
+                            <span className="text-foreground line-clamp-1">{String(exp.fields['Rationale'] || '')}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-muted-foreground">Launch:</span>
+                            <span className="text-foreground font-medium">{exp.fields['Launch Date']}</span>
+                          </div>
+                          {exp.fields['End Date'] && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">End:</span>
+                              <span className="text-foreground font-medium">{String(exp.fields['End Date'])}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+
+              {/* Pagination */}
+              <div className="px-5 py-3 border-t border-border flex items-center justify-between">
+                <span className="text-[12px] text-muted-foreground">
+                  {upcomingExperiments.length > 0 ? currentPage + 1 : 0} of {totalPages || 1}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handlePrevPage}
+                    disabled={currentPage === 0}
+                    className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title="Previous page"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages - 1}
+                    className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title="Next page"
+                  >
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </ContentCard>

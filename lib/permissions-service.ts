@@ -12,14 +12,23 @@ const DEFAULT_PERMISSION_VIEW = 'Team'  // Fallback for departments without uniq
 
 interface AirtablePermissionsRow {
   'Name': string
-  'Finances'?: boolean
-  'Sales'?: boolean
-  'Experiments'?: boolean
-  'Clients'?: boolean
-  'Client Dashboard'?: boolean
-  'Management'?: boolean
-  'Team'?: boolean
-  'Affiliates'?: boolean
+  'Finances'?: string | boolean
+  'Sales'?: string | boolean
+  'Experiments'?: string | boolean
+  'Clients'?: string | boolean
+  'Client Dashboard'?: string | boolean
+  'Management'?: string | boolean
+  'Team'?: string | boolean
+  'Affiliates'?: string | boolean
+}
+
+/**
+ * Convert Airtable checkbox value to boolean
+ * Airtable returns "checked" for checked boxes, empty string/undefined for unchecked
+ */
+function toBoolean(value: string | boolean | undefined): boolean {
+  if (typeof value === 'boolean') return value
+  return value === 'checked'
 }
 
 /**
@@ -48,7 +57,7 @@ export async function fetchUserPermissions(department: string): Promise<UserPerm
 }
 
 /**
- * Look up a specific permission view by name
+ * Look up a specific permission name/role
  */
 async function lookupPermissionsByView(viewName: string): Promise<UserPermissions | null> {
   try {
@@ -64,14 +73,14 @@ async function lookupPermissionsByView(viewName: string): Promise<UserPermission
     const fields = record.fields
     
     return {
-      finances: fields['Finances'] ?? false,
-      sales: fields['Sales'] ?? false,
-      experiments: fields['Experiments'] ?? false,
-      clients: fields['Clients'] ?? false,
-      clientDashboard: fields['Client Dashboard'] ?? false,
-      management: fields['Management'] ?? false,
-      team: fields['Team'] ?? false,
-      affiliates: fields['Affiliates'] ?? false,
+      finances: toBoolean(fields['Finances']),
+      sales: toBoolean(fields['Sales']),
+      experiments: toBoolean(fields['Experiments']),
+      clients: toBoolean(fields['Clients']),
+      clientDashboard: toBoolean(fields['Client Dashboard']),
+      management: toBoolean(fields['Management']),
+      team: toBoolean(fields['Team']),
+      affiliates: toBoolean(fields['Affiliates']),
     }
   } catch (err) {
     console.error(`[permissions] Failed to lookup permission "${viewName}":`, err)
@@ -89,14 +98,14 @@ export async function getAllPermissionViews(): Promise<PermissionsRecord[]> {
     return records.map(r => ({
       view: r.fields['Name'] || 'Unknown',
       permissions: {
-        finances: r.fields['Finances'] ?? false,
-        sales: r.fields['Sales'] ?? false,
-        experiments: r.fields['Experiments'] ?? false,
-        clients: r.fields['Clients'] ?? false,
-        clientDashboard: r.fields['Client Dashboard'] ?? false,
-        management: r.fields['Management'] ?? false,
-        team: r.fields['Team'] ?? false,
-        affiliates: r.fields['Affiliates'] ?? false,
+        finances: toBoolean(r.fields['Finances']),
+        sales: toBoolean(r.fields['Sales']),
+        experiments: toBoolean(r.fields['Experiments']),
+        clients: toBoolean(r.fields['Clients']),
+        clientDashboard: toBoolean(r.fields['Client Dashboard']),
+        management: toBoolean(r.fields['Management']),
+        team: toBoolean(r.fields['Team']),
+        affiliates: toBoolean(r.fields['Affiliates']),
       },
       recordId: r.id,
     }))

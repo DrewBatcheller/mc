@@ -73,6 +73,8 @@ export function ClientExperimentsOverview() {
     fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'Revenue Added (MRR) (Regular Format)', 'Batch (Linked)', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Launch Date', 'End Date', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Variants (Link)', 'Variants', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
   })
 
+  console.log('[v0] ClientExperimentsOverview - batches:', batches?.length || 0, 'experiments:', experiments?.length || 0)
+
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
   const [selectedExperiment, setSelectedExperiment] = useState<any>(null)
 

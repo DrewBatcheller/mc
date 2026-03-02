@@ -287,7 +287,7 @@ const trackerStats = [
 ]
 
 /* ── Component ── */
-export function ClientTracker() {
+export function ClientExperimentsOverview() {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(0)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("All Statuses")

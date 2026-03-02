@@ -88,7 +88,10 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[v0] Form submitted', formData)
+    
     if (!formData.title || !formData.placementLabel || !formData.placementUrl || !formData.hypothesis || !formData.rationale || formData.primaryGoals.length === 0 || !formData.weighting || !formData.designBrief) {
+      console.log('[v0] Validation failed - missing fields')
       toast({ title: 'Missing required fields', description: 'Please fill in all required fields', variant: 'destructive' })
       return
     }
@@ -113,17 +116,25 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Brand Name': clientId,
       }
 
+      console.log('[v0] Sending to API:', airtableFields)
+
       const response = await fetch('/api/airtable/experiment-ideas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields: airtableFields }),
       })
 
+      console.log('[v0] Response status:', response.status, response.ok)
+
       if (!response.ok) {
         const error = await response.json()
+        console.log('[v0] API error:', error)
         throw new Error(error.error || 'Failed to create idea')
       }
 
+      const { record } = await response.json()
+      console.log('[v0] Success! Record created:', record)
+      
       toast({ title: 'Success', description: 'Experiment idea created successfully' })
       
       setFormData({
@@ -145,6 +156,7 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
       onClose()
       onSuccess?.()
     } catch (err) {
+      console.error('[v0] Error during submission:', err)
       const message = err instanceof Error ? err.message : 'Failed to create idea'
       toast({ title: 'Error', description: message, variant: 'destructive' })
     } finally {

@@ -3,8 +3,9 @@
 import { useState, useMemo } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useAirtable } from '@/hooks/use-airtable'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ExperimentDetailsModal } from '@/components/experiments/experiment-details-modal'
 import { cn } from '@/lib/utils'
+import { ChevronDown, ChevronRight, Search } from 'lucide-react'
 
 interface Experiment {
   id: string
@@ -16,72 +17,73 @@ interface Experiment {
   geos: string
   variants: string
   revenue: string
-  endDate?: string
 }
 
 interface Batch {
   id: string
   launchDate: string
-  endDate: string
+  finishDate: string
   status: string
   tests: number
-  revenue: string
   experiments: Experiment[]
 }
 
 const statusStyles: Record<string, string> = {
-  "In Progress": "bg-sky-50 text-sky-700",
-  "Live - Collecting Data": "bg-emerald-50 text-emerald-700",
-  Successful: "bg-emerald-50 text-emerald-700",
-  Unsuccessful: "bg-rose-50 text-rose-700",
-  Inconclusive: "bg-amber-50 text-amber-700",
-  Pending: "bg-accent text-muted-foreground",
+  'Pending': 'bg-accent text-muted-foreground',
+  'In Progress': 'bg-sky-50 text-sky-700',
+  'Live': 'bg-emerald-50 text-emerald-700',
+  'Completed': 'bg-emerald-50 text-emerald-700',
 }
 
 const mapBatchStatus = (status: string): string => {
-  const s = status?.toLowerCase() || ''
-  if (s.includes('live')) return 'Live - Collecting Data'
-  if (s.includes('successful')) return 'Successful'
-  if (s.includes('unsuccessful')) return 'Unsuccessful'
-  if (s.includes('inconclusive')) return 'Inconclusive'
+  const s = String(status || '').toLowerCase()
+  if (s.includes('live') || s.includes('live - collecting')) return 'Live'
+  if (s.includes('successful') || s.includes('unsuccessful') || s.includes('inconclusive') || s.includes('blocked')) return 'Completed'
+  if (s.includes('in progress')) return 'In Progress'
   return 'Pending'
 }
 
 export function ClientExperimentsOverview() {
   const { user } = useUser()
-  const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(0)
+  const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Fetch batches for this client
   const { data: rawBatches } = useAirtable('batches', {
-    fields: ['Batch Key', 'Brand Name', 'Launch Date', 'All Tests Status', 'Linked Test Names', 'Revenue Added (MRR)'],
+    fields: ['Batch Key', 'Brand Name', 'Launch Date', 'PTA (Scheduled Finish)', 'All Tests Status', 'Linked Test Names', 'Revenue Added (MRR)'],
     filterByFormula: user?.role === 'client' ? `{Brand Name} = "${user.name}"` : undefined,
     sort: [{ field: 'Launch Date', direction: 'desc' }],
   })
 
-  // Fetch all experiments
+  // Fetch experiments
   const { data: rawExperiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Test Status', 'Batch', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Variants', 'Revenue Added (MRR) (Regular Format)', 'End Date'],
+    fields: ['Test Description', 'Test Status', 'Batch', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Variants (Link)', 'Revenue Added (MRR) (Regular Format)', 'End Date'],
   })
 
-  // Transform batches with linked experiments
+  // Transform into batches with nested experiments
   const batches = useMemo(() => {
     if (!rawBatches) return []
     
-    return rawBatches.map(batchRecord => {
-      const batchKey = String(batchRecord.fields['Batch Key'] ?? '')
-      const launchDate = batchRecord.fields['Launch Date'] 
-        ? new Date(String(batchRecord.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return rawBatches.map(b => {
+      const batchKey = String(b.fields['Batch Key'] ?? '')
+      const launchDate = b.fields['Launch Date'] 
+        ? new Date(String(b.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : ''
-      const status = String(batchRecord.fields['All Tests Status'] ?? 'Pending')
-      const revenue = String(batchRecord.fields['Revenue Added (MRR)'] ?? '$0')
-      const linkedTests = Array.isArray(batchRecord.fields['Linked Test Names']) ? batchRecord.fields['Linked Test Names'] : []
-      
-      // Find experiments linked to this batch
+      const finishDate = b.fields['PTA (Scheduled Finish)']
+        ? new Date(String(b.fields['PTA (Scheduled Finish)'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : ''
+      const status = String(b.fields['All Tests Status'] ?? 'Pending')
+      const linkedTests = Array.isArray(b.fields['Linked Test Names']) ? b.fields['Linked Test Names'] : []
+
+      // Find experiments for this batch
       const batchExperiments = (rawExperiments ?? [])
         .filter(exp => {
           const expBatches = exp.fields['Batch']
-          if (Array.isArray(expBatches)) return expBatches.includes(batchKey)
+          if (Array.isArray(expBatches)) {
+            return expBatches.includes(batchKey)
+          }
           return String(expBatches ?? '') === batchKey
         })
         .map(exp => ({
@@ -92,24 +94,25 @@ export function ClientExperimentsOverview() {
           placementUrl: exp.fields['Placement URL'] ? String(exp.fields['Placement URL']) : undefined,
           devices: String(exp.fields['Devices'] ?? ''),
           geos: String(exp.fields['GEOs'] ?? ''),
-          variants: String(exp.fields['Variants'] ?? '-'),
+          variants: exp.fields['Variants (Link)'] 
+            ? (Array.isArray(exp.fields['Variants (Link)']) ? exp.fields['Variants (Link)'].length : 1).toString()
+            : '-',
           revenue: exp.fields['Revenue Added (MRR) (Regular Format)'] ? String(exp.fields['Revenue Added (MRR) (Regular Format)']) : '-',
-          endDate: exp.fields['End Date'] ? String(exp.fields['End Date']) : undefined,
         }))
 
       return {
-        id: batchRecord.id,
+        id: b.id,
         launchDate,
-        endDate: '', // Batches don't have End Date
+        finishDate,
         status,
         tests: linkedTests.length,
-        revenue,
         experiments: batchExperiments,
       }
     })
   }, [rawBatches, rawExperiments])
 
-  const filteredBatches = useMemo(() => {
+  // Filter by search
+  const filtered = useMemo(() => {
     if (!search) return batches
     const q = search.toLowerCase()
     return batches.filter(b => 
@@ -118,118 +121,125 @@ export function ClientExperimentsOverview() {
     )
   }, [batches, search])
 
-  const isExpanded = (batchId: string) => expandedBatchId === batchId
-
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Experiment Batches</h1>
+        <p className="text-sm text-muted-foreground mt-1">View all your experiment batches and their associated tests</p>
+      </div>
+
       {/* Search */}
-      <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
+          placeholder="Search batches, experiments..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search batches or experiments..."
-          className="flex-1 px-3 py-2 text-[13px] border border-border rounded-lg bg-card focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="border-b border-border bg-accent/30">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 border-b border-border">
             <tr>
               <th className="w-10 px-3 py-3" />
-              <th className="px-4 py-3 text-[13px] font-medium text-left">Launch Date</th>
-              <th className="px-4 py-3 text-[13px] font-medium text-left">Status</th>
-              <th className="px-4 py-3 text-[13px] font-medium text-left">Tests</th>
-              <th className="px-4 py-3 text-[13px] font-medium text-left">Revenue</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Launch Date</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Finish Date</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tests</th>
             </tr>
           </thead>
-          <tbody>
-            {filteredBatches.map(batch => (
-              <tbody key={batch.id}>
-                <tr 
-                  onClick={() => setExpandedBatchId(isExpanded(batch.id) ? null : batch.id)}
-                  className="border-b border-border hover:bg-accent/20 cursor-pointer transition-colors"
-                >
-                  <td className="px-3 py-3">
-                    {isExpanded(batch.id) ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-[13px] font-medium">{batch.launchDate}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn(
-                      "text-[12px] font-medium px-2.5 py-1 rounded-md",
-                      statusStyles[mapBatchStatus(batch.status)] || "bg-accent"
-                    )}>
-                      {mapBatchStatus(batch.status)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[13px]">{batch.tests}</td>
-                  <td className="px-4 py-3 text-[13px] font-medium">{batch.revenue}</td>
-                </tr>
-
-                {/* Nested experiments table */}
-                {isExpanded(batch.id) && batch.experiments.length > 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-0">
-                      <table className="w-full">
-                        <thead className="border-t border-border bg-accent/10">
-                          <tr>
-                            <th className="px-8 py-2 text-[12px] font-medium text-left">Experiment</th>
-                            <th className="px-4 py-2 text-[12px] font-medium text-left">Status</th>
-                            <th className="px-4 py-2 text-[12px] font-medium text-left">Placement</th>
-                            <th className="px-4 py-2 text-[12px] font-medium text-left">Devices</th>
-                            <th className="px-4 py-2 text-[12px] font-medium text-left">GEOs</th>
-                            <th className="px-4 py-2 text-[12px] font-medium text-left">Variants</th>
-                            <th className="px-4 py-2 text-[12px] font-medium text-right">Revenue</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {batch.experiments.map(exp => (
-                            <tr key={exp.id} className="border-t border-border/50 hover:bg-accent/10">
-                              <td className="px-8 py-3 text-[12px]">{exp.name}</td>
-                              <td className="px-4 py-3">
-                                <span className={cn(
-                                  "text-[11px] font-medium px-2 py-1 rounded",
-                                  statusStyles[exp.status] || "bg-accent"
-                                )}>
-                                  {exp.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-[12px]">{exp.placement}</td>
-                              <td className="px-4 py-3 text-[12px]">{exp.devices}</td>
-                              <td className="px-4 py-3 text-[12px]">{exp.geos}</td>
-                              <td className="px-4 py-3 text-[12px]">{exp.variants}</td>
-                              <td className="px-4 py-3 text-[12px] text-right font-medium">{exp.revenue}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+          <tbody className="divide-y divide-border">
+            {filtered.map((batch, idx) => {
+              const isExpanded = expandedIdx === idx
+              return (
+                <div key={batch.id} className="contents">
+                  <tr 
+                    onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  >
+                    <td className="px-3 py-3">
+                      {batch.experiments.length > 0 && (
+                        isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                      )}
                     </td>
-                  </tr>
-                )}
-
-                {isExpanded(batch.id) && batch.experiments.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-[13px] text-muted-foreground">
-                      No experiments in this batch
+                    <td className="px-4 py-3">{batch.launchDate}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{batch.finishDate}</td>
+                    <td className="px-4 py-3">
+                      <span className={cn('text-xs font-medium px-2 py-1 rounded', statusStyles[mapBatchStatus(batch.status)])}>
+                        {mapBatchStatus(batch.status)}
+                      </span>
                     </td>
+                    <td className="px-4 py-3">{batch.tests}</td>
                   </tr>
-                )}
-              </tbody>
-            ))}
+
+                  {/* Nested experiments table */}
+                  {isExpanded && batch.experiments.length > 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-0">
+                        <div className="bg-muted/30 border-t border-border">
+                          <table className="w-full text-xs">
+                            <thead className="bg-muted/50">
+                              <tr>
+                                <th className="px-4 py-2 text-left font-medium">Experiment</th>
+                                <th className="px-4 py-2 text-left font-medium">Placement</th>
+                                <th className="px-4 py-2 text-left font-medium">Devices</th>
+                                <th className="px-4 py-2 text-left font-medium">GEOs</th>
+                                <th className="px-4 py-2 text-left font-medium">Variants</th>
+                                <th className="px-4 py-2 text-left font-medium">Revenue</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {batch.experiments.map((exp) => (
+                                <tr 
+                                  key={exp.id}
+                                  onClick={() => { setSelectedExperiment(exp); setIsModalOpen(true) }}
+                                  className="hover:bg-muted/50 cursor-pointer transition-colors"
+                                >
+                                  <td className="px-4 py-2">{exp.name}</td>
+                                  <td className="px-4 py-2">
+                                    {exp.placementUrl ? (
+                                      <a href={exp.placementUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                        {exp.placement}
+                                      </a>
+                                    ) : (
+                                      exp.placement
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2">{exp.devices}</td>
+                                  <td className="px-4 py-2">{exp.geos}</td>
+                                  <td className="px-4 py-2">{exp.variants}</td>
+                                  <td className="px-4 py-2 font-medium">{exp.revenue}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </div>
+              )
+            })}
           </tbody>
         </table>
 
-        {filteredBatches.length === 0 && (
-          <div className="p-8 text-center text-[13px] text-muted-foreground">
+        {filtered.length === 0 && (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
             No batches found
           </div>
         )}
       </div>
+
+      {/* Modal */}
+      <ExperimentDetailsModal 
+        isOpen={isModalOpen}
+        experiment={selectedExperiment}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   )
 }

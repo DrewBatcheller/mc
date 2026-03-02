@@ -535,11 +535,6 @@ export function ClientTracker() {
                       <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         {/* Client view: No CRUD actions */}
                       </td>
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                        </div>
-                      </td>
                     </tr>
 
                     {/* Expanded experiment rows */}
@@ -606,16 +601,7 @@ export function ClientTracker() {
                                       {exp.revenue}
                                     </td>
                                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setConvertExperimentModal(exp)
-                                        }}
-                                        className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-accent transition-colors ml-auto"
-                                        title="Convert Experiment back into Idea"
-                                      >
-                                        <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
-                                      </button>
+                                      {/* Client view: No CRUD actions */}
                                     </td>
                                   </tr>
                                 ))}

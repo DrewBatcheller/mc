@@ -65,14 +65,6 @@ const breadcrumbMap: Record<
     { label: "Clients", icon: Users, href: "/clients/dashboard" },
     { label: "Ideas", icon: Clock, href: "/clients/client-ideas" },
   ],
-  "/clients/test-ideas": [
-    { label: "Client", icon: Users, href: "/clients/dashboard" },
-    { label: "Test Ideas", icon: Clock, href: "/clients/test-ideas" },
-  ],
-  "/clients/experiments-overview": [
-    { label: "Client", icon: Users, href: "/clients/dashboard" },
-    { label: "Experiments", icon: FlaskConical, href: "/clients/experiments-overview" },
-  ],
   "/clients/client-dashboard": [
     { label: "Client Dashboard", icon: KanbanSquare, href: "/clients/client-dashboard" },
   ],

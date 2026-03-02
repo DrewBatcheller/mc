@@ -41,11 +41,9 @@ const columns: { key: SortKey | null; label: string }[] = [
 
 export function ClientIdeasTable() {
   const { user } = useUser()
-  
   const { data: rawIdeas, mutate } = useAirtable('experiment-ideas', {
-    fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Primary Goals', 'Priority', 'Client'],
+    fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Primary Goals', 'Priority'],
   })
-  
   const { toast } = useToast()
 
   const [search, setSearch] = useState("")

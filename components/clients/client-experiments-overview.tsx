@@ -74,6 +74,7 @@ export function ClientExperimentsOverview() {
 
   // Transform Airtable data into component shape
   const batches: Batch[] = useMemo(() => {
+    console.log('[v0] batchesData:', batchesData?.length, 'experimentsData:', experimentsData?.length, 'user:', user?.name)
     if (!batchesData) return []
     return batchesData.map(batch => {
       const batchExperiments = (experimentsData || []).filter(exp => {

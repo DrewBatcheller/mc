@@ -113,6 +113,7 @@ export function ClientExperimentsOverview() {
   // Transform Airtable data into component shape
   const batches: Batch[] = useMemo(() => {
     if (!batchesData) return []
+    console.log('[v0] batchesData:', batchesData?.length, 'experimentsData:', experimentsData?.length)
     return batchesData.map(batch => {
       // Find all experiments linked to this batch
       const batchExperiments = (experimentsData || []).filter(exp => {
@@ -137,6 +138,8 @@ export function ClientExperimentsOverview() {
         nextSteps: exp.fields['Next Steps (Action)'] as string,
       }))
 
+      console.log('[v0] Batch', batch.fields['Batch Key'], 'has', batchExperiments.length, 'experiments')
+      
       return {
         id: batch.id,
         client: user?.name || 'Unknown Client',
@@ -275,8 +278,13 @@ export function ClientExperimentsOverview() {
   const trackerStats = useMemo(() => {
     const totalBatches = batches.length
     const totalExperiments = batches.reduce((sum, b) => sum + b.experiments.length, 0)
-    const liveNow = batches.filter(b => mapBatchStatus(b.status) === "Live").length
+    // Live Now: count experiments with "In Progress" or "Live" status
+    const liveNow = batches.reduce((sum, b) => sum + b.experiments.filter(e => 
+      e.status?.toLowerCase().includes('in progress') || e.status?.toLowerCase().includes('live')
+    ).length, 0)
     const successful = batches.reduce((sum, b) => sum + b.experiments.filter(e => e.status === "Successful").length, 0)
+    
+    console.log('[v0] trackerStats - totalBatches:', totalBatches, 'totalExperiments:', totalExperiments, 'liveNow:', liveNow, 'batches:', batches)
     
     return [
       { label: "Total Batches", value: String(totalBatches), icon: Layers },

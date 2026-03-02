@@ -11,7 +11,7 @@
  * Permissions are fetched from Airtable and checked against current route.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -33,15 +33,20 @@ const FALLBACK_ROUTES: Record<UserRole, string> = {
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user, isLoading, isAuthenticated } = useUser()
-  const { canAccess } = usePermissions()
+  const { canAccess, permissions } = usePermissions()
   const router = useRouter()
   const pathname = usePathname()
+  const redirectedRef = useRef(false)
 
   useEffect(() => {
     if (isLoading) return
 
+    // If not authenticated, redirect to login
     if (!isAuthenticated) {
-      router.replace('/login')
+      if (!redirectedRef.current) {
+        redirectedRef.current = true
+        router.replace('/login')
+      }
       return
     }
 
@@ -49,20 +54,29 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
     // Check specific role requirement
     if (requiredRole && user.role !== requiredRole) {
-      router.replace(FALLBACK_ROUTES[user.role])
+      if (!redirectedRef.current) {
+        redirectedRef.current = true
+        router.replace(FALLBACK_ROUTES[user.role])
+      }
       return
     }
 
-    // Check route-level access using dynamic permissions
-    if (!canAccess(pathname)) {
-      router.replace(FALLBACK_ROUTES[user.role])
+    // Only check route access if we have permissions loaded
+    // This prevents redirect loops while permissions are loading
+    if (permissions && Object.keys(permissions).length > 0) {
+      if (!canAccess(pathname)) {
+        if (!redirectedRef.current) {
+          redirectedRef.current = true
+          router.replace(FALLBACK_ROUTES[user.role])
+        }
+      }
     }
-  }, [isLoading, isAuthenticated, user, router, pathname, requiredRole, canAccess])
+  }, [isLoading, isAuthenticated, user, router, pathname, requiredRole, canAccess, permissions])
 
   if (isLoading) return null
   if (!isAuthenticated) return null
   if (requiredRole && user?.role !== requiredRole) return null
-  if (user && !canAccess(pathname)) return null
+  if (user && permissions && Object.keys(permissions).length > 0 && !canAccess(pathname)) return null
 
   return <>{children}</>
 }

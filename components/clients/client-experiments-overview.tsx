@@ -10,6 +10,7 @@ import {
   FlaskConical,
   Zap,
   CheckCircle2,
+  Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"

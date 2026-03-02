@@ -71,10 +71,8 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[v0] Form submitted, clientId:', clientId)
     
     if (!formData.title || !formData.placementLabel || !formData.placementUrl || !formData.hypothesis || !formData.rationale || formData.primaryGoals.length === 0 || !formData.weighting || !formData.designBrief) {
-      console.log('[v0] Validation failed')
       toast({ title: 'Missing required fields', description: 'Please fill in all required fields', variant: 'destructive' })
       return
     }
@@ -87,18 +85,17 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         'Placement URL': normalizeUrl(formData.placementUrl),
         'Hypothesis': formData.hypothesis,
         'Rationale': formData.rationale,
-        'Primary Goals': formData.primaryGoals.join(', '),
+        'Primary Goals': formData.primaryGoals,
         'Devices': formData.devices,
-        'GEOs': formData.countries.join(', '),
+        'GEOs': formData.countries.length > 0 ? formData.countries : undefined,
         'Weighting': formData.weighting,
         'Design Brief': formData.designBrief,
         'Development Brief': formData.developmentBrief,
-        'Media/Links': formData.mediaLinks,
-        'Walkthrough Video URL': normalizeUrl(formData.walkthroughUrl),
+        'Media/Links': formData.mediaLinks || undefined,
+        'Walkthrough Video URL': normalizeUrl(formData.walkthroughUrl) || undefined,
         'Brand Name': clientId,
       }
 
-      console.log('[v0] Sending POST to /api/airtable/experiment-ideas with clientId:', clientId)
       const response = await fetch('/api/airtable/experiment-ideas', {
         method: 'POST',
         headers: {
@@ -110,15 +107,12 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
         body: JSON.stringify({ fields: airtableFields }),
       })
 
-      console.log('[v0] Response status:', response.status)
       if (!response.ok) {
         const error = await response.json()
-        console.log('[v0] API error:', error)
         throw new Error(error.error || 'Failed to create idea')
       }
 
       const result = await response.json()
-      console.log('[v0] Success:', result)
       toast({ title: 'Success', description: 'Test idea created successfully' })
       
       setFormData({
@@ -128,7 +122,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId 
       onClose()
       onSuccess?.()
     } catch (err) {
-      console.error('[v0] Error:', err)
       const message = err instanceof Error ? err.message : 'Failed to create idea'
       toast({ title: 'Error', description: message, variant: 'destructive' })
     } finally {

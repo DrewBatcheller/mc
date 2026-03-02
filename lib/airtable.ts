@@ -135,7 +135,6 @@ export async function createRecord<T = Record<string, unknown>>(
   fields: Partial<T>
 ): Promise<AirtableRecord<T>> {
   const url = `${BASE_URL}/${encodeURIComponent(tableName)}`
-  console.log('[v0] createRecord:', tableName, 'fields:', JSON.stringify(fields, null, 2))
   const res = await airtableFetch(url, {
     method: 'POST',
     body: JSON.stringify({ fields }),

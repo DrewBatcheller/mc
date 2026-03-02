@@ -15,6 +15,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (isLoading || !user) return
     
+    // Team members should go to their team dashboard
+    if (user.role === 'team') {
+      router.replace('/team')
+      return
+    }
+    
     // Sales should go to sales overview
     if (user.role === 'sales') {
       router.replace('/sales/overview')
@@ -27,11 +33,11 @@ export default function DashboardPage() {
       return
     }
     
-    // Management, Strategy, and Team members see the main dashboard (this page)
+    // Management and Strategy see the main dashboard (this page)
   }, [user, isLoading, router])
 
-  // Only show dashboard content for management/strategy/team users
-  if (user?.role === 'sales' || user?.role === 'client') {
+  // Only show dashboard content for management/strategy users
+  if (user?.role === 'team' || user?.role === 'sales' || user?.role === 'client') {
     return null
   }
 

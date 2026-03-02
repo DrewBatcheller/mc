@@ -48,7 +48,7 @@ export const SECTION_DEFINITIONS: Record<string, SectionDefinition> = {
     id: 'team',
     icon: 'Users',
     label: 'Team',
-    routes: ['/team', '/team/dashboard', '/team/directory', '/team/team-dashboard'],
+    routes: ['/team', '/team/directory', '/team/schedule'],
   },
   affiliates: {
     id: 'affiliates',

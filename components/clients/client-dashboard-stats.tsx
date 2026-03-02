@@ -81,18 +81,21 @@ export function ClientDashboardStats() {
 
   const row1 = [
     {
+      id: 'total-experiments',
       label: 'Total Experiments',
       value: String(stats.totalExperiments),
       sub: 'The cumulative count of all CRO tests launched to date.',
       className: 'border-l-[3px] border-l-sky-400',
     },
     {
+      id: 'scheduled-experiments',
       label: 'Scheduled Experiments',
       value: String(stats.scheduledExperiments),
       sub: 'Validated test ideas currently in the queue for production.',
       className: 'border-l-[3px] border-l-emerald-400',
     },
     {
+      id: 'active-tests',
       label: stats.liveStatus,
       value: String(stats.liveExperiments),
       sub: stats.liveStatus === 'No Active Tests' ? 'No tests currently active.' : 'Tests actively collecting data or in development pipeline.',
@@ -102,18 +105,21 @@ export function ClientDashboardStats() {
 
   const row2 = [
     {
+      id: 'unsuccessful-experiments',
       label: 'Unsuccessful Experiments',
       value: String(stats.unsuccessfulExperiments),
       sub: 'Total number of tests that resulted in a loss or were inconclusive.',
       className: 'border-l-[3px] border-l-rose-400',
     },
     {
+      id: 'successful-experiments',
       label: 'Successful Experiments',
       value: String(stats.successfulExperiments),
       sub: 'Winning variations that outperformed the control and were pushed to production.',
       className: 'border-l-[3px] border-l-emerald-400',
     },
     {
+      id: 'total-revenue',
       label: 'Total Revenue Added',
       value: stats.totalRevenueAdded,
       currency: true,
@@ -125,10 +131,10 @@ export function ClientDashboardStats() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {row1.map((s) => <MetricCard key={s.label} {...s} />)}
+        {row1.map((s) => <MetricCard key={s.id} {...s} />)}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {row2.map((s) => <MetricCard key={s.label} {...s} />)}
+        {row2.map((s) => <MetricCard key={s.id} {...s} />)}
       </div>
     </div>
   )

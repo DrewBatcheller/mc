@@ -228,35 +228,31 @@ export function ExperimentDetailsModal({
               </div>
             </div>
 
-            {/* Test Preview - Only show if experiment has deployed status or has results */}
-            {(experiment.deployed !== undefined || experiment.revenueAddedMrr) && (
+            {/* Test Preview - Only show if experiment has images */}
+            {(experiment.controlImage || experiment.variantImage) && (
               <>
                 <div className="h-px bg-border" />
                 <div>
                   <h3 className="text-sm font-semibold text-foreground mb-3">Test Preview</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-[12px] font-medium text-muted-foreground">Control</span>
-                      <p className="text-[12px] text-muted-foreground/70 mb-2">Original Page</p>
-                      <div className="h-44 rounded-lg border border-border overflow-hidden bg-accent/30">
-                        {experiment.controlImage ? (
+                    {experiment.controlImage && (
+                      <div>
+                        <span className="text-[12px] font-medium text-muted-foreground">Control</span>
+                        <p className="text-[12px] text-muted-foreground/70 mb-2">Original Page</p>
+                        <div className="h-44 rounded-lg border border-border overflow-hidden bg-accent/30">
                           <img src={experiment.controlImage} alt="Control" className="h-full w-full object-cover object-top" />
-                        ) : (
-                          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No image</div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <span className="text-[12px] font-medium text-muted-foreground">Variant</span>
-                      <p className="text-[12px] text-muted-foreground/70 mb-2">Variant Page</p>
-                      <div className="h-44 rounded-lg border border-border overflow-hidden bg-accent/30">
-                        {experiment.variantImage ? (
+                    )}
+                    {experiment.variantImage && (
+                      <div>
+                        <span className="text-[12px] font-medium text-muted-foreground">Variant</span>
+                        <p className="text-[12px] text-muted-foreground/70 mb-2">Variant Page</p>
+                        <div className="h-44 rounded-lg border border-border overflow-hidden bg-accent/30">
                           <img src={experiment.variantImage} alt="Variant" className="h-full w-full object-cover object-top" />
-                        ) : (
-                          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No image</div>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </>
@@ -347,33 +343,32 @@ export function ExperimentDetailsModal({
               </>
             )}
 
-            {/* Results Breakdown - Only show if there are actual result data */}
-            {(experiment.revenueAddedMrr || experiment.deployed !== undefined) && (
+            {/* Results Breakdown - Only show if there's actual result image */}
+            {experiment.resultImage && (
               <>
                 <div className="h-px bg-border" />
                 <div>
                   <span className="text-[12px] text-muted-foreground font-medium">Results Breakdown (Image)</span>
                   <div className="mt-2 h-52 rounded-lg border border-border overflow-hidden bg-accent/30">
-                    {experiment.resultImage ? (
-                      <img src={experiment.resultImage} alt="Results breakdown" className="h-full w-full object-contain" />
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No image</div>
-                    )}
+                    <img src={experiment.resultImage} alt="Results breakdown" className="h-full w-full object-contain" />
                   </div>
                 </div>
+              </>
+            )}
 
-                {/* Results Video */}
-                {experiment.resultVideo && (
-                  <div>
-                    <span className="text-[12px] text-muted-foreground font-medium">Results (Video)</span>
-                    <div className="mt-2">
-                      <a href={experiment.resultVideo} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 text-[12px] font-medium transition-colors">
-                        <Play className="h-3 w-3" />
-                        Watch Video
-                      </a>
-                    </div>
+            {/* Results Video */}
+            {experiment.resultVideo && (
+              <>
+                <div className="h-px bg-border" />
+                <div>
+                  <span className="text-[12px] text-muted-foreground font-medium">Results (Video)</span>
+                  <div className="mt-2">
+                    <a href={experiment.resultVideo} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 text-[12px] font-medium transition-colors">
+                      <Play className="h-3 w-3" />
+                      Watch Video
+                    </a>
                   </div>
-                )}
+                </div>
               </>
             )}
 

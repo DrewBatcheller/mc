@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SelectField } from '@/components/shared/select-field'
@@ -39,12 +39,27 @@ const COUNTRIES = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Me
 export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId, onAddOptimistic }: NewIdeaModalProps) {
   const { user } = useUser()
   const { toast } = useToast()
+  const countriesMenuRef = useRef<HTMLDivElement>(null)
   const [showCountriesMenu, setShowCountriesMenu] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     title: '', placementLabel: '', placementUrl: '', hypothesis: '', rationale: '', primaryGoals: [],
     devices: 'All Devices', countries: [], weighting: '', designBrief: '', developmentBrief: '', mediaLinks: '', walkthroughUrl: '',
   })
+
+  // Close countries menu when clicking outside
+  useEffect(() => {
+    if (!showCountriesMenu) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (countriesMenuRef.current && !countriesMenuRef.current.contains(e.target as Node)) {
+        setShowCountriesMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCountriesMenu])
 
   const handleChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -214,7 +229,7 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId,
               <p className="text-[12px] text-muted-foreground mb-3">Target device types</p>
               <SelectField value={formData.devices} onChange={(v) => handleChange('devices', v)} options={DEVICES} containerClassName="w-full" className="w-full disabled:opacity-50" disabled={isSubmitting} />
             </div>
-            <div className="relative">
+            <div className="relative" ref={countriesMenuRef}>
               <label className="text-sm font-medium text-foreground block mb-1">Countries</label>
               <p className="text-[12px] text-muted-foreground mb-3">Target countries (multi-select)</p>
               <button type="button" onClick={() => setShowCountriesMenu(!showCountriesMenu)} disabled={isSubmitting} className="w-full px-3 py-2 border border-border rounded-lg bg-background text-left text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50">

@@ -1,11 +1,10 @@
 'use client'
 
 /**
- * RoleSidebar — dynamic, permission-driven sidebar navigation.
+ * RoleSidebar — dynamic, permission-driven sidebar navigation with expandable sections.
  *
- * Fetches user permissions from Airtable (stored in UserContext).
- * Dynamically renders only the sections the user has access to.
- * No hardcoded NAV_CONFIG — fully Airtable-driven.
+ * Renders sections from SECTION_DEFINITIONS, filtered by user's Airtable permissions.
+ * Each section can be expanded to show its sub-routes.
  */
 
 import { cn } from '@/lib/utils'
@@ -27,8 +26,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useMemo } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { usePermissions } from '@/hooks/use-permissions'
-import { SECTION_DEFINITIONS } from '@/lib/section-config'
-import type { DynamicNavItem } from '@/lib/permission-types'
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -75,30 +72,25 @@ export function RoleSidebar() {
     return <SidebarSkeleton />
   }
 
-  // Build dynamic nav sections from accessible permissions
-  const navSections = useMemo<DynamicNavItem[]>(() => {
-    if (!accessibleSections || accessibleSections.length === 0) {
-      return []
-    }
-    return accessibleSections.map(section => ({
-      icon: section.icon,
-      label: section.label,
-      href: section.routes[0],  // Primary route
-    }))
-  }, [accessibleSections])
+  // Auto-expand sections that contain the current route
+  const initialOpenSections = useMemo(() => {
+    return accessibleSections
+      .filter(section => section.routes.some(route => pathname.startsWith(route)))
+      .map(section => section.id)
+  }, [accessibleSections, pathname])
 
-  const initialOpenSections = navSections
-    .filter((s) => pathname.startsWith(s.href || '/'))
-    .map((s) => s.label)
+  const [openSections, setOpenSections] = useState<string[]>(initialOpenSections)
 
-  const [openSections, setOpenSections] = useState<string[]>(
-    initialOpenSections.length > 0 ? initialOpenSections : []
-  )
-
-  function toggleSection(label: string) {
+  function toggleSection(sectionId: string) {
     setOpenSections((prev) =>
-      prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label]
+      prev.includes(sectionId) ? prev.filter((s) => s !== sectionId) : [...prev, sectionId]
     )
+  }
+
+  function handleCollapsedSectionClick(section: typeof accessibleSections[0]) {
+    // When collapsed, expand the sidebar and navigate to first route
+    setCollapsed(false)
+    router.push(section.routes[0])
   }
 
   return (
@@ -155,25 +147,101 @@ export function RoleSidebar() {
       {/* Nav */}
       <nav className="flex-1 flex flex-col justify-between overflow-y-auto">
         <div className="flex flex-col py-2 px-2.5">
-          {navSections.map((section) => {
-            const isActive = pathname.startsWith(section.href || '/')
+          {accessibleSections.map((section) => {
+            const isOpen = openSections.includes(section.id)
+            const hasMultipleRoutes = section.routes.length > 1
+            const isActive = section.routes.some(route => pathname.startsWith(route))
 
+            if (!hasMultipleRoutes) {
+              // Single-route sections are just buttons
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => {
+                    if (collapsed) {
+                      handleCollapsedSectionClick(section)
+                    } else {
+                      router.push(section.routes[0])
+                    }
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors',
+                    collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2',
+                    isActive
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+                  )}
+                  title={collapsed ? section.label : undefined}
+                >
+                  <NavIcon name={section.icon} className="h-4 w-4 shrink-0" />
+                  {!collapsed && <span>{section.label}</span>}
+                </button>
+              )
+            }
+
+            // Multi-route sections are expandable
             return (
-              <button
-                key={section.label}
-                onClick={() => router.push(section.href || '/')}
-                className={cn(
-                  'w-full flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors',
-                  collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2',
-                  isActive
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+              <div key={section.id}>
+                <button
+                  onClick={() => {
+                    if (collapsed) {
+                      handleCollapsedSectionClick(section)
+                    } else {
+                      toggleSection(section.id)
+                    }
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-colors',
+                    collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2 justify-between',
+                    isActive && !collapsed
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+                  )}
+                  title={collapsed ? section.label : undefined}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <NavIcon name={section.icon} className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span>{section.label}</span>}
+                  </span>
+                  {!collapsed && (
+                    <ChevronDown
+                      className={cn(
+                        'h-3.5 w-3.5 shrink-0 transition-transform duration-200',
+                        isOpen && 'rotate-180'
+                      )}
+                    />
+                  )}
+                </button>
+
+                {!collapsed && isOpen && (
+                  <div className="ml-[22px] border-l border-border pl-2.5 mt-0.5 mb-1 flex flex-col gap-0.5">
+                    {section.routes.slice(1).map((route) => {
+                      const routeLabel = route
+                        .split('/')
+                        .filter(Boolean)
+                        .pop()
+                        ?.split('-')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ')
+                      
+                      return (
+                        <button
+                          key={route}
+                          onClick={() => router.push(route)}
+                          className={cn(
+                            'w-full text-left px-2.5 py-1.5 rounded-md text-[13px] transition-colors',
+                            pathname === route
+                              ? 'text-foreground font-medium bg-accent'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+                          )}
+                        >
+                          {routeLabel}
+                        </button>
+                      )
+                    })}
+                  </div>
                 )}
-                title={collapsed ? section.label : undefined}
-              >
-                <NavIcon name={section.icon} className="h-4 w-4 shrink-0" />
-                {!collapsed && <span>{section.label}</span>}
-              </button>
+              </div>
             )
           })}
         </div>

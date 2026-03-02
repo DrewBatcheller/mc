@@ -1,12 +1,10 @@
 "use client"
 
-import { useState } from "react"
 import { useUser } from "@/contexts/UserContext"
 import { ClientIdeasTable } from "@/components/clients/client-ideas-table"
 
 export default function ClientTestIdeasPage() {
   const { user } = useUser()
-  const [expanded, setExpanded] = useState(false)
   const clientName = user?.name || "Client"
 
   const description =
@@ -24,13 +22,7 @@ export default function ClientTestIdeasPage() {
           Test Ideas
         </h1>
         <p className="text-[13px] text-muted-foreground mt-0.5 max-w-4xl">
-          {expanded ? description : `${description.slice(0, 80)}...`}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-foreground font-medium ml-1 hover:underline"
-          >
-            {expanded ? "Less" : "More"}
-          </button>
+          {description}
         </p>
       </div>
 

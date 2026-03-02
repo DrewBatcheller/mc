@@ -3,6 +3,8 @@
 import { ChevronDown, ArrowUpDown, Pencil, Trash2, AlertCircle } from "lucide-react"
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
 
 type SortKey = "expenses" | "statementName" | "date" | "vendor"
 type SortDir = "asc" | "desc"
@@ -12,6 +14,7 @@ interface ExpenseRow {
   statementName: string
   date: string
   vendor: string
+  category: string
 }
 
 interface CategoryGroup {
@@ -20,133 +23,173 @@ interface CategoryGroup {
   rows: ExpenseRow[]
 }
 
-const expenseData: CategoryGroup[] = [
-  {
-    category: "Accounting",
-    count: 8,
-    rows: [
-      { expenses: 1942.50, statementName: "e-Transfer sent Zed Tax Accounting", date: "11/14/2025", vendor: "-" },
-      { expenses: 12017.81, statementName: "Paid off Credit Card", date: "11/1/2025", vendor: "-" },
-      { expenses: 300, statementName: "e-Transfer sent Thereysa Tabert", date: "11/1/2025", vendor: "-" },
-      { expenses: 300, statementName: "e-Transfer sent Thereysa Tabert", date: "10/1/2025", vendor: "-" },
-      { expenses: 300, statementName: "e-Transfer sent Thereysa Tabert", date: "9/2/2025", vendor: "-" },
-      { expenses: 300, statementName: "e-Transfer sent Thereysa Tabert", date: "8/4/2025", vendor: "-" },
-      { expenses: 300, statementName: "e-Transfer sent Thereysa Tabert", date: "7/1/2025", vendor: "-" },
-      { expenses: 300, statementName: "e-Transfer sent Thereysa Tabert", date: "6/3/2025", vendor: "-" },
-    ],
-  },
-  {
-    category: "Operations",
-    count: 6,
-    rows: [
-      { expenses: 2400, statementName: "Office rent - November", date: "11/1/2025", vendor: "WeWork" },
-      { expenses: 2400, statementName: "Office rent - October", date: "10/1/2025", vendor: "WeWork" },
-      { expenses: 890, statementName: "Team lunch & meeting", date: "10/15/2025", vendor: "Uber Eats" },
-      { expenses: 450, statementName: "Office supplies", date: "9/20/2025", vendor: "Amazon" },
-      { expenses: 2400, statementName: "Office rent - September", date: "9/1/2025", vendor: "WeWork" },
-      { expenses: 150, statementName: "Courier services", date: "8/22/2025", vendor: "FedEx" },
-    ],
-  },
-  {
-    category: "Outsourcing / Freelancers",
-    count: 5,
-    rows: [
-      { expenses: 5500, statementName: "Freelancer - UI design sprint", date: "11/10/2025", vendor: "Upwork" },
-      { expenses: 3200, statementName: "Freelancer - Development", date: "10/25/2025", vendor: "Toptal" },
-      { expenses: 4800, statementName: "Freelancer - Strategy consultant", date: "10/5/2025", vendor: "-" },
-      { expenses: 2800, statementName: "Freelancer - Video editing", date: "9/15/2025", vendor: "Fiverr" },
-      { expenses: 1600, statementName: "Freelancer - QA testing", date: "9/8/2025", vendor: "-" },
-    ],
-  },
-  {
-    category: "Outsourcing / Freelancers (Development)",
-    count: 3,
-    rows: [
-      { expenses: 6500, statementName: "Developer - Sprint November", date: "11/5/2025", vendor: "-" },
-      { expenses: 6500, statementName: "Developer - Sprint October", date: "10/5/2025", vendor: "-" },
-      { expenses: 5000, statementName: "Developer - Sprint September", date: "9/5/2025", vendor: "-" },
-    ],
-  },
-  {
-    category: "Outsourcing / Freelancers (Strategy)",
-    count: 3,
-    rows: [
-      { expenses: 7284, statementName: "Strategy retainer - November", date: "11/1/2025", vendor: "-" },
-      { expenses: 6915, statementName: "Strategy retainer - October", date: "10/1/2025", vendor: "-" },
-      { expenses: 7025, statementName: "Strategy retainer - September", date: "9/1/2025", vendor: "-" },
-    ],
-  },
-  {
-    category: "Outsourcing / Freelancers (Design)",
-    count: 3,
-    rows: [
-      { expenses: 1904, statementName: "Design sprint - November", date: "11/8/2025", vendor: "-" },
-      { expenses: 1521, statementName: "Design sprint - October", date: "10/10/2025", vendor: "-" },
-      { expenses: 1337, statementName: "Design sprint - September", date: "9/12/2025", vendor: "-" },
-    ],
-  },
-  {
-    category: "Software",
-    count: 4,
-    rows: [
-      { expenses: 149.76, statementName: "Airtable - Monthly", date: "11/1/2025", vendor: "Airtable" },
-      { expenses: 79, statementName: "Calendly - Monthly", date: "11/1/2025", vendor: "Calendly" },
-      { expenses: 41.99, statementName: "DocuSign - Monthly", date: "11/1/2025", vendor: "DocuSign" },
-      { expenses: 13.43, statementName: "DigitalOcean - Monthly", date: "11/1/2025", vendor: "DigitalOcean" },
-    ],
-  },
-  {
-    category: "Software (Testing Platforms)",
-    count: 3,
-    rows: [
-      { expenses: 4724, statementName: "Convert.com - Monthly", date: "11/1/2025", vendor: "Convert.com" },
-      { expenses: 4531, statementName: "Convert.com - October", date: "10/1/2025", vendor: "Convert.com" },
-      { expenses: 4207, statementName: "Convert.com - September", date: "9/1/2025", vendor: "Convert.com" },
-    ],
-  },
-  {
-    category: "Marketing & Branding",
-    count: 3,
-    rows: [
-      { expenses: 8554.63, statementName: "Meta Ads - November", date: "11/30/2025", vendor: "Meta" },
-      { expenses: 787.50, statementName: "Content creation - October", date: "10/20/2025", vendor: "-" },
-      { expenses: 622.23, statementName: "SEO tools - September", date: "9/10/2025", vendor: "-" },
-    ],
-  },
-  {
-    category: "Interest and Bank Fees",
-    count: 2,
-    rows: [
-      { expenses: 161.02, statementName: "Bank service fee", date: "11/1/2025", vendor: "-" },
-      { expenses: 29, statementName: "Wire transfer fee", date: "10/15/2025", vendor: "-" },
-    ],
-  },
-  {
-    category: "Affiliate Payment",
-    count: 2,
-    rows: [
-      { expenses: 1263.18, statementName: "Affiliate payout - November", date: "11/20/2025", vendor: "-" },
-      { expenses: 1242.15, statementName: "Affiliate payout - October", date: "10/18/2025", vendor: "-" },
-    ],
-  },
-]
+export function ExpensesDetailTable({
+  dateRange = "All Time",
+  showCreateModal = false,
+  setShowCreateModal,
+  exportTrigger = 0,
+}: {
+  dateRange?: string
+  showCreateModal?: boolean
+  setShowCreateModal: (show: boolean) => void
+  exportTrigger?: number
+}) {
+  const { data: rawExpenses, isLoading } = useAirtable('expenses', {
+    fields: ['Expense', 'Date', 'Statement Name', 'Vendor (from Vendor)', 'Category (from Category)'],
+    sort: [{ field: 'Date', direction: 'desc' }],
+  })
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
+  const [sortKey, setSortKey] = useState<SortKey>("date")
+  const [sortDir, setSortDir] = useState<SortDir>("desc")
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
 
-const columns: { key: SortKey | "actions"; label: string; align?: "right" | "center" }[] = [
-  { key: "expenses", label: "Expenses", align: "right" },
-  { key: "statementName", label: "Statement Name" },
-  { key: "date", label: "Date" },
-  { key: "vendor", label: "Vendor" },
-  { key: "actions", label: "Actions", align: "center" },
-]
+  const groupedData = useMemo(() => {
+    if (!rawExpenses) return []
+
+    const rows: ExpenseRow[] = rawExpenses.map(r => {
+      let vendor = 'Unknown'
+      const vendorValue = r.fields['Vendor (from Vendor)']
+      if (Array.isArray(vendorValue)) {
+        vendor = String(vendorValue[0] ?? 'Unknown')
+      } else if (vendorValue) {
+        vendor = String(vendorValue)
+      }
+
+      let category = 'Other'
+      const catValue = r.fields['Category (from Category)']
+      if (Array.isArray(catValue)) {
+        category = String(catValue[0] ?? 'Other')
+      } else if (catValue) {
+        category = String(catValue)
+      }
+
+      return {
+        expenses: parseCurrency(r.fields['Expense'] as string),
+        statementName: String(r.fields['Statement Name'] ?? ''),
+        date: String(r.fields['Date'] ?? ''),
+        vendor,
+        category,
+      }
+    })
+
+    // Filter by date range
+    let filtered = rows
+    if (dateRange !== "All Time") {
+      const now = new Date()
+      let filterDate = new Date()
+      
+      if (dateRange === "Last Month") {
+        filterDate.setMonth(filterDate.getMonth() - 1)
+      } else if (dateRange === "Last 3 Months") {
+        filterDate.setMonth(filterDate.getMonth() - 3)
+      } else if (dateRange === "Last 6 Months") {
+        filterDate.setMonth(filterDate.getMonth() - 6)
+      } else if (dateRange.match(/^\d{4}$/)) {
+        const year = parseInt(dateRange)
+        filtered = filtered.filter(r => new Date(r.date).getFullYear() === year)
+      }
+
+      if (dateRange !== "All Time" && !dateRange.match(/^\d{4}$/)) {
+        filtered = filtered.filter(r => new Date(r.date) >= filterDate)
+      }
+    }
+
+    // Group by category
+    const grouped: Record<string, ExpenseRow[]> = {}
+    for (const row of filtered) {
+      if (!grouped[row.category]) grouped[row.category] = []
+      grouped[row.category].push(row)
+    }
+
+    // Sort within each category
+    const result: CategoryGroup[] = Object.entries(grouped)
+      .map(([category, categoryRows]) => {
+        let sorted = [...categoryRows]
+        if (sortKey === 'expenses') {
+          sorted.sort((a, b) => sortDir === 'asc' ? a.expenses - b.expenses : b.expenses - a.expenses)
+        } else if (sortKey === 'date') {
+          sorted.sort((a, b) => {
+            const aDate = new Date(a.date).getTime()
+            const bDate = new Date(b.date).getTime()
+            return sortDir === 'asc' ? aDate - bDate : bDate - aDate
+          })
+        } else if (sortKey === 'statementName') {
+          sorted.sort((a, b) => sortDir === 'asc' ? a.statementName.localeCompare(b.statementName) : b.statementName.localeCompare(a.statementName))
+        } else if (sortKey === 'vendor') {
+          sorted.sort((a, b) => sortDir === 'asc' ? a.vendor.localeCompare(b.vendor) : b.vendor.localeCompare(a.vendor))
+        }
+
+        return {
+          category,
+          count: categoryRows.length,
+          rows: sorted,
+        }
+      })
+      .sort((a, b) => b.rows.reduce((s, r) => s + r.expenses, 0) - a.rows.reduce((s, r) => s + r.expenses, 0))
+
+    return result
+  }, [rawExpenses, dateRange, sortKey, sortDir])
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category],
+    }))
+  }
+
+  const handleExport = () => {
+    const headers = ['Category', 'Statement Name', 'Date', 'Vendor', 'Amount']
+    const rows = groupedData.flatMap(group =>
+      group.rows.map(row => [group.category, row.statementName, row.date, row.vendor, row.expenses])
+    )
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row =>
+        row.map(cell =>
+          typeof cell === 'string' ? `"${cell.replace(/"/g, '""')}"` : cell
+        ).join(',')
+      ),
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  useEffect(() => {
+    if (exportTrigger && exportTrigger > 0) handleExport()
+  }, [exportTrigger])
+
+  function formatCurrency(value: number) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  }
+
+  const columns: { key: SortKey | "actions"; label: string; align?: "right" | "center" }[] = [
+    { key: "expenses", label: "Expenses", align: "right" },
+    { key: "statementName", label: "Statement Name" },
+    { key: "date", label: "Date" },
+    { key: "vendor", label: "Vendor" },
+    { key: "actions", label: "Actions", align: "center" },
+  ]
 
 function CategorySection({ 
   group, 
@@ -400,14 +443,20 @@ export function ExpensesDetailTable({
         </h2>
       </div>
       <div className="divide-y divide-border/50">
-        {expenseData.map((group) => (
-          <CategorySection 
-            key={group.category} 
-            group={group}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ))}
+        {isLoading ? (
+          <div className="p-8 text-center text-muted-foreground">Loading expenses...</div>
+        ) : groupedData.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">No expenses found for the selected date range.</div>
+        ) : (
+          groupedData.map((group) => (
+            <CategorySection 
+              key={group.category} 
+              group={group}
+              onEdit={() => {}}
+              onDelete={() => {}}
+            />
+          ))
+        )}
       </div>
 
       {/* Edit/Create Expense Modal */}

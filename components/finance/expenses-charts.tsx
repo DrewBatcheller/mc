@@ -14,29 +14,586 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { useMemo } from "react"
 
 /* ── Expenses Over Time (Area Chart) ── */
-
-const allExpensesOverTime = [
-  { month: "Sep 2022", expenses: 4200 },
-  { month: "Dec 2022", expenses: 7446 },
-  { month: "Mar 2023", expenses: 9800 },
-  { month: "Jun 2023", expenses: 12300 },
-  { month: "Sep 2023", expenses: 15600 },
-  { month: "Dec 2023", expenses: 18200 },
-  { month: "Mar 2024", expenses: 18700 },
-  { month: "Jun 2024", expenses: 20200 },
-  { month: "Sep 2024", expenses: 25500 },
-  { month: "Dec 2024", expenses: 24700 },
-  { month: "Mar 2025", expenses: 18700 },
-  { month: "Jun 2025", expenses: 20200 },
-  { month: "Sep 2025", expenses: 34900 },
-  { month: "Dec 2025", expenses: 31400 },
-]
 
 function formatDollar(value: number) {
   if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`
   return `$${value}`
+}
+
+const areaColor = "hsl(220, 55%, 62%)"
+
+export function ExpensesOverTimeChart({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawExpenses, isLoading } = useAirtable('expenses', {
+    fields: ['Expense', 'Date'],
+    sort: [{ field: 'Date', direction: 'asc' }],
+  })
+
+  const data = useMemo(() => {
+    if (!rawExpenses) return []
+    const byMonth: Record<string, number> = {}
+    const monthOrder: string[] = []
+
+    for (const r of rawExpenses) {
+      const d = String(r.fields['Date'] ?? '')
+      if (!d) continue
+      const dt = new Date(d)
+      const key = `${dt.toLocaleString('default', { month: 'short' })} ${dt.getFullYear()}`
+      if (!byMonth[key]) monthOrder.push(key)
+      byMonth[key] = (byMonth[key] ?? 0) + parseCurrency(r.fields['Expense'] as string)
+    }
+
+    let filtered = monthOrder.map(m => ({ month: m, expenses: byMonth[m] }))
+    
+    if (dateRange === "Last Month") filtered = filtered.slice(-1)
+    else if (dateRange === "Last 3 Months") filtered = filtered.slice(-3)
+    else if (dateRange === "Last 6 Months") filtered = filtered.slice(-6)
+    else if (dateRange.match(/^\d{4}$/)) {
+      const year = parseInt(dateRange)
+      filtered = filtered.filter(d => parseInt(d.month.split(" ")[1]) === year)
+    }
+
+    return filtered
+  }, [rawExpenses, dateRange])
+
+  const getInterval = () => {
+    if (data.length <= 3) return 0
+    if (data.length <= 6) return 1
+    return 2
+  }
+
+  return (
+    <div className="bg-card rounded-xl border border-border">
+      <div className="px-5 py-4 border-b border-border">
+        <h2 className="text-sm font-semibold text-foreground">
+          Expenses Over Time
+        </h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">
+          Monthly expense trend
+        </p>
+      </div>
+      <div className="p-5 pt-4">
+        <div className="h-[260px]">
+          {isLoading ? (
+            <div className="h-full bg-muted animate-pulse rounded" />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data}>
+                <defs>
+                  <linearGradient id="fillExpTime" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={areaColor} stopOpacity={0.1} />
+                    <stop offset="100%" stopColor={areaColor} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220, 13%, 91%)" />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dy={8}
+                  interval={getInterval()}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dx={-4}
+                  width={44}
+                  tickFormatter={formatDollar}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid hsl(220, 13%, 91%)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
+                    backgroundColor: "white",
+                  }}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, "Expenses"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="expenses"
+                  stroke={areaColor}
+                  strokeWidth={1.5}
+                  fill="url(#fillExpTime)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Expenses by Category Over Time (Multi-line) ── */
+
+const categoryColors: Record<string, string> = {
+  outsourcing: "hsl(195, 65%, 48%)",
+  software: "hsl(142, 45%, 55%)",
+  operations: "hsl(38, 70%, 55%)",
+  accounting: "hsl(262, 45%, 58%)",
+  marketing: "hsl(330, 45%, 55%)",
+}
+
+const categoryLabels: Record<string, string> = {
+  outsourcing: "Outsourcing / Freelancers",
+  software: "Software",
+  operations: "Operations",
+  accounting: "Accounting",
+  marketing: "Marketing & Branding",
+}
+
+export function ExpensesByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawExpenses, isLoading } = useAirtable('expenses', {
+    fields: ['Expense', 'Date', 'Category (from Category)'],
+    sort: [{ field: 'Date', direction: 'asc' }],
+  })
+
+  const data = useMemo(() => {
+    if (!rawExpenses) return []
+    const byMonth: Record<string, Record<string, number>> = {}
+    const monthOrder: string[] = []
+
+    for (const r of rawExpenses) {
+      const d = String(r.fields['Date'] ?? '')
+      const cat = String(r.fields['Category (from Category)'] ?? 'other').toLowerCase().replace(/\s+/g, '')
+      if (!d) continue
+
+      const dt = new Date(d)
+      const month = `${dt.toLocaleString('default', { month: 'short' })} ${dt.getFullYear()}`
+      if (!byMonth[month]) {
+        monthOrder.push(month)
+        byMonth[month] = {}
+      }
+
+      byMonth[month][cat] = (byMonth[month][cat] ?? 0) + parseCurrency(r.fields['Expense'] as string)
+    }
+
+    let result = monthOrder.map(m => ({
+      month: m,
+      ...byMonth[m],
+    }))
+
+    if (dateRange === "Last Month") result = result.slice(-1)
+    else if (dateRange === "Last 3 Months") result = result.slice(-3)
+    else if (dateRange === "Last 6 Months") result = result.slice(-6)
+    else if (dateRange.match(/^\d{4}$/)) {
+      const year = parseInt(dateRange)
+      result = result.filter(d => parseInt(d.month.split(" ")[1]) === year)
+    }
+
+    return result
+  }, [rawExpenses, dateRange])
+
+  const getInterval = () => {
+    if (data.length <= 3) return 0
+    if (data.length <= 6) return 1
+    return 2
+  }
+
+  return (
+    <div className="bg-card rounded-xl border border-border">
+      <div className="px-5 py-4 border-b border-border">
+        <h2 className="text-sm font-semibold text-foreground">
+          Expenses Over Time (By Category)
+        </h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">
+          Category-level expense trends
+        </p>
+      </div>
+      <div className="p-5 pt-4">
+        <div className="h-[260px]">
+          {isLoading ? (
+            <div className="h-full bg-muted animate-pulse rounded" />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220, 13%, 91%)" />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dy={8}
+                  interval={getInterval()}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dx={-4}
+                  width={44}
+                  tickFormatter={formatDollar}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid hsl(220, 13%, 91%)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
+                    backgroundColor: "white",
+                  }}
+                  formatter={(value: number, name: string) => [
+                    `$${value.toLocaleString()}`,
+                    categoryLabels[name] || name,
+                  ]}
+                />
+                {Object.keys(categoryColors).map((key) => (
+                  <Area
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stroke={categoryColors[key]}
+                    strokeWidth={1.5}
+                    fill="none"
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 text-[12px]">
+          {Object.entries(categoryLabels).map(([key, label]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ backgroundColor: categoryColors[key] }}
+              />
+              <span className="text-muted-foreground">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Expenses by Vendor Pie ── */
+
+const vendorColors = [
+  "hsl(195, 65%, 48%)",
+  "hsl(220, 55%, 62%)",
+  "hsl(142, 45%, 55%)",
+  "hsl(38, 70%, 55%)",
+  "hsl(0, 50%, 65%)",
+  "hsl(262, 45%, 58%)",
+  "hsl(195, 40%, 65%)",
+  "hsl(330, 45%, 55%)",
+  "hsl(170, 45%, 50%)",
+  "hsl(220, 13%, 72%)",
+]
+
+export function ExpensesByVendorPie({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawExpenses, isLoading } = useAirtable('expenses', {
+    fields: ['Expense', 'Date', 'Vendor (from Vendor)'],
+    sort: [{ field: 'Date', direction: 'desc' }],
+  })
+
+  const data = useMemo(() => {
+    if (!rawExpenses) return []
+    
+    const byVendor: Record<string, number> = {}
+    for (const r of rawExpenses) {
+      let vendor = 'Other'
+      const vendorValue = r.fields['Vendor (from Vendor)']
+      
+      if (Array.isArray(vendorValue)) {
+        vendor = String(vendorValue[0] ?? 'Other')
+      } else if (vendorValue) {
+        vendor = String(vendorValue)
+      }
+
+      byVendor[vendor] = (byVendor[vendor] ?? 0) + parseCurrency(r.fields['Expense'] as string)
+    }
+
+    const result = Object.entries(byVendor)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 9)
+
+    // Add "Other" category for remaining
+    const otherValue = Object.values(byVendor).reduce((s, v) => s + v, 0) - result.reduce((s, d) => s + d.value, 0)
+    if (otherValue > 0) result.push({ name: 'Other', value: otherValue })
+
+    return result
+  }, [rawExpenses])
+
+  const total = data.reduce((s, d) => s + d.value, 0)
+
+  return (
+    <div className="bg-card rounded-xl border border-border">
+      <div className="px-5 py-4 border-b border-border">
+        <h2 className="text-sm font-semibold text-foreground">
+          Total Expenses by Vendor
+        </h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">
+          Spending distribution by vendor
+        </p>
+      </div>
+      <div className="p-5 flex flex-col sm:flex-row items-center sm:items-start gap-5">
+        <div className="h-[180px] w-[180px] shrink-0">
+          {isLoading ? (
+            <div className="h-full w-full bg-muted animate-pulse rounded" />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={0}
+                  outerRadius={85}
+                  paddingAngle={0.5}
+                  dataKey="value"
+                  stroke="white"
+                  strokeWidth={1.5}
+                >
+                  {data.map((_, index) => (
+                    <Cell key={`v-${index}`} fill={vendorColors[index % vendorColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid hsl(220, 13%, 91%)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
+                    backgroundColor: "white",
+                  }}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 text-[12px] min-w-0">
+          {data.map((entry, i) => (
+            <div key={entry.name} className="flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ backgroundColor: vendorColors[i % vendorColors.length] }}
+              />
+              <span className="text-muted-foreground truncate">
+                {entry.name}{" "}
+                <span className="text-foreground font-medium">
+                  {total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0'}%
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Expenses by Category Pie ── */
+
+const catPieColors = [
+  "hsl(195, 65%, 48%)",
+  "hsl(220, 55%, 62%)",
+  "hsl(142, 45%, 55%)",
+  "hsl(38, 70%, 55%)",
+  "hsl(0, 50%, 65%)",
+  "hsl(262, 45%, 58%)",
+  "hsl(330, 45%, 55%)",
+  "hsl(195, 40%, 65%)",
+  "hsl(170, 45%, 50%)",
+  "hsl(50, 60%, 50%)",
+  "hsl(10, 55%, 55%)",
+  "hsl(220, 13%, 72%)",
+  "hsl(280, 40%, 58%)",
+  "hsl(155, 45%, 52%)",
+  "hsl(25, 65%, 55%)",
+]
+
+export function ExpensesByCategoryPie({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawExpenses, isLoading } = useAirtable('expenses', {
+    fields: ['Expense', 'Date', 'Category (from Category)'],
+    sort: [{ field: 'Date', direction: 'desc' }],
+  })
+
+  const data = useMemo(() => {
+    if (!rawExpenses) return []
+    
+    const byCat: Record<string, number> = {}
+    for (const r of rawExpenses) {
+      let cat = 'Other'
+      const catValue = r.fields['Category (from Category)']
+      
+      if (Array.isArray(catValue)) {
+        cat = String(catValue[0] ?? 'Other')
+      } else if (catValue) {
+        cat = String(catValue)
+      }
+
+      byCat[cat] = (byCat[cat] ?? 0) + parseCurrency(r.fields['Expense'] as string)
+    }
+
+    return Object.entries(byCat)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [rawExpenses])
+
+  const total = data.reduce((s, d) => s + d.value, 0)
+
+  return (
+    <div className="bg-card rounded-xl border border-border">
+      <div className="px-5 py-4 border-b border-border">
+        <h2 className="text-sm font-semibold text-foreground">
+          Total Expenses by Category
+        </h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">
+          Spending distribution by category
+        </p>
+      </div>
+      <div className="p-5 flex flex-col sm:flex-row items-center sm:items-start gap-5">
+        <div className="h-[180px] w-[180px] shrink-0">
+          {isLoading ? (
+            <div className="h-full w-full bg-muted animate-pulse rounded" />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={0}
+                  outerRadius={85}
+                  paddingAngle={0.5}
+                  dataKey="value"
+                  stroke="white"
+                  strokeWidth={1.5}
+                >
+                  {data.map((_, index) => (
+                    <Cell key={`c-${index}`} fill={catPieColors[index % catPieColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid hsl(220, 13%, 91%)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
+                    backgroundColor: "white",
+                  }}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 text-[12px] min-w-0">
+          {data.map((entry, i) => (
+            <div key={entry.name} className="flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ backgroundColor: catPieColors[i % catPieColors.length] }}
+              />
+              <span className="text-muted-foreground truncate">
+                {entry.name}{" "}
+                <span className="text-foreground font-medium">
+                  {total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0'}%
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Expenses by Category (Horizontal Bar) ── */
+
+export function ExpensesByCategoryBar({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawExpenses, isLoading } = useAirtable('expenses', {
+    fields: ['Expense', 'Date', 'Category (from Category)'],
+    sort: [{ field: 'Date', direction: 'desc' }],
+  })
+
+  const data = useMemo(() => {
+    if (!rawExpenses) return []
+    
+    const byCat: Record<string, number> = {}
+    for (const r of rawExpenses) {
+      let cat = 'Other'
+      const catValue = r.fields['Category (from Category)']
+      
+      if (Array.isArray(catValue)) {
+        cat = String(catValue[0] ?? 'Other')
+      } else if (catValue) {
+        cat = String(catValue)
+      }
+
+      byCat[cat] = (byCat[cat] ?? 0) + parseCurrency(r.fields['Expense'] as string)
+    }
+
+    return Object.entries(byCat)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [rawExpenses])
+
+  return (
+    <div className="bg-card rounded-xl border border-border">
+      <div className="px-5 py-4 border-b border-border">
+        <h2 className="text-sm font-semibold text-foreground">
+          Total Expenses by Category
+        </h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">
+          Ranked by total spend
+        </p>
+      </div>
+      <div className="p-5 pt-4">
+        <div className="h-[340px]">
+          {isLoading ? (
+            <div className="h-full bg-muted animate-pulse rounded" />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(220, 13%, 91%)" />
+                <XAxis
+                  type="number"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dx={-4}
+                  tickFormatter={formatDollar}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dx={-4}
+                  width={120}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid hsl(220, 13%, 91%)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
+                    backgroundColor: "white",
+                  }}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, "Expenses"]}
+                />
+                <Bar dataKey="value" fill={areaColor} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const areaColor = "hsl(220, 55%, 62%)"

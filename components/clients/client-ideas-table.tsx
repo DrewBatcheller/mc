@@ -3,132 +3,20 @@
 import { useState, useMemo, Fragment } from "react"
 import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAirtable } from "@/hooks/use-airtable"
 import { NewIdeaModal } from "./new-idea-modal"
 import { SyncIdeaModal } from "./sync-idea-modal"
 
 interface ClientIdea {
+  id: string
   testDescription: string
   hypothesis: string
   rationale: string
   placement: string
-  placementUrl: string
+  placementUrl?: string
   primaryGoals: string[]
-  weighting: string
-  devices: string
-  geos: string
   priority: string
 }
-
-const ideas: ClientIdea[] = [
-  {
-    testDescription: '"Love the Taste or It\'s Free" Guarantee',
-    hypothesis: 'If we add a specific "Taste-Match" badge near the ATC, then CVR will increase by addressing the primary barrier to protein purchases: taste anxiety.',
-    rationale: 'Users hesitate to buy large bags of new flavors. A specific taste guarantee removes the psychological risk of being stuck with a chalky protein powder they can\'t return.',
-    placement: "PDP ATC Area",
-    placementUrl: "https://vitahustle.com/products/one-superf",
-    primaryGoals: ["CVR", "ATC", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "5",
-  },
-  {
-    testDescription: "Updated Contextual Delivery Date",
-    hypothesis: 'If we add "Order in X hours to receive in [State] by [Date]," then CVR will increase by creating urgency and removing logistics anxiety.',
-    rationale: "Knowing exactly when a replenishment product will arrive is a massive conversion lever for users running low on supply.",
-    placement: "Under ATC",
-    placementUrl: "https://vitahustle.com/products/one-superf",
-    primaryGoals: ["CVR", "SCVR", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "4",
-  },
-  {
-    testDescription: "Move OTP Below ATC",
-    hypothesis: 'If we move the "One-Time Purchase" option to a text link below the main Add to Cart button, then Subscription CVR will increase by making subscription the default path.',
-    rationale: 'High growth brands use this to prioritize recurring revenue. It frames the subscription as the "standard" way to buy while keeping the one-time option accessible.',
-    placement: "Buybox (Toggles)",
-    placementUrl: "https://vitahustle.com/products/one-superf",
-    primaryGoals: ["CVR", "AOV", "SCVR", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "5",
-  },
-  {
-    testDescription: "In Cart Subscription Switcher",
-    hypothesis: 'If we add a toggle in the cart drawer to "Switch to Subscribe & Save," then Subscription CVR will increase by capturing users swayed by final price savings.',
-    rationale: 'Seeing the total price in the cart is the "moment of truth." A 20% discount here is a powerful final nudge.',
-    placement: "Slide-out Cart Drawer",
-    placementUrl: "https://vitahustle.com",
-    primaryGoals: ["CVR", "SCVR", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "3",
-  },
-  {
-    testDescription: "Tiered Quantity Breaks (1, 2, 3 Bags)",
-    hypothesis: 'If we replace the static quantity selectors with a "Build a Bundle" experience and a dynamic gamification bar that unlocks tiered discounts (10% off at 3 bags, 15% off at 4+), then AOV will increase.',
-    rationale: 'The current buybox lacks a clear "reward" for adding more bags beyond the $50 shipping threshold. By introducing a progress bar that visualizes savings, users feel motivated to add more.',
-    placement: "Above ATC Button",
-    placementUrl: "https://vitahustle.com/products/one-superf",
-    primaryGoals: ["AOV", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "4",
-  },
-  {
-    testDescription: "Sitewide Progress Bar: Tiered Reward Incentive",
-    hypothesis: "If we implement a new dynamic announcement bar that tracks progress toward Free Shipping and a Free Shaker, then AOV and CVR will increase by creating a persistent visual incentive.",
-    rationale: "Without an announcement bar, users may not realize they are close to a value threshold (like Free Shipping at 2 bags) until they reach the checkout.",
-    placement: "Site-wide Header / Top",
-    placementUrl: "https://vitahustle.com",
-    primaryGoals: ["CVR", "AOV", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "3",
-  },
-  {
-    testDescription: "Price Per Serving & Total Savings Visualization",
-    hypothesis: 'If we emphasize the "$2.66/serving" cost and show "You Save $10.00" in high contrast green, then SCVR will increase by making the value undeniable.',
-    rationale: 'Breaking down large lump sums into a "Daily Ritual" cost triggers rational value logic, making the purchase feel like a smaller daily investment.',
-    placement: "Purchase Options / Buybox",
-    placementUrl: "https://vitahustle.com/products/one-superf",
-    primaryGoals: ["CVR", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "2",
-  },
-  {
-    testDescription: "Cart Drawer Cross-Sell & Impulse Add-ons",
-    hypothesis: 'If we add a "Frequently Bought Together" section in the cart drawer with low-friction items, then AOV will increase via impulse purchases.',
-    rationale: "Once a user commits to a $50 bag, adding a $10 shaker or smaller accessory feels like a minor marginal cost that doesn't require heavy consideration.",
-    placement: "Cart Drawer / Slide-out Cart",
-    placementUrl: "https://vitahustle.com/cart",
-    primaryGoals: ["AOV", "ATC", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "4",
-  },
-  {
-    testDescription: "PDP Taste Validation Video Carousel",
-    hypothesis: 'If we implement a video testimonial carousel specifically showcasing people drinking the shake, then CVR will increase by removing "Taste Anxiety" at the point of purchase.',
-    rationale: "Users at the bottom of the funnel are often hesitant about texture and flavor. Seeing authentic video reviews of customers enjoying the product is more persuasive than text reviews.",
-    placement: "Below the Buybox",
-    placementUrl: "https://vitahustle.com/products/one-superf",
-    primaryGoals: ["CVR", "ATC", "RPV"],
-    weighting: "50/50",
-    devices: "All Devices",
-    geos: "United States",
-    priority: "5",
-  },
-]
 
 const goalColors: Record<string, string> = {
   CVR: "bg-sky-50 text-sky-700 border-sky-200",
@@ -138,7 +26,7 @@ const goalColors: Record<string, string> = {
   SCVR: "bg-indigo-50 text-indigo-700 border-indigo-200",
 }
 
-type SortKey = "testDescription" | "placement" | "devices" | "geos"
+type SortKey = "testDescription" | "placement"
 
 const columns: { key: SortKey | null; label: string }[] = [
   { key: null, label: "" },
@@ -149,6 +37,10 @@ const columns: { key: SortKey | null; label: string }[] = [
 ]
 
 export function ClientIdeasTable() {
+  const { data: rawIdeas } = useAirtable('experiment-ideas', {
+    fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Primary Goals', 'Priority'],
+  })
+  
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("testDescription")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
@@ -156,6 +48,21 @@ export function ClientIdeasTable() {
   const [syncModalOpen, setSyncModalOpen] = useState(false)
   const [syncIdea, setSyncIdea] = useState<ClientIdea | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Transform Airtable records to ClientIdea format
+  const ideas = useMemo(() => {
+    if (!rawIdeas) return []
+    return rawIdeas.map(record => ({
+      id: record.id,
+      testDescription: record.fields['Test Description'] as string || '',
+      hypothesis: record.fields['Hypothesis'] as string || '',
+      rationale: record.fields['Rationale'] as string || '',
+      placement: record.fields['Placement'] as string || '',
+      placementUrl: record.fields['Placement URL'] as string,
+      primaryGoals: (record.fields['Primary Goals'] as string[]) || [],
+      priority: String(record.fields['Priority'] || ''),
+    }))
+  }, [rawIdeas])
 
   const toggleRow = (idx: number) => {
     setExpandedRows((prev) => {
@@ -193,7 +100,7 @@ export function ClientIdeasTable() {
       return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av)
     })
     return list
-  }, [search, sortKey, sortDir])
+  }, [search, sortKey, sortDir, ideas])
 
   return (
     <>

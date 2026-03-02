@@ -3,26 +3,22 @@
 import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAirtable } from '@/hooks/use-airtable'
 import { ContentCard } from '@/components/shared/content-card'
 import { ExperimentDetailsModal } from '@/components/experiments/experiment-details-modal'
 
 type TestStatus = 'Successful' | 'Inconclusive' | 'Unsuccessful'
 
 interface RecentResult {
+  id: string
   name: string
   status: TestStatus
   placement: string
   endDate: string
   revenueAdded: number
-  client?: string
   launchDate?: string
   rationale?: string
   goals?: string[]
-  device?: string
-  geos?: string
-  deployed?: boolean
-  controlLabel?: string
-  variantLabel?: string
 }
 
 const statusStyles: Record<TestStatus, string> = {
@@ -37,73 +33,6 @@ const cardBorder: Record<TestStatus, string> = {
   Inconclusive: 'border-l-amber-400',
 }
 
-const results: RecentResult[] = [
-  {
-    name: 'OTP Under ATC (L/F)',
-    status: 'Successful',
-    placement: 'Landing Page (Under ATC)',
-    endDate: 'January 10, 2026',
-    revenueAdded: 45000,
-    client: 'Vita Hustle',
-    launchDate: 'December 27, 2025',
-    rationale: 'Testing one-time purchase offers directly under the add-to-cart button to increase conversion rates on landing pages.',
-    goals: ['CVR', 'AOV'],
-    device: 'All Devices',
-    geos: 'US, CA',
-    deployed: true,
-    controlLabel: 'Standard ATC',
-    variantLabel: 'OTP Below ATC',
-  },
-  {
-    name: 'Vertical Stack Buybox & Gamification',
-    status: 'Inconclusive',
-    placement: 'PDP Buybox / Flavor Selection Area',
-    endDate: 'February 7, 2026',
-    revenueAdded: 0,
-    client: 'Vita Hustle',
-    launchDate: 'January 24, 2026',
-    rationale: 'Restructuring the buybox with gamification elements to improve engagement and conversion on product detail pages.',
-    goals: ['CVR', 'ATC'],
-    device: 'All Devices',
-    geos: 'US',
-    deployed: false,
-    controlLabel: 'Horizontal Buybox',
-    variantLabel: 'Vertical Stack + Gamification',
-  },
-  {
-    name: 'Checkout UVP Tests',
-    status: 'Unsuccessful',
-    placement: 'Checkout Page',
-    endDate: 'December 4, 2025',
-    revenueAdded: 0,
-    client: 'Vita Hustle',
-    launchDate: 'November 20, 2025',
-    rationale: 'Adding unique value propositions at checkout to reduce cart abandonment and increase completion rates.',
-    goals: ['CVR'],
-    device: 'All Devices',
-    geos: 'US, CA',
-    deployed: false,
-    controlLabel: 'Standard Checkout',
-    variantLabel: 'UVP-Enhanced Checkout',
-  },
-  {
-    name: 'Free Shipping Banner',
-    status: 'Successful',
-    placement: 'Header',
-    endDate: 'January 25, 2026',
-    revenueAdded: 22000,
-    client: 'Vita Hustle',
-    launchDate: 'January 11, 2026',
-    rationale: 'Promoting free shipping threshold in a prominent header banner to encourage larger cart sizes and increase average order value.',
-    goals: ['AOV', 'CVR'],
-    device: 'All Devices',
-    geos: 'US, CA, UK',
-    deployed: true,
-    controlLabel: 'No Banner',
-    variantLabel: 'Free Shipping Banner',
-  },
-]
-
 const RESULTS_PER_PAGE = 2
 
 function formatRevenue(n: number) {
@@ -112,35 +41,54 @@ function formatRevenue(n: number) {
   return `$${n.toLocaleString()}`
 }
 
-// Convert RecentResult to Experiment interface for modal compatibility
 function convertResultToExperiment(result: RecentResult): any {
   return {
     name: result.name,
     description: result.rationale || '',
     status: result.status,
     placement: result.placement,
-    devices: result.device || 'All Devices',
-    geos: result.geos || 'US',
+    devices: 'All Devices',
+    geos: 'US',
     variants: "2",
     revenue: formatRevenue(result.revenueAdded),
     primaryGoals: result.goals || [],
     rationale: result.rationale || '',
     revenueAddedMrr: formatRevenue(result.revenueAdded),
-    deployed: result.deployed || false,
+    deployed: true,
     launchDate: result.launchDate || '',
     endDate: result.endDate,
   }
 }
 
 export function ClientRecentResults() {
+  const { data: experiments } = useAirtable('experiments', {
+    fields: ['Test Description', 'Result', 'Placement', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date'],
+  })
+  
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedResult, setSelectedResult] = useState<RecentResult | null>(null)
   
+  const results = useMemo(() => {
+    if (!experiments) return []
+    return experiments
+      .filter(e => e.fields['Result'] && ['Successful', 'Unsuccessful', 'Inconclusive'].includes(String(e.fields['Result'])))
+      .map(e => ({
+        id: e.id,
+        name: String(e.fields['Test Description'] || ''),
+        status: String(e.fields['Result']) as TestStatus,
+        placement: String(e.fields['Placement'] || ''),
+        endDate: String(e.fields['End Date'] || ''),
+        revenueAdded: typeof e.fields['Revenue Added (MRR) (Regular Format)'] === 'number' ? e.fields['Revenue Added (MRR) (Regular Format)'] : 0,
+        launchDate: String(e.fields['Launch Date'] || ''),
+      }))
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
+  }, [experiments])
+
   const totalPages = Math.ceil(results.length / RESULTS_PER_PAGE)
   const paginatedResults = useMemo(() => {
     const start = currentPage * RESULTS_PER_PAGE
     return results.slice(start, start + RESULTS_PER_PAGE)
-  }, [currentPage])
+  }, [currentPage, results])
 
   const handlePrevPage = () => {
     setCurrentPage(prev => Math.max(0, prev - 1))
@@ -155,7 +103,7 @@ export function ClientRecentResults() {
       <div className="flex-1 px-5 py-4 flex flex-col gap-3">
         {paginatedResults.map((result) => (
           <div
-            key={result.name}
+            key={result.id}
             onClick={() => setSelectedResult(result)}
             className={cn(
               'rounded-lg border border-border p-4 border-l-[3px] flex flex-col gap-2 cursor-pointer hover:shadow-md transition-all',
@@ -198,7 +146,7 @@ export function ClientRecentResults() {
       {/* Pagination */}
       <div className="px-5 py-3 border-t border-border flex items-center justify-between">
         <span className="text-[12px] text-muted-foreground">
-          {currentPage + 1} of {totalPages || 1}
+          {results.length > 0 ? currentPage + 1 : 0} of {totalPages || 1}
         </span>
         <div className="flex items-center gap-1.5">
           <button

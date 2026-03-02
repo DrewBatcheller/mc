@@ -6,15 +6,11 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
-  Play,
-  Pencil,
-  Trash2,
   ExternalLink,
   Layers,
   FlaskConical,
   Zap,
   CheckCircle2,
-  ArrowLeftRight,
   Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,6 +20,7 @@ import { useUser } from "@/contexts/UserContext"
 
 /* ── Types ── */
 interface Experiment {
+  id: string
   name: string
   description: string
   status: string
@@ -33,38 +30,10 @@ interface Experiment {
   geos: string
   variants: string
   revenue: string
-  primaryGoals?: string[]
-  hypothesis?: string
-  rationale?: string
-  weighting?: string
-  revenueAddedMrr?: string
-  nextSteps?: string
-  variantData?: {
-    name: string
-    status?: string
-    trafficPercent?: number
-    visitors: number
-    conversions: number
-    cr?: number
-    crPercent?: number
-    crImprovement: number
-    crConfidence?: number
-    rpv: number
-    rpvImprovement: number
-    rpvConfidence?: number
-    revenue: number
-    revenueImprovement: number
-    appv?: number
-    appvImprovement?: number
-  }[]
-  launchDate?: string
-  endDate?: string
-  deployed?: boolean
-  whatHappened?: string
-  [key: string]: unknown
 }
 
 interface Batch {
+  id: string
   client: string
   launchDate: string
   finishDate: string
@@ -79,6 +48,7 @@ interface Batch {
 const statusStyles: Record<string, string> = {
   "In Progress": "bg-sky-50 text-sky-700",
   "Live - Collecting Data": "bg-emerald-50 text-emerald-700",
+  "Live": "bg-emerald-50 text-emerald-700",
   Mixed: "bg-amber-50 text-amber-700",
   Pending: "bg-accent text-muted-foreground",
   "No Tests": "bg-accent text-muted-foreground",
@@ -98,16 +68,6 @@ const mapBatchStatus = (status: string): "Pending" | "In Progress" | "Live" | "C
 }
 
 const allStatuses = ["All Statuses", "Pending", "In Progress", "Live", "Completed"]
-
-/* ── Stat Cards ── */
-const trackerStats = useMemo(() => {
-  return [
-    { label: "Total Batches", value: String(batches.length), icon: Layers },
-    { label: "Total Experiments", value: String(batches.reduce((sum, b) => sum + b.experiments.length, 0)), icon: FlaskConical },
-    { label: "Live Now", value: String(batches.filter(b => mapBatchStatus(b.status) === "Live").length), icon: Zap },
-    { label: "Completed", value: String(batches.filter(b => mapBatchStatus(b.status) === "Completed").length), icon: CheckCircle2 },
-  ]
-}, [batches])
 
 /* ── Component ── */
 export function ClientExperimentsOverview() {
@@ -187,6 +147,25 @@ export function ClientExperimentsOverview() {
     })
   }, [rawBatches, rawExperiments])
 
+  /* ── Stat Cards ── */
+  const trackerStats = useMemo(() => {
+    return [
+      { label: "Total Batches", value: String(batches.length), icon: Layers },
+      { label: "Total Experiments", value: String(batches.reduce((sum, b) => sum + b.experiments.length, 0)), icon: FlaskConical },
+      { label: "Live Now", value: String(batches.filter(b => mapBatchStatus(b.status) === "Live").length), icon: Zap },
+      { label: "Completed", value: String(batches.filter(b => mapBatchStatus(b.status) === "Completed").length), icon: CheckCircle2 },
+    ]
+  }, [batches])
+
+  const filtered = useMemo(() => {
+    let result = batches
+    if (search) result = result.filter((b) => b.launchDate.toLowerCase().includes(search.toLowerCase()))
+    if (statusFilter !== "All Statuses") result = result.filter((b) => mapBatchStatus(b.status) === statusFilter)
+    return result
+  }, [search, statusFilter, batches])
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((_, i) => selectedBatches.has(i))
+
   const toggleSelectAll = () => {
     if (allFilteredSelected) {
       setSelectedBatches(new Set())
@@ -203,14 +182,32 @@ export function ClientExperimentsOverview() {
     })
   }
 
-  const filtered = useMemo(() => {
-    let result = batches
-    if (search) result = result.filter((b) => b.launchDate.toLowerCase().includes(search.toLowerCase()))
-    if (statusFilter !== "All Statuses") result = result.filter((b) => mapBatchStatus(b.status) === statusFilter)
-    return result
-  }, [search, statusFilter, batches])
+  const exportCSV = () => {
+    const selected = filtered.filter((_, i) => selectedBatches.has(i))
+    if (selected.length === 0) return
 
-  const allFilteredSelected = filtered.length > 0 && filtered.every((_, i) => selectedBatches.has(i))
+    const rows: string[][] = []
+    rows.push(["Launch Date", "Finish Date", "Status", "Tests", "Experiment", "Status", "Placement", "Devices", "GEOs", "Variants", "Revenue"])
+
+    for (const batch of selected) {
+      if (batch.experiments.length === 0) continue
+      for (const exp of batch.experiments) {
+        rows.push([
+          batch.launchDate, batch.finishDate, mapBatchStatus(batch.status), String(batch.tests),
+          exp.name, exp.status, exp.placement, exp.devices, exp.geos, exp.variants, exp.revenue,
+        ])
+      }
+    }
+
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `experiments-${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -322,7 +319,7 @@ export function ClientExperimentsOverview() {
                     {/* Expanded experiment rows */}
                     {isExpanded && batch.experiments.length > 0 && (
                       <tr>
-                        <td colSpan={5} className="p-0">
+                        <td colSpan={6} className="p-0">
                           <div className="bg-accent/10 border-b border-border">
                             <table className="w-full">
                               <thead>

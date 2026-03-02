@@ -59,6 +59,39 @@ export function UserContextProvider({ children }: { children: React.ReactNode })
     fetchPermissions()
   }, [user?.id])  // Only run when user changes
 
+  // Periodic permission refresh: check every 5 minutes for permission changes
+  useEffect(() => {
+    if (!user) return
+
+    const REFRESH_INTERVAL = 5 * 60 * 1000  // 5 minutes in milliseconds
+
+    const refreshPermissions = async () => {
+      try {
+        const response = await fetch('/api/auth/permissions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            department: user.department,
+            role: user.role,
+          }),
+        })
+
+        if (response.ok) {
+          const { permissions } = await response.json()
+          setUser(prev => prev ? { ...prev, permissions } : null)
+        }
+      } catch (err) {
+        console.error('[UserContext] Periodic permission refresh failed:', err)
+      }
+    }
+
+    // Set up interval to periodically refresh permissions
+    const intervalId = setInterval(refreshPermissions, REFRESH_INTERVAL)
+
+    // Cleanup interval on unmount or when user changes
+    return () => clearInterval(intervalId)
+  }, [user?.id])  // Restart interval if user changes
+
   const logout = useCallback(() => {
     authLogout()
     setUser(null)

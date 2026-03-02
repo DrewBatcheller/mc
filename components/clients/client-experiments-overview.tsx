@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
-import { ExperimentDetailsModal } from "./experiment-details-modal"
+import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
 
 /* ── Types ── */
 interface Experiment {

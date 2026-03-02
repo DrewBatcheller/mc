@@ -77,6 +77,9 @@ export function RoleSidebar() {
 
   // Build dynamic nav sections from accessible permissions
   const navSections = useMemo<DynamicNavItem[]>(() => {
+    if (!accessibleSections || accessibleSections.length === 0) {
+      return []
+    }
     return accessibleSections.map(section => ({
       icon: section.icon,
       label: section.label,

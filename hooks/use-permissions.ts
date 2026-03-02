@@ -1,31 +1,33 @@
 /**
  * usePermissions — get the current user's permissions and utility functions.
- * Requires UserContext to be set up.
+ * Handles unauthenticated state gracefully (returns empty permissions).
  */
 
 'use client'
 
 import { useMemo } from 'react'
-import { useAuthUser } from '@/contexts/UserContext'
+import { useUser } from '@/contexts/UserContext'
 import { canAccessRoute, getAccessibleSections } from '@/lib/section-config'
 import type { UserPermissions } from '@/lib/permission-types'
 import type { SectionDefinition } from '@/lib/permission-types'
 
+const DEFAULT_PERMISSIONS: UserPermissions = {
+  finances: false,
+  sales: false,
+  experiments: false,
+  clients: false,
+  clientDashboard: false,
+  management: false,
+  team: false,
+  affiliates: false,
+}
+
 export function usePermissions() {
-  const user = useAuthUser()
+  const { user } = useUser()
   
   const permissions = useMemo<UserPermissions>(() => {
-    return user.permissions ?? {
-      finances: false,
-      sales: false,
-      experiments: false,
-      clients: false,
-      clientDashboard: false,
-      management: false,
-      team: false,
-      affiliates: false,
-    }
-  }, [user.permissions])
+    return user?.permissions ?? DEFAULT_PERMISSIONS
+  }, [user?.permissions])
 
   const accessibleSections = useMemo<SectionDefinition[]>(() => {
     return getAccessibleSections(permissions)

@@ -59,7 +59,6 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
   const [sortKey, setSortKey] = useState<SortKey>("month")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
-  // Parse and filter P&L data
   const data = useMemo(() => {
     if (!rawPnl) return []
 
@@ -67,7 +66,6 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
       .map((r) => {
         const monthStr = String(r.fields['Month & Year'] ?? '')
         const dateStr = String(r.fields['DateClean'] ?? '')
-        const yearFromDate = dateStr.split('/')[0] || '2025'
 
         return {
           month: monthStr,
@@ -77,7 +75,7 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
           expenses: parseCurrency(r.fields['Total Expense'] as string),
           netProfit: parseCurrency(r.fields['Net Profit'] as string),
           adjustedProfit: parseCurrency(r.fields['Adjusted Profit'] as string),
-          revenueGrowth: 0, // Will be calculated below
+          revenueGrowth: 0,
           dividendConnor: String(r.fields['Dividend Connor'] ?? '').toLowerCase() === 'checked',
           dividendJayden: String(r.fields['Dividend Jayden'] ?? '').toLowerCase() === 'checked',
           connor: parseCurrency(r.fields['Connor'] as string),
@@ -89,7 +87,6 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
         return row.month.includes(year)
       })
 
-    // Calculate revenue growth
     for (let i = 0; i < parsed.length; i++) {
       if (i === 0) {
         parsed[i].revenueGrowth = 0

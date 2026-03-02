@@ -11,6 +11,7 @@ interface SelectFieldProps {
   className?: string
   containerClassName?: string
   label?: string
+  disabled?: boolean
 }
 
 export function SelectField({
@@ -20,6 +21,7 @@ export function SelectField({
   className,
   containerClassName,
   label,
+  disabled,
 }: SelectFieldProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -42,9 +44,11 @@ export function SelectField({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
         className={cn(
           "flex items-center justify-between gap-2 text-[13px] font-medium bg-card border border-border rounded-lg px-3 py-1.5 pr-2.5 text-foreground hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer transition-colors w-full",
           open && "bg-accent",
+          disabled && "opacity-50 cursor-not-allowed",
           className
         )}
       >

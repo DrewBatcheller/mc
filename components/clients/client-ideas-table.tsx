@@ -311,8 +311,8 @@ export function ClientIdeasTable() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleCreateIdea}
-        clientName={user?.brandName || 'Unknown Client'}
-        clientId={user?.id || ''}
+        clientName={user?.name || 'Unknown Client'}
+        clientId={user?.clientId || ''}
       />
 
       {syncIdea && (

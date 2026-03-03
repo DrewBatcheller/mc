@@ -1,5 +1,5 @@
 import { ClientDirectory } from "@/components/clients/client-directory"
 
-export default function ClientDirectoryPage() {
+export default function ManagementClientDirectoryPage() {
   return <ClientDirectory />
 }

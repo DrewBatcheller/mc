@@ -29,6 +29,7 @@ function getFilteredData(allData: any[], dateRange: string) {
   if (dateRange === "Last Month") return allData.slice(-1)
   if (dateRange === "Last 3 Months") return allData.slice(-3)
   if (dateRange === "Last 6 Months") return allData.slice(-6)
+  if (dateRange === "Last 12 Months") return allData.slice(-12)
   if (dateRange.match(/^\d{4}$/)) {
     const year = parseInt(dateRange)
     return allData.filter(d => {
@@ -84,7 +85,7 @@ export function RevenueOverTimeChart({ dateRange = "All Time" }: RevenueChartPro
             <div className="h-full bg-muted animate-pulse rounded" />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={data} margin={{ bottom: data.length > 6 ? 40 : 0 }}>
                 <defs>
                   <linearGradient id="fillRevenueTime" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={chartColor} stopOpacity={0.1} />
@@ -97,8 +98,10 @@ export function RevenueOverTimeChart({ dateRange = "All Time" }: RevenueChartPro
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
-                  dy={8}
-                  interval={Math.max(0, Math.floor(data.length / 6) - 1)}
+                  dy={data.length > 6 ? 0 : 8}
+                  angle={data.length > 6 ? -45 : 0}
+                  textAnchor={data.length > 6 ? "end" : "middle"}
+                  interval={Math.max(0, Math.ceil(data.length / 12) - 1)}
                 />
                 <YAxis
                   axisLine={false}
@@ -187,7 +190,7 @@ export function AvgRevenuePerClientChart({ dateRange = "All Time" }: RevenueChar
             <div className="h-full bg-muted animate-pulse rounded" />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={data} margin={{ bottom: data.length > 6 ? 40 : 0 }}>
                 <defs>
                   <linearGradient id="fillAvgClient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={chartColor} stopOpacity={0.1} />
@@ -200,8 +203,10 @@ export function AvgRevenuePerClientChart({ dateRange = "All Time" }: RevenueChar
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
-                  dy={8}
-                  interval={Math.max(0, Math.floor(data.length / 6) - 1)}
+                  dy={data.length > 6 ? 0 : 8}
+                  angle={data.length > 6 ? -45 : 0}
+                  textAnchor={data.length > 6 ? "end" : "middle"}
+                  interval={Math.max(0, Math.ceil(data.length / 12) - 1)}
                 />
                 <YAxis
                   axisLine={false}

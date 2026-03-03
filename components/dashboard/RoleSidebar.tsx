@@ -21,15 +21,19 @@ import {
   Handshake,
   KanbanSquare,
   Lightbulb,
-  Activity,
-  TrendingUp,
-  CheckCircle,
+  Zap,
+  BarChart2,
 } from 'lucide-react'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useMemo, useEffect } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { usePermissions } from '@/hooks/use-permissions'
+
+// ─── Route label overrides (slug → display name) ─────────────────────────────
+const ROUTE_LABEL_OVERRIDES: Record<string, string> = {
+  'pnl': 'P&L',
+}
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -42,18 +46,17 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Handshake,
   KanbanSquare,
   Lightbulb,
-  Activity,
-  TrendingUp,
-  CheckCircle,
+  Zap,
+  BarChart2,
 }
 
 // ─── Client route icons (flat sidebar for clients) ────────────────────────────
 const CLIENT_ROUTE_ICONS: Record<string, string> = {
-  '/clients/client-dashboard': 'LayoutDashboard',
-  '/clients/client-ideas': 'Lightbulb',
-  '/clients/experiments-overview': 'Activity',
-  '/clients/client-live-tests': 'TrendingUp',
-  '/clients/client-results': 'CheckCircle',
+  '/clients/dashboard': 'LayoutDashboard',
+  '/clients/test-ideas': 'Lightbulb',
+  '/clients/experiments-overview': 'FlaskConical',
+  '/clients/live-tests': 'Zap',
+  '/clients/results': 'BarChart2',
 }
 
 function NavIcon({ name, className }: { name: string; className?: string }) {
@@ -204,14 +207,12 @@ export function RoleSidebar() {
               {accessibleSections
                 .flatMap(section => section.routes)
                 .map((route) => {
-                  const label = route
-                    .split('/')
-                    .filter(Boolean)
-                    .pop()
-                    ?.split('-')
+                  const slug = route.split('/').filter(Boolean).pop() ?? ''
+                  const label = ROUTE_LABEL_OVERRIDES[slug] ?? slug
+                    .split('-')
                     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                     .join(' ')
-                  
+
                   const iconName = CLIENT_ROUTE_ICONS[route] || 'LayoutDashboard'
                   const isActive = pathname === route
                   
@@ -324,11 +325,9 @@ export function RoleSidebar() {
                     {!collapsed && isOpen && (
                       <div className="ml-[22px] border-l border-border pl-2.5 mt-0.5 mb-1 flex flex-col gap-0.5">
                         {section.routes.slice(1).map((route) => {
-                          const routeLabel = route
-                            .split('/')
-                            .filter(Boolean)
-                            .pop()
-                            ?.split('-')
+                          const routeSlug = route.split('/').filter(Boolean).pop() ?? ''
+                          const routeLabel = ROUTE_LABEL_OVERRIDES[routeSlug] ?? routeSlug
+                            .split('-')
                             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                             .join(' ')
                           

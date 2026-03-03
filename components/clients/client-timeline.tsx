@@ -43,9 +43,14 @@ function parseDate(s: string) {
   return new Date(y, m - 1, d)
 }
 
-export function ClientTimeline() {
+export function ClientTimeline({ clientId }: { clientId?: string }) {
+  const clientFilter = clientId
+    ? `{Record ID (from Client)} = "${clientId}"`
+    : undefined
+
   const { data: tasks } = useAirtable('tasks', {
     fields: ['Client Facing Name', 'Start Date', 'Due Date', 'Status'],
+    filterExtra: clientFilter,
   })
 
   const [year, setYear] = useState(2026)

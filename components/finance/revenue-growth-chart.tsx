@@ -56,16 +56,18 @@ export function RevenueGrowthChart({ dateRange = "All Time" }: RevenueGrowthChar
     if (dateRange === "Last Month") return chartData.slice(-1)
     if (dateRange === "Last 3 Months") return chartData.slice(-3)
     if (dateRange === "Last 6 Months") return chartData.slice(-6)
+    if (dateRange === "Last 12 Months") return chartData.slice(-12)
+    if (dateRange.match(/^\d{4}$/)) {
+      const year = parseInt(dateRange)
+      return chartData.filter(d => parseInt(d.month.split(" ")[1]) === year)
+    }
     return chartData
   }
 
   const data = getFilteredData()
 
-  const getInterval = () => {
-    if (data.length <= 3) return 0
-    if (data.length <= 6) return 1
-    return 2
-  }
+  const interval = Math.max(0, Math.ceil(data.length / 12) - 1)
+  const shouldTilt = data.length > 6
 
   function formatDollar(value: number) {
     if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(0)}k`
@@ -88,15 +90,17 @@ export function RevenueGrowthChart({ dateRange = "All Time" }: RevenueGrowthChar
             <div className="h-full bg-muted animate-pulse rounded" />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
+              <BarChart data={data} margin={{ bottom: shouldTilt ? 40 : 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220, 13%, 91%)" />
                 <XAxis
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: "hsl(220, 8%, 46%)" }}
-                  dy={8}
-                  interval={getInterval()}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dy={shouldTilt ? 0 : 8}
+                  angle={shouldTilt ? -45 : 0}
+                  textAnchor={shouldTilt ? "end" : "middle"}
+                  interval={interval}
                 />
                 <YAxis
                   axisLine={false}

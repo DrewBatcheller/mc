@@ -11,6 +11,8 @@ type SortKey = "name" | "client" | "date" | "amountUsd" | "feesUsd" | "conversio
 type SortDirection = "asc" | "desc"
 
 interface RevenueRow {
+  recordId: string
+  clientRecordId: string
   name: string
   client: string
   date: string
@@ -21,7 +23,23 @@ interface RevenueRow {
   feesCad: number
 }
 
-const data: RevenueRow[] = []
+interface FormState {
+  date: string
+  amountUsd: number | ''
+  feesUsd: number | ''
+  conversionRate: number | ''
+  amountCad: number | ''
+  feesCad: number | ''
+}
+
+const emptyForm: FormState = {
+  date: '',
+  amountUsd: '',
+  feesUsd: '',
+  conversionRate: '',
+  amountCad: '',
+  feesCad: '',
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -48,118 +66,108 @@ interface RevenueDetailsTableProps {
   setShowCreateModal?: (show: boolean) => void
   exportTrigger?: number
   dateRange?: string
+  readOnly?: boolean
 }
 
-export function RevenueDetailsTable({ 
-  showCreateModal = false, 
+export function RevenueDetailsTable({
+  showCreateModal = false,
   setShowCreateModal,
   exportTrigger = 0,
-  dateRange = "All Time"
+  dateRange = "All Time",
+  readOnly = false,
 }: RevenueDetailsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
-  const [revenueData, setRevenueData] = useState<RevenueRow[]>([])
-  const [editingRow, setEditingRow] = useState<{index: number, row: RevenueRow} | null>(null)
-  const [formData, setFormData] = useState<Partial<RevenueRow>>({})
-  const [deleteConfirm, setDeleteConfirm] = useState<{index: number, row: RevenueRow} | null>(null)
+  const [editingRow, setEditingRow] = useState<RevenueRow | null>(null)
+  const [formData, setFormData] = useState<FormState>(emptyForm)
+  const [selectedClientId, setSelectedClientId] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<RevenueRow | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
-  // Fetch revenue data from Airtable
-  const { data: rawRevenue, isLoading: revLoading } = useAirtable('revenue', {
-    fields: ['Entry', 'Brand Name', 'Date', 'Amount USD', 'Fees USD', 'Conversion Rate (USD>CAD)', 'Amount CAD', 'Fees CAD'],
+  // Fetch revenue data — no fields[] to avoid 422 on lookup fields
+  const { data: rawRevenue, isLoading: revLoading, mutate } = useAirtable('revenue', {
     sort: [{ field: 'Date', direction: 'desc' }],
   })
 
-  // Fetch active clients for dropdown
+  // Fetch active clients for dropdown — keep filterByFormula, drop fields[]
   const { data: rawClients } = useAirtable('clients', {
-    fields: ['Brand Name', 'Client Status'],
     filterByFormula: "{Client Status}='Active'",
   })
 
-  const activeClients = useMemo(
+  // { id, name } pairs for the client dropdown
+  const clientOptions = useMemo(
     () => (rawClients ?? [])
-      .map(r => String(r.fields['Brand Name'] ?? ''))
-      .filter(Boolean)
-      .sort(),
+      .map(r => ({ id: r.id, name: String(r.fields['Brand Name'] ?? '') }))
+      .filter(c => c.name)
+      .sort((a, b) => a.name.localeCompare(b.name)),
     [rawClients]
   )
 
-  // Transform Airtable revenue data to RevenueRow format
-  useEffect(() => {
-    if (rawRevenue) {
-      const transformed = rawRevenue.map(r => {
-        const clientValue = r.fields['Brand Name']
-        let client = ''
-        if (Array.isArray(clientValue)) {
-          client = String(clientValue[0] ?? '')
-        } else if (clientValue) {
-          client = String(clientValue)
-        }
+  // Transform Airtable records → RevenueRow (replaces useEffect+setState)
+  const liveData = useMemo<RevenueRow[]>(() => {
+    if (!rawRevenue) return []
+    return rawRevenue.map(r => {
+      // Brand Name (from Client) is a lookup — returns array
+      const clientLookup = r.fields['Brand Name (from Client)']
+      let client = ''
+      if (Array.isArray(clientLookup)) {
+        client = String(clientLookup[0] ?? '')
+      } else if (clientLookup) {
+        client = String(clientLookup)
+      }
 
-        return {
-          name: String(r.fields['Entry'] ?? ''),
-          client,
-          date: String(r.fields['Date'] ?? ''),
-          amountUsd: parseCurrency(r.fields['Amount USD'] as string),
-          feesUsd: parseCurrency(r.fields['Fees USD'] as string),
-          conversionRate: parseFloat(String(r.fields['Conversion Rate (USD>CAD)'] ?? '0')) || null,
-          amountCad: parseCurrency(r.fields['Amount CAD'] as string),
-          feesCad: parseCurrency(r.fields['Fees CAD'] as string),
-        }
-      })
-      setRevenueData(transformed)
-    }
+      // Client is a linked record — returns array of record IDs
+      const clientLink = r.fields['Client']
+      let clientRecordId = ''
+      if (Array.isArray(clientLink) && clientLink.length > 0) {
+        clientRecordId = String(clientLink[0])
+      }
+
+      return {
+        recordId: r.id,
+        clientRecordId,
+        name: String(r.fields['Entry'] ?? ''),
+        client,
+        date: String(r.fields['Date'] ?? ''),
+        amountUsd: parseCurrency(r.fields['Amount USD'] as string),
+        feesUsd: parseCurrency(r.fields['Fees USD'] as string),
+        conversionRate: parseFloat(String(r.fields['Conversion Rate (USD>CAD)'] ?? '0')) || null,
+        amountCad: parseCurrency(r.fields['Amount CAD'] as string),
+        feesCad: parseCurrency(r.fields['Fees CAD'] as string),
+      }
+    })
   }, [rawRevenue])
 
-  // Filter data based on date range
-  const filterByDateRange = (data: RevenueRow[], range: string): RevenueRow[] => {
-    if (range === "All Time") return data
-
+  // Date range filter
+  const filteredData = useMemo(() => {
+    if (dateRange === "All Time") return liveData
     const now = new Date()
-    const getDateThreshold = () => {
-      if (range === "Last Month") {
-        const date = new Date(now)
-        date.setMonth(date.getMonth() - 1)
-        return date
-      }
-      if (range === "Last 3 Months") {
-        const date = new Date(now)
-        date.setMonth(date.getMonth() - 3)
-        return date
-      }
-      if (range === "Last 6 Months") {
-        const date = new Date(now)
-        date.setMonth(date.getMonth() - 6)
-        return date
-      }
-      if (range === "Last 12 Months") {
-        const date = new Date(now)
-        date.setFullYear(date.getFullYear() - 1)
-        return date
-      }
-      if (range.match(/^\d{4}$/)) {
-        return null
-      }
-      return null
-    }
-
-    const threshold = getDateThreshold()
-    
-    return data.filter((row) => {
+    return liveData.filter(row => {
       const rowDate = new Date(row.date)
-      if (range.match(/^\d{4}$/)) {
-        return rowDate.getFullYear().toString() === range
+      if (dateRange.match(/^\d{4}$/)) {
+        return rowDate.getFullYear().toString() === dateRange
       }
-      if (threshold) {
-        return rowDate >= threshold
-      }
-      return true
+      let threshold = new Date()
+      if (dateRange === "Last Month") threshold = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      else if (dateRange === "Last 3 Months") threshold = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+      else if (dateRange === "Last 6 Months") threshold = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+      else if (dateRange === "Last 12 Months") threshold = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+      return rowDate >= threshold
     })
-  }
+  }, [liveData, dateRange])
 
-  const filteredData = useMemo(
-    () => filterByDateRange(revenueData, dateRange),
-    [revenueData, dateRange]
-  )
+  const sortedData = useMemo(() => {
+    return [...filteredData].sort((a, b) => {
+      const aVal = a[sortKey]
+      const bVal = b[sortKey]
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      }
+      const aNum = (aVal ?? 0) as number
+      const bNum = (bVal ?? 0) as number
+      return sortDirection === "asc" ? aNum - bNum : bNum - aNum
+    })
+  }, [filteredData, sortKey, sortDirection])
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -170,54 +178,75 @@ export function RevenueDetailsTable({
     }
   }
 
-  const handleEdit = (index: number, row: RevenueRow) => {
-    setEditingRow({index, row})
-    setFormData(row)
+  const handleEdit = (row: RevenueRow) => {
+    setEditingRow(row)
+    setSelectedClientId(row.clientRecordId)
+    setFormData({
+      date: row.date,
+      amountUsd: row.amountUsd,
+      feesUsd: row.feesUsd,
+      conversionRate: row.conversionRate ?? '',
+      amountCad: row.amountCad,
+      feesCad: row.feesCad,
+    })
   }
 
-  const handleDeleteClick = (index: number, row: RevenueRow) => {
-    setDeleteConfirm({index, row})
+  const handleDeleteClick = (row: RevenueRow) => {
+    setDeleteConfirm(row)
   }
 
-  const confirmDelete = () => {
-    if (deleteConfirm) {
-      const updatedData = revenueData.filter((_, i) => i !== deleteConfirm.index)
-      setRevenueData(updatedData)
-      setDeleteConfirm(null)
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return
+    try {
+      await fetch(`/api/airtable/revenue/${deleteConfirm.recordId}`, { method: 'DELETE' })
+      await mutate()
+    } catch (err) {
+      console.error('Delete failed:', err)
     }
+    setDeleteConfirm(null)
   }
 
-  const formatEntryName = (client: string, date: string) => {
-    if (!client || !date) return ""
-    const dateObj = new Date(date)
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    const formattedDate = `${months[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`
-    return `${client} - ${formattedDate}`
-  }
-
-  const handleSaveRevenue = () => {
-    if (editingRow) {
-      const updatedData = [...revenueData]
-      updatedData[editingRow.index] = formData as RevenueRow
-      setRevenueData(updatedData)
-    } else {
-      if (formData.client && formData.date) {
-        const entryWithName = {
-          ...formData,
-          name: formatEntryName(formData.client, formData.date)
-        } as RevenueRow
-        setRevenueData([...revenueData, entryWithName])
+  const handleSaveRevenue = async () => {
+    if (!selectedClientId || !formData.date) return
+    setIsSaving(true)
+    try {
+      const fields: Record<string, unknown> = {
+        'Client': [selectedClientId],
+        'Date': formData.date,
+        ...(formData.amountUsd !== '' && { 'Amount USD': formData.amountUsd }),
+        ...(formData.feesUsd !== '' && { 'Fees USD': formData.feesUsd }),
+        ...(formData.conversionRate !== '' && { 'Conversion Rate (USD>CAD)': formData.conversionRate }),
+        ...(formData.amountCad !== '' && { 'Amount CAD': formData.amountCad }),
+        ...(formData.feesCad !== '' && { 'Fees CAD': formData.feesCad }),
       }
+
+      if (editingRow) {
+        await fetch(`/api/airtable/revenue/${editingRow.recordId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      } else {
+        await fetch('/api/airtable/revenue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      }
+      await mutate()
+    } catch (err) {
+      console.error('Save failed:', err)
+    } finally {
+      setIsSaving(false)
     }
-    setShowCreateModal?.(false)
-    setEditingRow(null)
-    setFormData({})
+    handleCloseModal()
   }
 
   const handleCloseModal = () => {
     setEditingRow(null)
     setShowCreateModal?.(false)
-    setFormData({})
+    setFormData(emptyForm)
+    setSelectedClientId('')
   }
 
   const handleExportCSV = () => {
@@ -236,7 +265,6 @@ export function RevenueDetailsTable({
         ].join(",")
       )
       .join("\n")
-
     const csv = `${headers}\n${rows}`
     const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
@@ -247,28 +275,12 @@ export function RevenueDetailsTable({
     URL.revokeObjectURL(url)
   }
 
-  const sortedData = useMemo(() => {
-    return [...filteredData].sort((a, b) => {
-      const aVal = a[sortKey]
-      const bVal = b[sortKey]
-
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortDirection === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal)
-      }
-
-      const aNum = (aVal ?? 0) as number
-      const bNum = (bVal ?? 0) as number
-      return sortDirection === "asc" ? aNum - bNum : bNum - aNum
-    })
-  }, [filteredData, sortKey, sortDirection])
-
   useEffect(() => {
-    if (exportTrigger > 0) {
-      handleExportCSV()
-    }
+    if (exportTrigger > 0) handleExportCSV()
   }, [exportTrigger])
+
+  // Resolve the display name for the currently selected client
+  const selectedClientName = clientOptions.find(c => c.id === selectedClientId)?.name ?? ''
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -304,15 +316,30 @@ export function RevenueDetailsTable({
                   </button>
                 </th>
               ))}
-              <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-right whitespace-nowrap">
-                Actions
-              </th>
+              {!readOnly && (
+                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-right whitespace-nowrap">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
-            {sortedData.map((row, i) => (
+            {revLoading ? (
+              <tr>
+                <td colSpan={columns.length + (readOnly ? 0 : 1)} className="px-4 py-8 text-center text-[13px] text-muted-foreground">
+                  Loading revenue data...
+                </td>
+              </tr>
+            ) : sortedData.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length + (readOnly ? 0 : 1)} className="px-4 py-8 text-center text-[13px] text-muted-foreground">
+                  No revenue entries found for the selected date range.
+                </td>
+              </tr>
+            ) : (
+              sortedData.map((row, i) => (
                 <tr
-                  key={`${row.name}-${i}`}
+                  key={`${row.recordId}-${i}`}
                   className="border-b border-border/50 transition-colors hover:bg-accent/30"
                 >
                   <td className="px-4 py-3.5 text-[13px] font-medium text-foreground whitespace-nowrap">
@@ -339,31 +366,35 @@ export function RevenueDetailsTable({
                   <td className="px-4 py-3.5 text-[13px] text-foreground tabular-nums text-right">
                     {row.feesCad > 0 ? formatCurrency(row.feesCad) : "$0.00"}
                   </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => handleEdit(i, row)}
-                        className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(i, row)}
-                        className="h-7 w-7 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </td>
+                  {!readOnly && (
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleEdit(row)}
+                          className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(row)}
+                          className="h-7 w-7 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
-              ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {(editingRow || showCreateModal) && (
+      {/* Create / Edit modal */}
+      {(editingRow !== null || showCreateModal) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-border sticky top-0 bg-card">
@@ -372,43 +403,45 @@ export function RevenueDetailsTable({
               </h3>
             </div>
             <div className="px-6 py-4 space-y-4">
-              <div>
-                <label className="block text-[13px] font-medium text-foreground mb-1.5">Entry Name</label>
-                <input
-                  type="text"
-                  value={formData.name || ""}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="e.g., Client Name - Dec 1, 2025"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
+              {/* Client — linked record dropdown */}
               <div>
                 <label className="block text-[13px] font-medium text-foreground mb-1.5">Client</label>
                 <SelectField
-                  value={formData.client || "Select a client"}
-                  onChange={(v) => setFormData({...formData, client: v === "Select a client" ? "" : v})}
-                  options={["Select a client", ...activeClients]}
+                  value={selectedClientName || "Select a client"}
+                  onChange={(v) => {
+                    if (v === "Select a client") {
+                      setSelectedClientId('')
+                    } else {
+                      const found = clientOptions.find(c => c.name === v)
+                      if (found) setSelectedClientId(found.id)
+                    }
+                  }}
+                  options={["Select a client", ...clientOptions.map(c => c.name)]}
                   containerClassName="w-full"
                   className="w-full"
                 />
               </div>
+
+              {/* Date */}
               <div>
                 <label className="block text-[13px] font-medium text-foreground mb-1.5">Date</label>
                 <input
                   type="date"
-                  value={formData.date || ""}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
+
+              {/* Amount USD + Fees USD */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] font-medium text-foreground mb-1.5">Amount USD</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.amountUsd || ""}
-                    onChange={(e) => setFormData({...formData, amountUsd: parseFloat(e.target.value) || 0})}
+                    value={formData.amountUsd}
+                    onChange={(e) => setFormData({ ...formData, amountUsd: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
@@ -417,20 +450,22 @@ export function RevenueDetailsTable({
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.feesUsd || ""}
-                    onChange={(e) => setFormData({...formData, feesUsd: parseFloat(e.target.value) || 0})}
+                    value={formData.feesUsd}
+                    onChange={(e) => setFormData({ ...formData, feesUsd: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
               </div>
+
+              {/* Conversion Rate + Amount CAD */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] font-medium text-foreground mb-1.5">Conversion Rate</label>
                   <input
                     type="number"
                     step="0.0001"
-                    value={formData.conversionRate || ""}
-                    onChange={(e) => setFormData({...formData, conversionRate: parseFloat(e.target.value) || 0})}
+                    value={formData.conversionRate}
+                    onChange={(e) => setFormData({ ...formData, conversionRate: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
@@ -439,19 +474,21 @@ export function RevenueDetailsTable({
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.amountCad || ""}
-                    onChange={(e) => setFormData({...formData, amountCad: parseFloat(e.target.value) || 0})}
+                    value={formData.amountCad}
+                    onChange={(e) => setFormData({ ...formData, amountCad: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
               </div>
+
+              {/* Fees CAD */}
               <div>
                 <label className="block text-[13px] font-medium text-foreground mb-1.5">Fees CAD</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.feesCad || ""}
-                  onChange={(e) => setFormData({...formData, feesCad: parseFloat(e.target.value) || 0})}
+                  value={formData.feesCad}
+                  onChange={(e) => setFormData({ ...formData, feesCad: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -465,15 +502,17 @@ export function RevenueDetailsTable({
               </button>
               <button
                 onClick={handleSaveRevenue}
-                className="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-medium transition-colors"
+                disabled={!selectedClientId || !formData.date || isSaving}
+                className="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editingRow ? "Update" : "Create"}
+                {isSaving ? 'Saving…' : editingRow ? "Update" : "Create"}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Delete confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-xl border border-border w-full max-w-sm">
@@ -483,7 +522,7 @@ export function RevenueDetailsTable({
                 <div>
                   <h3 className="text-base font-semibold text-foreground">Delete Entry</h3>
                   <p className="text-[13px] text-muted-foreground mt-1">
-                    Are you sure you want to delete {deleteConfirm.row.name}? This cannot be undone.
+                    Are you sure you want to delete <span className="font-medium text-foreground">{deleteConfirm.name}</span>? This cannot be undone.
                   </p>
                 </div>
               </div>

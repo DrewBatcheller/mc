@@ -48,7 +48,7 @@ export function DrilldownStatCards({ month = "2025-01" }: DrilldownStatCardsProp
     const totalRevenue = monthRevenue.reduce((sum, r) => sum + parseCurrency(r.fields['Amount USD'] as string), 0)
     const totalExpenses = monthExpenses.reduce((sum, r) => sum + parseCurrency(r.fields['Expense'] as string), 0)
     const mrrRevenue = monthRevenue
-      .filter(r => r.fields['Monthly Recurring Revenue'] || String(r.fields['Category (from Category)'] ?? '').toLowerCase().includes('mrr'))
+      .filter(r => r.fields['Monthly Recurring Revenue'])
       .reduce((sum, r) => sum + parseCurrency(r.fields['Amount USD'] as string), 0)
 
     const netProfit = totalRevenue - totalExpenses

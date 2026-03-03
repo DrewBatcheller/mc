@@ -109,20 +109,23 @@ export function PnlTable({ year, showDividends, exportTrigger }: PnlTableProps) 
     }
   }
 
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+  function monthOrder(monthStr: string): number {
+    const parts = monthStr.split(' ')
+    const year = parseInt(parts[1] ?? '0')
+    const idx = MONTH_NAMES.indexOf(parts[0] ?? '')
+    return year * 12 + (idx >= 0 ? idx : 0)
+  }
+
   const sortedData = useMemo(() => {
     return [...data].sort((a, b) => {
-      let aVal: number | string
-      let bVal: number | string
       if (sortKey === "month") {
-        aVal = a.month
-        bVal = b.month
-      } else {
-        aVal = a[sortKey] as number
-        bVal = b[sortKey] as number
+        const cmp = monthOrder(a.month) - monthOrder(b.month)
+        return sortDirection === "asc" ? cmp : -cmp
       }
-      if (typeof aVal === 'string') {
-        return sortDirection === "asc" ? aVal.localeCompare(bVal as string) : (bVal as string).localeCompare(aVal)
-      }
+      const aVal = a[sortKey] as number
+      const bVal = b[sortKey] as number
       return sortDirection === "asc" ? aVal - bVal : bVal - aVal
     })
   }, [data, sortKey, sortDirection])

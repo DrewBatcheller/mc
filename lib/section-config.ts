@@ -25,12 +25,6 @@ export const SECTION_DEFINITIONS: Record<string, SectionDefinition> = {
     label: 'Experiments',
     routes: ['/experiments', '/experiments/dashboard', '/experiments/client-tracker', '/experiments/ideas', '/experiments/live-tests', '/experiments/results', '/experiments/timeline'],
   },
-  clients: {
-    id: 'clients',
-    icon: 'Users',
-    label: 'Clients',
-    routes: ['/clients', '/clients/directory', '/clients/dashboard'],
-  },
   clientDashboard: {
     id: 'clientDashboard',
     icon: 'KanbanSquare',
@@ -42,7 +36,9 @@ export const SECTION_DEFINITIONS: Record<string, SectionDefinition> = {
     id: 'management',
     icon: 'UserCircle',
     label: 'Management',
-    routes: ['/management', '/management/team-directory', '/management/team-dashboard'],
+    // Visible to users with 'management' OR 'clients' Airtable permission
+    permissionKeys: ['management', 'clients'],
+    routes: ['/management', '/management/team-directory', '/management/team-dashboard', '/management/client-directory', '/management/client-dashboard'],
   },
   team: {
     id: 'team',
@@ -66,32 +62,41 @@ export function getSectionDefinition(sectionId: string): SectionDefinition | und
 }
 
 /**
- * Check if a route is accessible based on permissions
- * Returns true if the route starts with any of the user's accessible prefixes
+ * Check if a route is accessible based on permissions.
+ * Uses permissionKeys (falls back to [section.id]) to determine access.
  */
 export function canAccessRoute(route: string, permissions: Record<string, boolean>): boolean {
-  for (const [sectionId, allowed] of Object.entries(permissions)) {
-    if (!allowed) continue
-    
-    const section = getSectionDefinition(sectionId)
-    if (!section) continue
-    
+  for (const section of Object.values(SECTION_DEFINITIONS)) {
+    const keys = section.permissionKeys ?? [section.id]
+    if (!keys.some(k => permissions[k])) continue
+
     for (const routePrefix of section.routes) {
       if (route.startsWith(routePrefix)) {
         return true
       }
     }
   }
-  
+
   return false
 }
 
 /**
- * Get all accessible sections for a user
+ * Get all accessible sections for a user.
+ * Uses permissionKeys to allow a section to respond to multiple permission flags.
+ * De-duplicates so a section only appears once even if multiple permissionKeys match.
  */
 export function getAccessibleSections(permissions: Record<string, boolean>): SectionDefinition[] {
-  return Object.entries(permissions)
-    .filter(([_, allowed]) => allowed)
-    .map(([sectionId, _]) => getSectionDefinition(sectionId))
-    .filter((section): section is SectionDefinition => section !== undefined)
+  const seen = new Set<string>()
+  const result: SectionDefinition[] = []
+
+  for (const section of Object.values(SECTION_DEFINITIONS)) {
+    if (seen.has(section.id)) continue
+    const keys = section.permissionKeys ?? [section.id]
+    if (keys.some(k => permissions[k])) {
+      result.push(section)
+      seen.add(section.id)
+    }
+  }
+
+  return result
 }

@@ -60,9 +60,7 @@ function formatMrr(value: number | undefined): string {
 }
 
 function getImageUrl(field: any): string | undefined {
-  if (Array.isArray(field) && field.length > 0) {
-    return field[0].url || field[0]
-  }
+  if (Array.isArray(field) && field.length > 0) return field[0].url || field[0]
   if (typeof field === 'string') return field
   return undefined
 }
@@ -92,14 +90,19 @@ function convertResultToExperiment(result: RecentResult): any {
   }
 }
 
-export function ClientRecentResults() {
+export function ClientRecentResults({ clientId }: { clientId?: string }) {
+  const clientFilter = clientId
+    ? `{Record ID (from Brand Name)} = "${clientId}"`
+    : undefined
+
   const { data: experiments } = useAirtable('experiments', {
     fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
+    filterExtra: clientFilter,
   })
-  
+
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedResult, setSelectedResult] = useState<RecentResult | null>(null)
-  
+
   const results = useMemo(() => {
     if (!experiments) return []
     return experiments
@@ -115,7 +118,7 @@ export function ClientRecentResults() {
         launchDate: String(e.fields['Launch Date'] || ''),
         hypothesis: String(e.fields['Hypothesis'] || ''),
         rationale: String(e.fields['Rationale'] || ''),
-        goals: e.fields['Category Primary Goals'] ? String(e.fields['Category Primary Goals']).split(',').map(g => g.trim()) : [],
+        goals: e.fields['Category Primary Goals'] ? String(e.fields['Category Primary Goals']).split(',').map((g: string) => g.trim()) : [],
         devices: String(e.fields['Devices'] || ''),
         geos: String(e.fields['GEOs'] || ''),
         deployed: e.fields['Deployed'] === true,
@@ -134,14 +137,6 @@ export function ClientRecentResults() {
     const start = currentPage * RESULTS_PER_PAGE
     return results.slice(start, start + RESULTS_PER_PAGE)
   }, [currentPage, results])
-
-  const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(0, prev - 1))
-  }
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))
-  }
 
   return (
     <ContentCard title="Recent Experiment Results">
@@ -166,12 +161,7 @@ export function ClientRecentResults() {
             <div className="flex flex-col gap-1 text-[12px]">
               <div className="flex items-center gap-1.5">
                 <span className="text-muted-foreground">Status:</span>
-                <span
-                  className={cn(
-                    'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border',
-                    statusStyles[result.status]
-                  )}
-                >
+                <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border', statusStyles[result.status])}>
                   {result.status}
                 </span>
               </div>
@@ -187,38 +177,26 @@ export function ClientRecentResults() {
           </div>
         ))}
       </div>
-      
-      {/* Pagination */}
+
       <div className="px-5 py-3 border-t border-border flex items-center justify-between">
         <span className="text-[12px] text-muted-foreground">
           {results.length > 0 ? currentPage + 1 : 0} of {totalPages || 1}
         </span>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={handlePrevPage}
-            disabled={currentPage === 0}
-            className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="Previous page"
-          >
+          <button onClick={() => setCurrentPage(p => Math.max(0, p - 1))} disabled={currentPage === 0} className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <ChevronLeft className="h-4 w-4 text-muted-foreground" />
           </button>
-          <button
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages - 1}
-            className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="Next page"
-          >
+          <button onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))} disabled={currentPage === totalPages - 1} className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
       </div>
 
-      {/* Result Detail Modal */}
       {selectedResult && (
-        <ExperimentDetailsModal 
+        <ExperimentDetailsModal
           isOpen={!!selectedResult}
-          experiment={convertResultToExperiment(selectedResult)} 
-          onClose={() => setSelectedResult(null)} 
+          experiment={convertResultToExperiment(selectedResult)}
+          onClose={() => setSelectedResult(null)}
         />
       )}
     </ContentCard>

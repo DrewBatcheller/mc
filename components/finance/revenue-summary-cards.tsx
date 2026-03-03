@@ -5,32 +5,30 @@ import { useAirtable } from "@/hooks/use-airtable"
 import { parseCurrency } from "@/lib/transforms"
 import { useMemo } from "react"
 
-const topClients = [
-  { name: "Goose Creek Candles", revenue: 172600 },
-  { name: "Primal Queen", revenue: 136189 },
-  { name: "Blox Boom", revenue: 80542 },
-  { name: "Perfect White Tee", revenue: 76560 },
-  { name: "Kitty Spout", revenue: 61000 },
-]
-
-const mrrData = [
-  { name: "MRR", value: 88.3, color: "hsl(195, 65%, 48%)" },
-  { name: "Upsell", value: 0, color: "hsl(220, 55%, 62%)" },
-  { name: "Other", value: 11.7, color: "hsl(220, 13%, 82%)" },
-]
-
-const catColors = [
-  "hsl(195, 65%, 48%)",
-  "hsl(220, 55%, 62%)",
-  "hsl(142, 45%, 55%)",
-  "hsl(38, 70%, 55%)",
-  "hsl(0, 50%, 65%)",
-  "hsl(262, 45%, 58%)",
-  "hsl(330, 45%, 55%)",
-  "hsl(170, 45%, 50%)",
-  "hsl(50, 60%, 50%)",
-  "hsl(10, 55%, 55%)",
-]
+function buildDateFilter(dateRange: string): string {
+  if (dateRange === 'All Time') return ''
+  const now = new Date()
+  if (dateRange === 'Last Month') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 3 Months') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 6 Months') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 12 Months') {
+    const d = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange.match(/^\d{4}$/)) {
+    return `YEAR({Date}) = ${dateRange}`
+  }
+  return ''
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -41,17 +39,42 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
+/**
+ * Shared hook for all three revenue summary card components.
+ * Uses only confirmed-working field names from the revenue table CSV.
+ * All three components use identical options → same SWR key → one request.
+ */
+function useRevenueSummaryData(dateRange: string) {
+  const dateFilter = buildDateFilter(dateRange)
+  return useAirtable('revenue', {
+    fields: ['Amount USD', 'Date', 'Brand Name (from Client)', 'Category (from Category)', 'Monthly Recurring Revenue'],
+    ...(dateFilter ? { filterExtra: dateFilter } : {}),
+  })
+}
+
 export function TopClientsByRevenue({ dateRange = "All Time" }: { dateRange?: string }) {
-  const getMultiplier = () => {
-    if (dateRange === "All Time") return 1
-    if (dateRange === "Last Month") return 0.08
-    if (dateRange === "Last 3 Months") return 0.22
-    if (dateRange === "Last 6 Months") return 0.45
-    return 1
-  }
-  
-  const multiplier = getMultiplier()
-  const filteredClients = topClients.map(c => ({ ...c, revenue: Math.round(c.revenue * multiplier) }))
+  const { data: rawRevenue } = useRevenueSummaryData(dateRange)
+
+  const topClients = useMemo(() => {
+    if (!rawRevenue) return []
+    const totals: Record<string, number> = {}
+    for (const r of rawRevenue) {
+      const brandValue = r.fields['Brand Name (from Client)']
+      let brand = 'Unknown'
+      if (Array.isArray(brandValue)) {
+        brand = String(brandValue[0] ?? 'Unknown')
+      } else if (brandValue) {
+        brand = String(brandValue)
+      }
+      if (brand && brand !== 'Unknown') {
+        totals[brand] = (totals[brand] ?? 0) + parseCurrency(r.fields['Amount USD'] as string)
+      }
+    }
+    return Object.entries(totals)
+      .map(([name, revenue]) => ({ name, revenue }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+  }, [rawRevenue])
 
   return (
     <div className="bg-card rounded-xl border border-border">
@@ -61,7 +84,7 @@ export function TopClientsByRevenue({ dateRange = "All Time" }: { dateRange?: st
       </div>
       <div className="px-5 py-4">
         <div className="flex flex-col gap-3">
-          {filteredClients.map((client) => (
+          {topClients.map((client) => (
             <div key={client.name} className="flex items-center justify-between">
               <span className="text-[13px] font-medium text-foreground">{client.name}</span>
               <span className="text-[13px] tabular-nums text-foreground">{formatCurrency(client.revenue)}</span>
@@ -74,24 +97,19 @@ export function TopClientsByRevenue({ dateRange = "All Time" }: { dateRange?: st
 }
 
 export function RevenueByCategoryList({ dateRange = "All Time" }: { dateRange?: string }) {
-  const { data: rawRevenue } = useAirtable('revenue', {
-    fields: ['Amount USD', 'Category (from Category)'],
-  })
+  const { data: rawRevenue } = useRevenueSummaryData(dateRange)
 
   const categoryTotals = useMemo(() => {
     if (!rawRevenue) return []
     const totals: Record<string, number> = {}
     for (const r of rawRevenue) {
-      // Handle linked field - could be array or string
       let catValue = r.fields['Category (from Category)']
       let cat = 'Other'
-      
       if (Array.isArray(catValue)) {
         cat = String(catValue[0] ?? 'Other')
       } else if (catValue) {
         cat = String(catValue)
       }
-      
       totals[cat] = (totals[cat] ?? 0) + parseCurrency(r.fields['Amount USD'] as string)
     }
     return Object.entries(totals)
@@ -99,17 +117,6 @@ export function RevenueByCategoryList({ dateRange = "All Time" }: { dateRange?: 
       .map(([name, revenue]) => ({ name, revenue }))
       .sort((a, b) => b.revenue - a.revenue)
   }, [rawRevenue])
-
-  const getMultiplier = () => {
-    if (dateRange === "All Time") return 1
-    if (dateRange === "Last Month") return 0.08
-    if (dateRange === "Last 3 Months") return 0.22
-    if (dateRange === "Last 6 Months") return 0.45
-    return 1
-  }
-
-  const multiplier = getMultiplier()
-  const displayData = categoryTotals.map(c => ({ ...c, revenue: Math.round(c.revenue * multiplier) }))
 
   return (
     <div className="bg-card rounded-xl border border-border">
@@ -119,7 +126,7 @@ export function RevenueByCategoryList({ dateRange = "All Time" }: { dateRange?: 
       </div>
       <div className="px-5 py-4">
         <div className="flex flex-col gap-3">
-          {displayData.map((cat) => (
+          {categoryTotals.map((cat) => (
             <div key={cat.name} className="flex items-center justify-between gap-4">
               <span className="text-[13px] font-medium text-foreground">{cat.name}</span>
               <span className="text-[13px] tabular-nums text-foreground shrink-0">{formatCurrency(cat.revenue)}</span>
@@ -132,6 +139,42 @@ export function RevenueByCategoryList({ dateRange = "All Time" }: { dateRange?: 
 }
 
 export function MrrUpsellOtherChart({ dateRange = "All Time" }: { dateRange?: string }) {
+  const { data: rawRevenue } = useRevenueSummaryData(dateRange)
+
+  const mrrData = useMemo(() => {
+    const empty = [
+      { name: "MRR", value: 0, color: "hsl(195, 65%, 48%)" },
+      { name: "Upsell", value: 0, color: "hsl(220, 55%, 62%)" },
+      { name: "Other", value: 100, color: "hsl(220, 13%, 82%)" },
+    ]
+    if (!rawRevenue?.length) return empty
+
+    let mrrTotal = 0
+    let otherTotal = 0
+    for (const r of rawRevenue) {
+      const amt = parseCurrency(r.fields['Amount USD'] as string)
+      if (r.fields['Monthly Recurring Revenue']) {
+        mrrTotal += amt
+      } else {
+        otherTotal += amt
+      }
+    }
+
+    const total = mrrTotal + otherTotal
+    if (total === 0) return empty
+
+    const mrrPct = Math.round((mrrTotal / total) * 100 * 10) / 10
+    const otherPct = Math.round((otherTotal / total) * 100 * 10) / 10
+
+    return [
+      { name: "MRR", value: mrrPct, color: "hsl(195, 65%, 48%)" },
+      { name: "Upsell", value: 0, color: "hsl(220, 55%, 62%)" },
+      { name: "Other", value: otherPct, color: "hsl(220, 13%, 82%)" },
+    ]
+  }, [rawRevenue])
+
+  const chartData = mrrData.filter(d => d.value > 0)
+
   return (
     <div className="bg-card rounded-xl border border-border">
       <div className="px-5 py-4 border-b border-border">
@@ -143,7 +186,7 @@ export function MrrUpsellOtherChart({ dateRange = "All Time" }: { dateRange?: st
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={mrrData}
+                data={chartData}
                 cx="50%"
                 cy="50%"
                 innerRadius={45}
@@ -153,7 +196,7 @@ export function MrrUpsellOtherChart({ dateRange = "All Time" }: { dateRange?: st
                 stroke="white"
                 strokeWidth={1.5}
               >
-                {mrrData.map((entry, index) => (
+                {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -185,6 +228,3 @@ export function MrrUpsellOtherChart({ dateRange = "All Time" }: { dateRange?: st
     </div>
   )
 }
-
-
-

@@ -67,17 +67,18 @@ export function RevenueChart({ dateRange = "All Time" }: RevenueChartProps) {
     if (dateRange === "Last Month") return chartData.slice(-1)
     if (dateRange === "Last 3 Months") return chartData.slice(-3)
     if (dateRange === "Last 6 Months") return chartData.slice(-6)
+    if (dateRange === "Last 12 Months") return chartData.slice(-12)
+    if (dateRange.match(/^\d{4}$/)) {
+      const year = parseInt(dateRange)
+      return chartData.filter(d => parseInt(d.month.split(" ")[1]) === year)
+    }
     return chartData
   }
 
   const data = getFilteredData()
 
-  // Calculate dynamic interval based on data length
-  const getInterval = () => {
-    if (data.length <= 3) return 0
-    if (data.length <= 6) return 1
-    return 2
-  }
+  const interval = Math.max(0, Math.ceil(data.length / 12) - 1)
+  const shouldTilt = data.length > 6
 
   const chartColors = {
     revenue: "hsl(220, 55%, 62%)",
@@ -108,7 +109,7 @@ export function RevenueChart({ dateRange = "All Time" }: RevenueChartProps) {
             <div className="h-full bg-muted animate-pulse rounded" />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={data} margin={{ bottom: shouldTilt ? 40 : 0 }}>
                 <defs>
                   <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={chartColors.revenue} stopOpacity={0.1} />
@@ -129,8 +130,10 @@ export function RevenueChart({ dateRange = "All Time" }: RevenueChartProps) {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
-                  dy={8}
-                  interval={getInterval()}
+                  dy={shouldTilt ? 0 : 8}
+                  angle={shouldTilt ? -45 : 0}
+                  textAnchor={shouldTilt ? "end" : "middle"}
+                  interval={interval}
                 />
                 <YAxis
                   axisLine={false}
@@ -153,7 +156,7 @@ export function RevenueChart({ dateRange = "All Time" }: RevenueChartProps) {
                 <Legend
                   iconType="circle"
                   iconSize={6}
-                  wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+                  wrapperStyle={{ fontSize: 12, paddingTop: shouldTilt ? 52 : 12 }}
                 />
                 <Area type="monotone" dataKey="revenue" name="Revenue" stroke={chartColors.revenue} strokeWidth={1.5} fill="url(#fillRevenue)" />
                 <Area type="monotone" dataKey="expenses" name="Expenses" stroke={chartColors.expenses} strokeWidth={1.5} fill="url(#fillExpenses)" />

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { login } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/auth'
 import { DEFAULT_ROUTE } from '@/lib/permissions'
+import { useUser } from '@/contexts/UserContext'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -12,14 +13,17 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { refreshUser } = useUser()
 
-  // If already logged in, redirect to the correct dashboard
+  // If already logged in, redirect to the correct dashboard.
+  // Empty dep array intentional: we only want this to run once on mount,
+  // not re-run when the router reference changes in dev/HMR.
   useEffect(() => {
     const user = getCurrentUser()
     if (user) {
       router.replace(DEFAULT_ROUTE[user.role])
     }
-  }, [router])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,6 +32,9 @@ export default function LoginPage() {
 
     try {
       const { redirectTo } = await login(email.trim(), password)
+      // Sync UserContext state from localStorage before navigating so that
+      // ProtectedRoute sees an authenticated user immediately on arrival.
+      refreshUser()
       router.push(redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.')

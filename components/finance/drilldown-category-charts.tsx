@@ -7,6 +7,14 @@ import { useMemo } from "react"
 
 type BreakdownEntry = { name: string; value: number; color: string }
 
+function hashColor(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return `hsl(${Math.abs(hash) % 360}, 60%, 50%)`
+}
+
 const categoryColors: Record<string, string> = {
   "CRO Retainer": "hsl(195, 70%, 50%)",
   "Affiliate Software": "hsl(262, 52%, 47%)",
@@ -75,10 +83,9 @@ export function RevenueCategoryBreakdown({ month = "2025-01" }: { month?: string
       .map(([name, amount]) => ({
         name,
         value: Math.round((amount / total) * 100 * 10) / 10,
-        color: categoryColors[name] || `hsl(${Math.random() * 360}, 60%, 50%)`,
+        color: categoryColors[name] || hashColor(name),
       }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
   }, [rawRevenue, month])
 
   return (
@@ -131,10 +138,9 @@ export function ExpenseCategoryBreakdown({ month = "2025-01" }: { month?: string
       .map(([name, amount]) => ({
         name,
         value: Math.round((amount / total) * 100 * 10) / 10,
-        color: categoryColors[name] || `hsl(${Math.random() * 360}, 60%, 50%)`,
+        color: categoryColors[name] || hashColor(name),
       }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
   }, [rawExpenses, month])
 
   return (

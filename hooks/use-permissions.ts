@@ -13,6 +13,7 @@ import type { SectionDefinition } from '@/lib/permission-types'
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
   finances: false,
+  financesViewOnly: false,
   sales: false,
   experiments: false,
   clients: false,

@@ -74,6 +74,9 @@ export const TABLE_NAMES = {
   'onboard-qa': 'Onboard QA',
   'revenue-categories': 'Revenue Categories',
   'expense-categories': 'Expense Categories',
+  vendors: 'Vendors',
+  notifications: 'Notifications',
+  dividends: 'Dividends Paid',
 } as const
 
 export type ResourceSlug = keyof typeof TABLE_NAMES

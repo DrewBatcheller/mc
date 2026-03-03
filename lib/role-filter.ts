@@ -13,6 +13,7 @@ import type { UserRole } from './types'
 export interface FilterContext {
   role: UserRole
   userId?: string      // Airtable record ID of the authenticated user
+  userName?: string    // Display name — used for linked-field name matching in filterByFormula
   clientId?: string    // Airtable record ID of the client (for client users, or selected client)
 }
 
@@ -47,7 +48,7 @@ export function buildRoleFilter(
   resource: string,
   ctx: FilterContext
 ): string | null {
-  const { role, userId, clientId } = ctx
+  const { role, userId, userName, clientId } = ctx
 
   switch (resource) {
     // ── Experiments ─────────────────────────────────────────────────────────
@@ -95,9 +96,10 @@ export function buildRoleFilter(
     // ── Variants ─────────────────────────────────────────────────────────────
     case 'variants': {
       if (role === 'management' || role === 'strategy' || role === 'team') return ''
-      if (role === 'client' && clientId) {
-        // Variants link to Experiments; filter by experiment's brand ID
-        return containsId('Experiments', clientId)
+      if (role === 'client') {
+        // Variants have no direct client ID field. Scoping is handled via
+        // filterExtra in the client component using the client's experiment record IDs.
+        return ''
       }
       return null
     }
@@ -191,8 +193,53 @@ export function buildRoleFilter(
       return null
     }
 
+    // ── Dividends ─────────────────────────────────────────────────────────────
+    case 'dividends': {
+      if (role === 'management') return ''
+      return null
+    }
+
     // ── Onboard QA ────────────────────────────────────────────────────────────
     case 'onboard-qa': {
+      if (role === 'management' || role === 'strategy') return ''
+      return null
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+    case 'notifications': {
+      // Only show notifications whose Display Time has passed (or has no Display Time set).
+      // NOTE: Airtable's filterByFormula evaluates linked record fields as their primary
+      // field value (display name), NOT record IDs. So we match by userName, not userId.
+      const displayReady = `OR(NOT({Display Time}), IS_BEFORE({Display Time}, NOW()))`
+      const safeName = (userName ?? '').replace(/"/g, '\\"')
+      if ((role === 'management' || role === 'strategy') && safeName) {
+        // Addressed to this user (by name) OR broadcast (no Team Member set)
+        return and(displayReady, or(`NOT({Team Member})`, `FIND("${safeName}", {Team Member}) > 0`))
+      }
+      if (role === 'team' && safeName) {
+        return and(displayReady, `FIND("${safeName}", {Team Member}) > 0`)
+      }
+      if (role === 'client' && userName) {
+        const safeClientName = userName.replace(/"/g, '\\"')
+        return and(displayReady, or(`NOT({Client})`, `FIND("${safeClientName}", {Client}) > 0`))
+      }
+      return null
+    }
+
+    // ── Revenue Categories ─────────────────────────────────────────────────────
+    case 'revenue-categories': {
+      if (role === 'management' || role === 'strategy') return ''
+      return null
+    }
+
+    // ── Expense Categories ─────────────────────────────────────────────────────
+    case 'expense-categories': {
+      if (role === 'management' || role === 'strategy') return ''
+      return null
+    }
+
+    // ── Vendors ───────────────────────────────────────────────────────────────
+    case 'vendors': {
       if (role === 'management' || role === 'strategy') return ''
       return null
     }
@@ -207,9 +254,10 @@ export function buildRoleFilter(
 export function extractQueryContext(headers: Headers): FilterContext | null {
   const role = headers.get('x-user-role') as UserRole | null
   const userId = headers.get('x-user-id') ?? undefined
+  const userName = headers.get('x-user-name') ?? undefined
   const clientId = headers.get('x-client-id') ?? undefined
 
   if (!role) return null
 
-  return { role, userId, clientId }
+  return { role, userId, userName, clientId }
 }

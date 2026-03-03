@@ -26,6 +26,8 @@ export interface UseAirtableOptions {
   enabled?: boolean
   /** SWR refresh interval in ms (0 = no auto-refresh) */
   refreshInterval?: number
+  /** Revalidate on window focus (default: true) */
+  revalidateOnFocus?: boolean
 }
 
 // ─── Return type ──────────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ export function useAirtable<T = Record<string, unknown>>(
   options: UseAirtableOptions = {}
 ): UseAirtableResult<T> {
   const { user, isAuthenticated } = useUser()
-  const { enabled = true, refreshInterval = 0, ...queryOptions } = options
+  const { enabled = true, refreshInterval = 0, revalidateOnFocus = true, ...queryOptions } = options
 
   // Build URL with query params
   const shouldFetch = isAuthenticated && enabled && !!user
@@ -65,6 +67,7 @@ export function useAirtable<T = Record<string, unknown>>(
     ? {
         'x-user-role': user.role,
         'x-user-id': user.id,
+        'x-user-name': user.name,
         ...(user.clientId ? { 'x-client-id': user.clientId } : {}),
       }
     : {}
@@ -74,7 +77,7 @@ export function useAirtable<T = Record<string, unknown>>(
     ([u, h]) => fetcher(u, h),
     {
       refreshInterval,
-      revalidateOnFocus: true,
+      revalidateOnFocus,
       revalidateOnReconnect: true,
       dedupingInterval: 5000,
     }
@@ -90,7 +93,7 @@ export function useAirtable<T = Record<string, unknown>>(
 }
 
 // ─── URL builder ──────────────────────────────────────────────────────────────
-function buildUrl(resource: string, options: Omit<UseAirtableOptions, 'enabled' | 'refreshInterval'>): string {
+function buildUrl(resource: string, options: Omit<UseAirtableOptions, 'enabled' | 'refreshInterval' | 'revalidateOnFocus'>): string {
   const params = new URLSearchParams()
 
   if (options.maxRecords) params.set('maxRecords', String(options.maxRecords))

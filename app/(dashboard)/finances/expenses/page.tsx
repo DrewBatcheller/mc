@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Plus } from "lucide-react"
+import { useUser } from "@/contexts/UserContext"
 import {
   ExpensesOverTimeChart,
   ExpensesByCategoryChart,
@@ -13,6 +14,8 @@ import { ExpensesDetailTable } from "@/components/finance/expenses-detail-table"
 import { DateRangeFilter } from "@/components/finance/date-range-filter"
 
 export default function ExpensesPage() {
+  const { user } = useUser()
+  const isViewOnly = !!user?.permissions?.financesViewOnly
   const [dateRange, setDateRange] = useState("All Time")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [exportTrigger, setExportTrigger] = useState(0)
@@ -45,13 +48,15 @@ export default function ExpensesPage() {
               </svg>
               Export
             </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-4 text-[13px] font-medium transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Entry
-            </button>
+            {!isViewOnly && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-4 text-[13px] font-medium transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Entry
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -68,11 +73,12 @@ export default function ExpensesPage() {
 
       <ExpensesByCategoryBar dateRange={dateRange} />
 
-      <ExpensesDetailTable 
+      <ExpensesDetailTable
         dateRange={dateRange}
         showCreateModal={showCreateModal}
         setShowCreateModal={setShowCreateModal}
         exportTrigger={exportTrigger}
+        readOnly={isViewOnly}
       />
     </>
   )

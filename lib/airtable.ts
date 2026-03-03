@@ -103,20 +103,39 @@ export async function listRecords<T = Record<string, unknown>>(
 }
 
 // ─── Get all pages (auto-paginate) ───────────────────────────────────────────
+// Retries from the first page on LIST_RECORDS_ITERATOR_NOT_AVAILABLE (422).
+// This error occurs during cold-cache bursts when Airtable's pagination cursor
+// expires, or when concurrent requests hit the same table simultaneously.
 export async function listAllRecords<T = Record<string, unknown>>(
   tableName: string,
   options: Omit<ListOptions, 'offset'> = {}
 ): Promise<AirtableRecord<T>[]> {
-  const allRecords: AirtableRecord<T>[] = []
-  let offset: string | undefined
+  const MAX_RETRIES = 2
 
-  do {
-    const page = await listRecords<T>(tableName, { ...options, offset })
-    allRecords.push(...page.records)
-    offset = page.offset
-  } while (offset)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const allRecords: AirtableRecord<T>[] = []
+      let offset: string | undefined
 
-  return allRecords
+      do {
+        const page = await listRecords<T>(tableName, { ...options, offset })
+        allRecords.push(...page.records)
+        offset = page.offset
+      } while (offset)
+
+      return allRecords
+    } catch (err) {
+      const is422 = err instanceof AirtableError && err.status === 422
+      if (is422 && attempt < MAX_RETRIES) {
+        // Back off briefly before retrying from page 1
+        await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+        continue
+      }
+      throw err
+    }
+  }
+
+  return [] // unreachable — satisfies TypeScript
 }
 
 // ─── Get single record by ID ──────────────────────────────────────────────────
@@ -154,6 +173,15 @@ export async function updateRecord<T = Record<string, unknown>>(
     body: JSON.stringify({ fields }),
   })
   return res.json()
+}
+
+// ─── Delete record ────────────────────────────────────────────────────────────
+export async function deleteRecord(
+  tableName: string,
+  recordId: string
+): Promise<void> {
+  const url = `${BASE_URL}/${encodeURIComponent(tableName)}/${recordId}`
+  await airtableFetch(url, { method: 'DELETE' })
 }
 
 // ─── Find records by formula ──────────────────────────────────────────────────

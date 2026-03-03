@@ -5,6 +5,7 @@
 
 export interface UserPermissions {
   finances: boolean
+  financesViewOnly: boolean
   sales: boolean
   experiments: boolean
   clients: boolean
@@ -27,6 +28,7 @@ export interface SectionDefinition {
   label: string  // Display name
   routes: string[]  // Accessible route prefixes (e.g. ['/finances', '/finances/pnl'])
   isFlat?: boolean  // If true, render as flat list of links instead of expandable section
+  permissionKeys?: string[]  // Which permission keys unlock this section. Defaults to [id]
 }
 
 export interface DynamicNavItem {

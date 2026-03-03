@@ -24,6 +24,13 @@ function getDateFilter(dateRange: string): string {
     const d = new Date(now.getFullYear(), now.getMonth() - 6, 1)
     return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
   }
+  if (dateRange === 'Last 12 Months') {
+    const d = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange.match(/^\d{4}$/)) {
+    return `YEAR({Date}) = ${dateRange}`
+  }
   return ''
 }
 

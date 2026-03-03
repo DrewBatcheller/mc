@@ -4,11 +4,10 @@ import { Phone, UserPlus, Search, Sparkles, TrendingUp, AlertCircle } from "luci
 import { MetricCard } from "@/components/shared/metric-card"
 import { useAirtable } from "@/hooks/use-airtable"
 import { useMemo } from "react"
-import { parseCurrency } from "@/lib/transforms"
 
 export function SalesStatCards() {
   const { data: leads, isLoading } = useAirtable('leads', {
-    fields: ['Lead Status', 'Stage', 'Deal Value', 'Date Created'],
+    fields: ['Lead Status', 'Stage', 'Date Created'],
   })
 
   const stats = useMemo(() => {
@@ -22,12 +21,12 @@ export function SalesStatCards() {
     })
     return {
       fresh: all.filter(r => String(r.fields['Lead Status'] ?? '') === 'Fresh').length,
-      discovery: all.filter(r => String(r.fields['Stage'] ?? '').toLowerCase().includes('discovery')).length,
-      sales: all.filter(r => String(r.fields['Stage'] ?? '').toLowerCase().includes('sales call')).length,
-      converted: all.filter(r => String(r.fields['Lead Status'] ?? '') === 'Converted').length,
+      discovery: all.filter(r => String(r.fields['Stage'] ?? '') === 'Qualifying Call').length,
+      sales: all.filter(r => String(r.fields['Stage'] ?? '') === 'Sales Call').length,
+      converted: all.filter(r => String(r.fields['Lead Status'] ?? '') === 'Client').length,
       stale: all.filter(r => String(r.fields['Lead Status'] ?? '') === 'Stale').length,
       old: all.filter(r => String(r.fields['Lead Status'] ?? '') === 'Old').length,
-      wonThisMonth: thisMonth.filter(r => String(r.fields['Lead Status'] ?? '') === 'Converted').length,
+      wonThisMonth: thisMonth.filter(r => String(r.fields['Lead Status'] ?? '') === 'Client').length,
       lostThisMonth: thisMonth.filter(r => String(r.fields['Lead Status'] ?? '') === 'Lost').length,
     }
   }, [leads])

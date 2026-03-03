@@ -4,16 +4,20 @@ import { useAirtable } from '@/hooks/use-airtable'
 import { MetricCard } from '@/components/shared/metric-card'
 import { useMemo } from 'react'
 
-export function ClientDashboardStats() {
-  const { data: experiments } = useAirtable('experiments')
-  const { data: variants } = useAirtable('variants')
+export function ClientDashboardStats({ clientId }: { clientId?: string }) {
+  const clientFilter = clientId
+    ? `{Record ID (from Brand Name)} = "${clientId}"`
+    : undefined
+
+  const { data: experiments } = useAirtable('experiments', { filterExtra: clientFilter })
 
   const stats = useMemo(() => {
-    if (!experiments || !variants) {
+    if (!experiments) {
       return {
         totalExperiments: 0,
         scheduledExperiments: 0,
         liveExperiments: 0,
+        liveStatus: 'No Active Tests',
         unsuccessfulExperiments: 0,
         successfulExperiments: 0,
         totalRevenueAdded: 0,
@@ -21,42 +25,36 @@ export function ClientDashboardStats() {
     }
 
     const totalExperiments = experiments.length
-    
-    // Live/In Progress experiments - find the active batch status
+
     let liveExperiments = 0
     let liveStatus = 'No Active Tests'
     const activeStatuses = experiments.filter(e => {
       const status = String(e.fields['Test Status'] || '')
       return status.includes('In Progress') || status.includes('Live')
     })
-    
+
     if (activeStatuses.length > 0) {
       liveExperiments = activeStatuses.length
-      // Get the most common/current status
       const statusCounts: Record<string, number> = {}
       activeStatuses.forEach(e => {
         const status = String(e.fields['Test Status'] || '')
         statusCounts[status] = (statusCounts[status] || 0) + 1
       })
       const mostCommonStatus = Object.entries(statusCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
-      if (mostCommonStatus) {
-        liveStatus = mostCommonStatus
-      }
+      if (mostCommonStatus) liveStatus = mostCommonStatus
     }
-    
+
     const scheduledExperiments = experiments.filter(e => {
       const status = String(e.fields['Test Status'] || '')
       return status === 'Pending' || status === 'Scheduled'
     }).length
-    
-    // Successful experiments are those with Test Status of 'Successful' or Outcome field of 'Successful'/'Win'
+
     const successfulExperiments = experiments.filter(e => {
       const testStatus = String(e.fields['Test Status'] || '')
       const outcome = String(e.fields['Outcome'] || '')
       return testStatus === 'Successful' || outcome === 'Successful' || outcome === 'Win'
     }).length
-    
-    // Unsuccessful are those with 'Unsuccessful', 'Loss', or 'Inconclusive'
+
     const unsuccessfulExperiments = experiments.filter(e => {
       const testStatus = String(e.fields['Test Status'] || '')
       const outcome = String(e.fields['Outcome'] || '')
@@ -68,64 +66,19 @@ export function ClientDashboardStats() {
       return sum + (typeof revenue === 'number' ? revenue : 0)
     }, 0)
 
-    return {
-      totalExperiments,
-      scheduledExperiments,
-      liveExperiments,
-      liveStatus,
-      unsuccessfulExperiments,
-      successfulExperiments,
-      totalRevenueAdded,
-    }
-  }, [experiments, variants])
+    return { totalExperiments, scheduledExperiments, liveExperiments, liveStatus, unsuccessfulExperiments, successfulExperiments, totalRevenueAdded }
+  }, [experiments])
 
   const row1 = [
-    {
-      id: 'total-experiments',
-      label: 'Total Experiments',
-      value: String(stats.totalExperiments),
-      sub: 'The cumulative count of all CRO tests launched to date.',
-      className: 'border-l-[3px] border-l-sky-400',
-    },
-    {
-      id: 'scheduled-experiments',
-      label: 'Scheduled Experiments',
-      value: String(stats.scheduledExperiments),
-      sub: 'Validated test ideas currently in the queue for production.',
-      className: 'border-l-[3px] border-l-emerald-400',
-    },
-    {
-      id: 'active-tests',
-      label: stats.liveStatus,
-      value: String(stats.liveExperiments),
-      sub: stats.liveStatus === 'No Active Tests' ? 'No tests currently active.' : 'Tests actively collecting data or in development pipeline.',
-      className: 'border-l-[3px] border-l-emerald-400',
-    },
+    { id: 'total-experiments', label: 'Total Experiments', value: String(stats.totalExperiments), sub: 'The cumulative count of all CRO tests launched to date.', className: 'border-l-[3px] border-l-sky-400' },
+    { id: 'scheduled-experiments', label: 'Scheduled Experiments', value: String(stats.scheduledExperiments), sub: 'Validated test ideas currently in the queue for production.', className: 'border-l-[3px] border-l-emerald-400' },
+    { id: 'active-tests', label: stats.liveStatus, value: String(stats.liveExperiments), sub: stats.liveStatus === 'No Active Tests' ? 'No tests currently active.' : 'Tests actively collecting data or in development pipeline.', className: 'border-l-[3px] border-l-emerald-400' },
   ]
 
   const row2 = [
-    {
-      id: 'unsuccessful-experiments',
-      label: 'Unsuccessful Experiments',
-      value: String(stats.unsuccessfulExperiments),
-      sub: 'Total number of tests that resulted in a loss or were inconclusive.',
-      className: 'border-l-[3px] border-l-rose-400',
-    },
-    {
-      id: 'successful-experiments',
-      label: 'Successful Experiments',
-      value: String(stats.successfulExperiments),
-      sub: 'Winning variations that outperformed the control and were pushed to production.',
-      className: 'border-l-[3px] border-l-emerald-400',
-    },
-    {
-      id: 'total-revenue',
-      label: 'Total Revenue Added',
-      value: stats.totalRevenueAdded,
-      currency: true,
-      sub: 'Estimated incremental Monthly Recurring Revenue ($MRR) generated from winning experiments.',
-      className: 'border-l-[3px] border-l-emerald-400',
-    },
+    { id: 'unsuccessful-experiments', label: 'Unsuccessful Experiments', value: String(stats.unsuccessfulExperiments), sub: 'Total number of tests that resulted in a loss or were inconclusive.', className: 'border-l-[3px] border-l-rose-400' },
+    { id: 'successful-experiments', label: 'Successful Experiments', value: String(stats.successfulExperiments), sub: 'Winning variations that outperformed the control and were pushed to production.', className: 'border-l-[3px] border-l-emerald-400' },
+    { id: 'total-revenue', label: 'Total Revenue Added', value: stats.totalRevenueAdded, currency: true, sub: 'Estimated incremental Monthly Recurring Revenue ($MRR) generated from winning experiments.', className: 'border-l-[3px] border-l-emerald-400' },
   ]
 
   return (

@@ -13,6 +13,7 @@ const DEFAULT_PERMISSION_VIEW = 'Team'  // Fallback for departments without uniq
 interface AirtablePermissionsRow {
   'Name': string
   'Finances'?: string | boolean
+  'Finances View Only'?: string | boolean
   'Sales'?: string | boolean
   'Experiments'?: string | boolean
   'Clients'?: string | boolean
@@ -74,6 +75,7 @@ async function lookupPermissionsByView(viewName: string): Promise<UserPermission
     
     return {
       finances: toBoolean(fields['Finances']),
+      financesViewOnly: toBoolean(fields['Finances View Only']),
       sales: toBoolean(fields['Sales']),
       experiments: toBoolean(fields['Experiments']),
       clients: toBoolean(fields['Clients']),
@@ -99,6 +101,7 @@ export async function getAllPermissionViews(): Promise<PermissionsRecord[]> {
       view: r.fields['Name'] || 'Unknown',
       permissions: {
         finances: toBoolean(r.fields['Finances']),
+        financesViewOnly: toBoolean(r.fields['Finances View Only']),
         sales: toBoolean(r.fields['Sales']),
         experiments: toBoolean(r.fields['Experiments']),
         clients: toBoolean(r.fields['Clients']),

@@ -5,6 +5,39 @@ import { useAirtable } from "@/hooks/use-airtable"
 import { parseCurrency } from "@/lib/transforms"
 import { useMemo } from "react"
 
+function buildDateFilter(dateRange: string): string {
+  if (dateRange === 'All Time') return ''
+  const now = new Date()
+  if (dateRange === 'Last Month') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 3 Months') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 6 Months') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange === 'Last 12 Months') {
+    const d = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+    return `IS_AFTER({Date}, "${d.toISOString().split('T')[0]}")`
+  }
+  if (dateRange.match(/^\d{4}$/)) {
+    return `YEAR({Date}) = ${dateRange}`
+  }
+  return ''
+}
+
+function hashColor(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return `hsl(${Math.abs(hash) % 360}, 60%, 50%)`
+}
+
 const categoryColors: Record<string, string> = {
   "CRO Retainer": "hsl(195, 70%, 50%)",
   "Affiliate Software": "hsl(220, 70%, 50%)",
@@ -93,13 +126,15 @@ function CategoryPie({ title, subtitle, data, dateRange = "All Time" }: Category
 }
 
 export function RevenueByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
+  const dateFilter = buildDateFilter(dateRange)
   const { data: rawRevenue, isLoading } = useAirtable('revenue', {
     fields: ['Amount USD', 'Category (from Category)'],
+    ...(dateFilter ? { filterExtra: dateFilter } : {}),
   })
 
   const chartData = useMemo(() => {
     if (!rawRevenue?.length) return []
-    
+
     const totals: Record<string, number> = {}
     for (const r of rawRevenue) {
       // Handle linked field - could be array or string
@@ -124,7 +159,7 @@ export function RevenueByCategoryChart({ dateRange = "All Time" }: { dateRange?:
       .map(([name, value]) => ({
         name,
         value: (value / total) * 100,
-        color: categoryColors[name] || `hsl(${Math.random() * 360}, 60%, 50%)`,
+        color: categoryColors[name] || hashColor(name),
       }))
       .sort((a, b) => b.value - a.value)
   }, [rawRevenue])
@@ -140,13 +175,15 @@ export function RevenueByCategoryChart({ dateRange = "All Time" }: { dateRange?:
 }
 
 export function ExpenseByCategoryChart({ dateRange = "All Time" }: { dateRange?: string }) {
+  const dateFilter = buildDateFilter(dateRange)
   const { data: rawExpenses, isLoading } = useAirtable('expenses', {
     fields: ['Expense', 'Category (from Category)'],
+    ...(dateFilter ? { filterExtra: dateFilter } : {}),
   })
 
   const chartData = useMemo(() => {
     if (!rawExpenses?.length) return []
-    
+
     const totals: Record<string, number> = {}
     for (const r of rawExpenses) {
       // Handle linked field - could be array or string
@@ -171,7 +208,7 @@ export function ExpenseByCategoryChart({ dateRange = "All Time" }: { dateRange?:
       .map(([name, value]) => ({
         name,
         value: (value / total) * 100,
-        color: categoryColors[name] || `hsl(${Math.random() * 360}, 60%, 50%)`,
+        color: categoryColors[name] || hashColor(name),
       }))
       .sort((a, b) => b.value - a.value)
   }, [rawExpenses])

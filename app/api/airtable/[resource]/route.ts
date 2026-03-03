@@ -24,7 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { listRecords, AirtableError, createRecord } from '@/lib/airtable'
+import { listRecords, listAllRecords, AirtableError, createRecord } from '@/lib/airtable'
 import { buildRoleFilter, extractQueryContext } from '@/lib/role-filter'
 import { getOrSet, cacheKey, invalidatePattern, TTL } from '@/lib/cache'
 import { TABLE_NAMES } from '@/lib/types'
@@ -102,23 +102,30 @@ export async function GET(
 
     // ── Cache ────────────────────────────────────────────────────────────────
     const noCache = searchParams.get('noCache') === 'true'
+    const fieldsSuffix = fields.length > 0 ? fields.slice().sort().join(',') : ''
     const key = cacheKey(
       resource,
       ctx.role,
       ctx.clientId ?? ctx.userId,
-      filterByFormula?.slice(0, 50)  // partial formula for key uniqueness
+      [filterByFormula?.slice(0, 50), fieldsSuffix].filter(Boolean).join('|') || undefined
     )
 
+    // Auto-paginate when no maxRecords cap — returns all matching records
+    const doFetch = async () => {
+      if (options.maxRecords) {
+        const res = await listRecords(tableName, options)
+        return { records: res.records, offset: res.offset }
+      }
+      const records = await listAllRecords(tableName, options)
+      return { records, offset: undefined }
+    }
+
     if (noCache) {
-      const result = await listRecords(tableName, options)
+      const result = await doFetch()
       return NextResponse.json({ records: result.records, offset: result.offset, cached: false })
     }
 
-    const { data, cached } = await getOrSet(
-      key,
-      () => listRecords(tableName, options),
-      TTL.medium
-    )
+    const { data, cached } = await getOrSet(key, doFetch, TTL.medium)
 
     return NextResponse.json({ records: data.records, offset: data.offset, cached })
 

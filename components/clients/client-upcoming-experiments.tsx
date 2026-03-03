@@ -25,39 +25,31 @@ function getCardBorder(status: string): string {
   return 'border-l-gray-400'
 }
 
-export function ClientUpcomingLiveExperiments() {
+export function ClientUpcomingLiveExperiments({ clientId }: { clientId?: string }) {
   const [selectedExperiment, setSelectedExperiment] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(0)
-  
+
+  const clientFilter = clientId
+    ? `{Record ID (from Brand Name)} = "${clientId}"`
+    : undefined
+
   const { data: experiments } = useAirtable('experiments', {
     fields: ['Test Description', 'Test Status', 'Launch Date', 'End Date', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Devices', 'GEOs', 'Revenue Added (MRR) (Regular Format)', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)', 'Category Primary Goals', 'Record ID (from Brand Name)'],
+    filterExtra: clientFilter,
   })
 
   const upcomingExperiments = useMemo(() => {
-    if (!experiments) {
-      return []
-    }
+    if (!experiments) return []
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    
-    const filtered = experiments.filter(e => {
+
+    return experiments.filter(e => {
       const status = String(e.fields['Test Status'] || '')
       const launchDate = e.fields['Launch Date'] ? new Date(String(e.fields['Launch Date'])) : null
-      
-      if (launchDate) {
-        launchDate.setHours(0, 0, 0, 0)
-      }
-      
-      const isPending = status === 'Pending'
-      const isInProgress = status.includes('In Progress')
-      const isLive = status.includes('Live')
-      const hasFutureLaunchDate = launchDate && launchDate > today
-      
-      const isUpcoming = isPending || isInProgress || isLive || hasFutureLaunchDate
-      return isUpcoming
+      if (launchDate) launchDate.setHours(0, 0, 0, 0)
+
+      return status === 'Pending' || status.includes('In Progress') || status.includes('Live') || (launchDate && launchDate > today)
     })
-    
-    return filtered
   }, [experiments])
 
   const totalPages = Math.ceil(upcomingExperiments.length / RESULTS_PER_PAGE)
@@ -66,18 +58,8 @@ export function ClientUpcomingLiveExperiments() {
     return upcomingExperiments.slice(start, start + RESULTS_PER_PAGE)
   }, [currentPage, upcomingExperiments])
 
-  const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(0, prev - 1))
-  }
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))
-  }
-
   function getImageUrl(field: any): string | undefined {
-    if (Array.isArray(field) && field.length > 0) {
-      return field[0].url || field[0]
-    }
+    if (Array.isArray(field) && field.length > 0) return field[0].url || field[0]
     if (typeof field === 'string') return field
     return undefined
   }
@@ -90,7 +72,7 @@ export function ClientUpcomingLiveExperiments() {
   }
 
   function handleExperimentClick(exp: any) {
-    const experimentData = {
+    setSelectedExperiment({
       name: String(exp.fields['Test Description'] || ''),
       description: String(exp.fields['Test Description'] || ''),
       status: String(exp.fields['Test Status'] || ''),
@@ -100,7 +82,7 @@ export function ClientUpcomingLiveExperiments() {
       geos: String(exp.fields['GEOs'] || ''),
       hypothesis: String(exp.fields['Hypothesis'] || ''),
       rationale: String(exp.fields['Rationale'] || ''),
-      primaryGoals: exp.fields['Category Primary Goals'] ? String(exp.fields['Category Primary Goals']).split(',').map(g => g.trim()) : [],
+      primaryGoals: exp.fields['Category Primary Goals'] ? String(exp.fields['Category Primary Goals']).split(',').map((g: string) => g.trim()) : [],
       revenueAddedMrr: formatMrr(typeof exp.fields['Revenue Added (MRR) (Regular Format)'] === 'number' ? exp.fields['Revenue Added (MRR) (Regular Format)'] : 0),
       deployed: exp.fields['Deployed'] === true,
       launchDate: String(exp.fields['Launch Date'] || ''),
@@ -113,8 +95,7 @@ export function ClientUpcomingLiveExperiments() {
       resultVideo: getImageUrl(exp.fields['Post-Test Analysis (Loom)']),
       variants: "0",
       revenue: "$0",
-    }
-    setSelectedExperiment(experimentData)
+    })
   }
 
   return (
@@ -126,16 +107,13 @@ export function ClientUpcomingLiveExperiments() {
               <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center">
                 <FileText className="h-10 w-10 text-muted-foreground/40" />
               </div>
-              <p className="text-[13px] text-muted-foreground">
-                No upcoming experiments
-              </p>
+              <p className="text-[13px] text-muted-foreground">No upcoming experiments</p>
             </div>
           ) : (
             <>
               <div className="flex-1 px-5 py-4 flex flex-col gap-3">
                 {paginatedExperiments.map(exp => {
                   const status = String(exp.fields['Test Status'] || '')
-                  
                   return (
                     <div
                       key={exp.id}
@@ -147,12 +125,7 @@ export function ClientUpcomingLiveExperiments() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-[13px] font-semibold text-foreground flex-1">{exp.fields['Test Description']}</span>
-                        <span
-                          className={cn(
-                            'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap',
-                            getStatusStyle(status)
-                          )}
-                        >
+                        <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap', getStatusStyle(status))}>
                           {status}
                         </span>
                       </div>
@@ -186,27 +159,15 @@ export function ClientUpcomingLiveExperiments() {
                   )
                 })}
               </div>
-
-              {/* Pagination */}
               <div className="px-5 py-3 border-t border-border flex items-center justify-between">
                 <span className="text-[12px] text-muted-foreground">
                   {upcomingExperiments.length > 0 ? currentPage + 1 : 0} of {totalPages || 1}
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={handlePrevPage}
-                    disabled={currentPage === 0}
-                    className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    title="Previous page"
-                  >
+                  <button onClick={() => setCurrentPage(p => Math.max(0, p - 1))} disabled={currentPage === 0} className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                     <ChevronLeft className="h-4 w-4 text-muted-foreground" />
                   </button>
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage === totalPages - 1}
-                    className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    title="Next page"
-                  >
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))} disabled={currentPage === totalPages - 1} className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </div>
@@ -216,7 +177,6 @@ export function ClientUpcomingLiveExperiments() {
         </div>
       </ContentCard>
 
-      {/* Experiment Details Modal */}
       {selectedExperiment && (
         <ExperimentDetailsModal
           isOpen={!!selectedExperiment}

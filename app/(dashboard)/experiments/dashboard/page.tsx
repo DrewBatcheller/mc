@@ -23,7 +23,9 @@ export default function ExperimentsDashboardPage() {
       <ExperimentStatCards />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <UpcomingBatches onExperimentClick={setSelectedExperiment} />
+        {/* Batches: no experiment modal — click handler reserved for future batch drill-down */}
+        <UpcomingBatches />
+        {/* Recently ended tests: click opens ExperimentDetailsModal */}
         <RecentlyEndedTests onExperimentClick={setSelectedExperiment} />
       </div>
 

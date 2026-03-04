@@ -1,54 +1,57 @@
 "use client"
 
-import { useMemo } from "react"
-import { Calendar } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react"
+
+const PAGE_SIZE = 5
 import { cn } from "@/lib/utils"
 import { useAirtable } from "@/hooks/use-airtable"
+
+import type { ScheduleTask } from "./upcoming-tasks-table"
+import { deriveTaskStatus } from "./upcoming-tasks-table"
 
 interface AirtableTask {
   id: string
   name: string
+  teamFacingName: string
   category: string
   sprint: string
   startDate: string
   dueDate: string
   status: string
   assigned: string
+  batchRecordId: string
+  openUrl: string
+  clientRecordId: string
 }
 
-interface ScheduleTask {
-  title: string
-  client: string
-  department: string
-  dueDate: string
-  status: "Pending" | "Overdue" | "Complete"
-  assigned: string
-  batchId?: string
-  experiments?: { id: string; name: string; figmaUrl?: string; convertId?: string; qaApproved?: boolean; qaReportUrl?: string }[]
-}
-
-function convertToScheduleTask(task: AirtableTask): ScheduleTask {
-  const clientName = task.sprint.split(" | ")[0] || task.sprint
+function convertToScheduleTask(task: AirtableTask, today: Date): ScheduleTask {
+  const sprintStr = typeof task.sprint === 'string' ? task.sprint : String(task.sprint ?? '')
+  const clientName = sprintStr.split(" | ")[0] || sprintStr
   return {
     title: task.name,
+    teamFacingName: task.teamFacingName,
     client: clientName,
     department: task.category || "Development",
+    startDate: task.startDate,
     dueDate: task.dueDate,
-    status: "Pending",
+    status: deriveTaskStatus(task.status, task.startDate, task.dueDate, today),
     assigned: task.assigned,
+    taskId: task.id,
     batchId: task.id,
+    batchRecordId: task.batchRecordId,
+    openUrl: task.openUrl,
+    clientRecordId: task.clientRecordId,
   }
 }
 
 function getStatusStyle(status: string) {
   switch (status) {
-    case "Ready to Start": return "bg-emerald-600 text-white"
-    case "In Progress": return "bg-amber-500 text-white"
-    case "Pending Approval": return "bg-purple-600 text-white"
-    case "Complete": return "bg-sky-600 text-white"
-    case "Pending": return "bg-emerald-600 text-white"
-    case "Overdue": return "bg-red-600 text-white"
-    default: return "bg-muted text-muted-foreground"
+    case "In Progress":  return "bg-amber-500 text-white"
+    case "Overdue":      return "bg-red-600 text-white"
+    case "Complete":     return "bg-emerald-600 text-white"
+    case "Pending":
+    default:             return "bg-sky-600 text-white"
   }
 }
 
@@ -89,10 +92,12 @@ interface InProgressTasksTableProps {
 }
 
 export function InProgressTasksTable({ onTaskClick, memberFilter, deptFilter, statusFilter }: InProgressTasksTableProps) {
+  const [currentPage, setCurrentPage] = useState(0)
+
   // Build server-side filter
   const filterParts: string[] = []
   if (memberFilter && memberFilter !== "All Members") {
-    filterParts.push(`FIND("${memberFilter}", {Assigned To}) > 0`)
+    filterParts.push(`FIND("${memberFilter}", {Assigned to}) > 0`)
   }
   if (deptFilter && deptFilter !== "All Departments") {
     filterParts.push(`{Department} = "${deptFilter}"`)
@@ -102,7 +107,6 @@ export function InProgressTasksTable({ onTaskClick, memberFilter, deptFilter, st
     : undefined
 
   const { data: rawTasks, isLoading } = useAirtable<Record<string, unknown>>('tasks', {
-    fields: ['Client Facing Name', 'Start Date', 'Due Date', 'Status', 'Department', 'Assigned To', 'Sprint'],
     sort: [{ field: 'Start Date', direction: 'asc' }],
     ...(filterExtra ? { filterExtra } : {}),
   })
@@ -110,17 +114,27 @@ export function InProgressTasksTable({ onTaskClick, memberFilter, deptFilter, st
   const tasks = useMemo<AirtableTask[]>(() => {
     return (rawTasks ?? []).map(r => {
       const f = r.fields as Record<string, unknown>
-      const assignedRaw = f['Assigned To']
+      const assignedRaw = f['Assigned to']
       const assigned = Array.isArray(assignedRaw) ? (assignedRaw[0] as string ?? '') : (assignedRaw as string ?? '')
       return {
         id: r.id,
-        name: (f['Client Facing Name'] as string) ?? (f['Name'] as string) ?? 'Untitled',
+        name: (f['Client Facing Name'] as string) ?? (f['Team Facing Name'] as string) ?? 'Untitled',
+        teamFacingName: (f['Team Facing Name'] as string) ?? '',
         category: (f['Department'] as string) ?? '',
-        sprint: (f['Sprint'] as string) ?? '',
+        sprint: Array.isArray(f['Brand Name (from Client)'])
+          ? ((f['Brand Name (from Client)'] as string[])[0] ?? (f['Batch'] as string) ?? '')
+          : ((f['Brand Name (from Client)'] as string) ?? (f['Batch'] as string) ?? ''),
         startDate: (f['Start Date'] as string) ?? '',
         dueDate: (f['Due Date'] as string) ?? '',
         status: (f['Status'] as string) ?? '',
         assigned,
+        batchRecordId: Array.isArray(f['Record ID (from Batch)'])
+          ? ((f['Record ID (from Batch)'] as string[])[0] ?? '')
+          : ((f['Record ID (from Batch)'] as string) ?? ''),
+        openUrl: (f['Open URL'] as string) ?? '',
+        clientRecordId: Array.isArray(f['Record ID (from Client)'])
+          ? ((f['Record ID (from Client)'] as string[])[0] ?? '')
+          : ((f['Record ID (from Client)'] as string) ?? ''),
       }
     })
   }, [rawTasks])
@@ -132,24 +146,32 @@ export function InProgressTasksTable({ onTaskClick, memberFilter, deptFilter, st
   }, [])
 
   const inProgressTasks = useMemo(() => {
-    return tasks.filter((task) => {
-      if (!task.startDate || !task.dueDate) return false
-      const startDate = parseIsoDate(task.startDate)
-      const dueDate = parseIsoDate(task.dueDate)
-      if (!(startDate <= today && today <= dueDate)) return false
-      if (statusFilter && statusFilter !== "All Status") {
-        if (task.status !== statusFilter) return false
-      }
-      return true
-    })
+    return tasks
+      .map(task => ({
+        ...task,
+        displayStatus: deriveTaskStatus(task.status, task.startDate, task.dueDate, today),
+      }))
+      .filter(task => {
+        const { displayStatus } = task
+        // This table shows active work: In Progress and Overdue
+        if (displayStatus !== 'In Progress' && displayStatus !== 'Overdue') return false
+        if (statusFilter && statusFilter !== "All Status") {
+          if (displayStatus !== statusFilter) return false
+        }
+        return true
+      })
   }, [tasks, statusFilter, today])
+
+  const totalPages = Math.ceil(inProgressTasks.length / PAGE_SIZE)
+  const safePage = Math.min(currentPage, Math.max(0, totalPages - 1))
+  const pageItems = inProgressTasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
 
   if (isLoading) {
     return (
       <div className="bg-card rounded-xl border border-border">
         <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-sm font-semibold text-foreground">In Progress Tasks</h3>
-          <p className="text-[12px] text-muted-foreground mt-0.5">Tasks currently being worked on</p>
+          <h3 className="text-sm font-semibold text-foreground">In Progress &amp; Overdue</h3>
+          <p className="text-[12px] text-muted-foreground mt-0.5">Active tasks and past-due work</p>
         </div>
         <div className="px-5 py-16 flex items-center justify-center text-[13px] text-muted-foreground">
           Loading…
@@ -161,59 +183,85 @@ export function InProgressTasksTable({ onTaskClick, memberFilter, deptFilter, st
   return (
     <div className="bg-card rounded-xl border border-border">
       <div className="px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-semibold text-foreground">In Progress Tasks</h3>
+        <h3 className="text-sm font-semibold text-foreground">In Progress &amp; Overdue</h3>
         <p className="text-[12px] text-muted-foreground mt-0.5">
-          Tasks currently being worked on
+          Active tasks and past-due work
         </p>
       </div>
       {inProgressTasks.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Task</th>
-                <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sprint</th>
-                <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Start Date</th>
-                <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Due Date</th>
-                <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {inProgressTasks.map((task) => (
-                <tr
-                  key={task.id}
-                  onClick={() => onTaskClick && onTaskClick(convertToScheduleTask(task))}
-                  className="transition-colors hover:bg-muted/30 cursor-pointer"
-                >
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      {task.category && (
-                        <span className={cn("px-2 py-0.5 rounded text-[11px] font-medium whitespace-nowrap", getCategoryStyle(task.category))}>
-                          {task.category}
-                        </span>
-                      )}
-                      <span className="text-[13px] text-foreground">{task.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
-                    {task.sprint || "—"}
-                  </td>
-                  <td className="px-5 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
-                    {formatDate(task.startDate)}
-                  </td>
-                  <td className="px-5 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
-                    {formatDate(task.dueDate)}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={cn("px-2.5 py-1 rounded text-[11px] font-semibold whitespace-nowrap", getStatusStyle(task.status))}>
-                      {task.status || "—"}
-                    </span>
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Task</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sprint</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Start Date</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Due Date</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {pageItems.map((task) => (
+                  <tr
+                    key={task.id}
+                    onClick={() => onTaskClick && onTaskClick(convertToScheduleTask(task, today))}
+                    className="transition-colors hover:bg-muted/30 cursor-pointer"
+                  >
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        {task.category && (
+                          <span className={cn("px-2 py-0.5 rounded text-[11px] font-medium whitespace-nowrap", getCategoryStyle(task.category))}>
+                            {task.category}
+                          </span>
+                        )}
+                        <span className="text-[13px] text-foreground">{task.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
+                      {task.sprint || "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
+                      {formatDate(task.startDate)}
+                    </td>
+                    <td className="px-5 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
+                      {formatDate(task.dueDate)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={cn("px-2.5 py-1 rounded text-[11px] font-semibold whitespace-nowrap", getStatusStyle(task.displayStatus))}>
+                        {task.displayStatus || "—"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="px-5 py-3 border-t border-border flex items-center justify-between">
+              <p className="text-[12px] text-muted-foreground">
+                {safePage * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE + PAGE_SIZE, inProgressTasks.length)} of {inProgressTasks.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  disabled={safePage === 0}
+                  className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-[12px] text-muted-foreground px-1">{safePage + 1} / {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={safePage >= totalPages - 1}
+                  className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="px-5 py-16 flex flex-col items-center justify-center text-center">
           <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mb-3">

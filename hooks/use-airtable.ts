@@ -55,7 +55,7 @@ export function useAirtable<T = Record<string, unknown>>(
   options: UseAirtableOptions = {}
 ): UseAirtableResult<T> {
   const { user, isAuthenticated } = useUser()
-  const { enabled = true, refreshInterval = 0, revalidateOnFocus = true, ...queryOptions } = options
+  const { enabled = true, refreshInterval = 0, revalidateOnFocus = false, ...queryOptions } = options
 
   // Build URL with query params
   const shouldFetch = isAuthenticated && enabled && !!user
@@ -78,8 +78,8 @@ export function useAirtable<T = Record<string, unknown>>(
     {
       refreshInterval,
       revalidateOnFocus,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60_000,   // suppress duplicate fetches for 60s
     }
   )
 

@@ -7,47 +7,90 @@ import { useAirtable } from "@/hooks/use-airtable"
 interface AirtableTask {
   id: string
   name: string
+  teamFacingName: string
   category: string
   sprint: string
   startDate: string
   dueDate: string
   status: string
   assigned: string
+  batchRecordId: string
+  openUrl: string
+  clientRecordId: string
 }
 
-interface ScheduleTask {
+export interface ScheduleTask {
   title: string
+  teamFacingName: string
   client: string
   department: string
+  startDate?: string
   dueDate: string
-  status: "Pending" | "Overdue" | "Complete"
+  status: "Pending" | "In Progress" | "Overdue" | "Complete"
   assigned: string
+  taskId: string
   batchId?: string
+  batchRecordId?: string
+  openUrl?: string
+  clientRecordId?: string
+  experimentIds?: string[]
   experiments?: { id: string; name: string; figmaUrl?: string; convertId?: string; qaApproved?: boolean; qaReportUrl?: string }[]
 }
 
-function convertToScheduleTask(task: AirtableTask): ScheduleTask {
-  const clientName = task.sprint.split(" | ")[0] || task.sprint
+/**
+ * Derive the display status from raw Airtable data + today's date.
+ *
+ * Rules (in priority order):
+ *  1. Done/Complete in Airtable → "Complete"
+ *  2. Past due date             → "Overdue"
+ *  3. Start Date ≤ Today ≤ Due  → "In Progress"
+ *  4. Anything else             → "Pending"
+ */
+export function deriveTaskStatus(
+  airtableStatus: string,
+  startDate: string | undefined,
+  dueDate: string | undefined,
+  today: Date,
+): "Pending" | "In Progress" | "Overdue" | "Complete" {
+  if (airtableStatus === 'Complete' || airtableStatus === 'Done') return 'Complete'
+  if (dueDate) {
+    const due = parseIsoDate(dueDate)
+    if (due < today) return 'Overdue'
+    if (startDate) {
+      const start = parseIsoDate(startDate)
+      if (start <= today) return 'In Progress'
+    }
+  }
+  return 'Pending'
+}
+
+function convertToScheduleTask(task: AirtableTask, today: Date): ScheduleTask {
+  const sprintStr = typeof task.sprint === 'string' ? task.sprint : String(task.sprint ?? '')
+  const clientName = sprintStr.split(" | ")[0] || sprintStr
   return {
     title: task.name,
+    teamFacingName: task.teamFacingName,
     client: clientName,
     department: task.category || "Development",
+    startDate: task.startDate,
     dueDate: task.dueDate,
-    status: "Pending",
+    status: deriveTaskStatus(task.status, task.startDate, task.dueDate, today),
     assigned: task.assigned,
+    taskId: task.id,
     batchId: task.id,
+    batchRecordId: task.batchRecordId,
+    openUrl: task.openUrl,
+    clientRecordId: task.clientRecordId,
   }
 }
 
 function getStatusStyle(status: string) {
   switch (status) {
-    case "Ready to Start": return "bg-emerald-600 text-white"
-    case "In Progress": return "bg-amber-500 text-white"
-    case "Pending Approval": return "bg-purple-600 text-white"
-    case "Complete": return "bg-sky-600 text-white"
-    case "Pending": return "bg-emerald-600 text-white"
-    case "Overdue": return "bg-red-600 text-white"
-    default: return "bg-muted text-muted-foreground"
+    case "In Progress":  return "bg-amber-500 text-white"
+    case "Overdue":      return "bg-red-600 text-white"
+    case "Complete":     return "bg-emerald-600 text-white"
+    case "Pending":
+    default:             return "bg-sky-600 text-white"
   }
 }
 
@@ -91,7 +134,7 @@ export function UpcomingTasksTable({ onTaskClick, memberFilter, deptFilter, stat
   // Build server-side filter
   const filterParts: string[] = []
   if (memberFilter && memberFilter !== "All Members") {
-    filterParts.push(`FIND("${memberFilter}", {Assigned To}) > 0`)
+    filterParts.push(`FIND("${memberFilter}", {Assigned to}) > 0`)
   }
   if (deptFilter && deptFilter !== "All Departments") {
     filterParts.push(`{Department} = "${deptFilter}"`)
@@ -101,7 +144,6 @@ export function UpcomingTasksTable({ onTaskClick, memberFilter, deptFilter, stat
     : undefined
 
   const { data: rawTasks, isLoading } = useAirtable<Record<string, unknown>>('tasks', {
-    fields: ['Client Facing Name', 'Start Date', 'Due Date', 'Status', 'Department', 'Assigned To', 'Sprint'],
     sort: [{ field: 'Start Date', direction: 'asc' }],
     ...(filterExtra ? { filterExtra } : {}),
   })
@@ -109,17 +151,27 @@ export function UpcomingTasksTable({ onTaskClick, memberFilter, deptFilter, stat
   const tasks = useMemo<AirtableTask[]>(() => {
     return (rawTasks ?? []).map(r => {
       const f = r.fields as Record<string, unknown>
-      const assignedRaw = f['Assigned To']
+      const assignedRaw = f['Assigned to']
       const assigned = Array.isArray(assignedRaw) ? (assignedRaw[0] as string ?? '') : (assignedRaw as string ?? '')
       return {
         id: r.id,
-        name: (f['Client Facing Name'] as string) ?? (f['Name'] as string) ?? 'Untitled',
+        name: (f['Client Facing Name'] as string) ?? (f['Team Facing Name'] as string) ?? 'Untitled',
+        teamFacingName: (f['Team Facing Name'] as string) ?? '',
         category: (f['Department'] as string) ?? '',
-        sprint: (f['Sprint'] as string) ?? '',
+        sprint: Array.isArray(f['Brand Name (from Client)'])
+          ? ((f['Brand Name (from Client)'] as string[])[0] ?? (f['Batch'] as string) ?? '')
+          : ((f['Brand Name (from Client)'] as string) ?? (f['Batch'] as string) ?? ''),
         startDate: (f['Start Date'] as string) ?? '',
         dueDate: (f['Due Date'] as string) ?? '',
         status: (f['Status'] as string) ?? '',
         assigned,
+        batchRecordId: Array.isArray(f['Record ID (from Batch)'])
+          ? ((f['Record ID (from Batch)'] as string[])[0] ?? '')
+          : ((f['Record ID (from Batch)'] as string) ?? ''),
+        openUrl: (f['Open URL'] as string) ?? '',
+        clientRecordId: Array.isArray(f['Record ID (from Client)'])
+          ? ((f['Record ID (from Client)'] as string[])[0] ?? '')
+          : ((f['Record ID (from Client)'] as string) ?? ''),
       }
     })
   }, [rawTasks])
@@ -132,12 +184,10 @@ export function UpcomingTasksTable({ onTaskClick, memberFilter, deptFilter, stat
 
   const upcomingTasks = useMemo(() => {
     return tasks.filter((task) => {
-      if (!task.startDate) return false
-      const startDate = parseIsoDate(task.startDate)
-      if (startDate <= today) return false
-      if (statusFilter && statusFilter !== "All Status") {
-        if (task.status !== statusFilter) return false
-      }
+      const derived = deriveTaskStatus(task.status, task.startDate, task.dueDate, today)
+      // This table shows only truly pending (not yet started) tasks
+      if (derived !== 'Pending') return false
+      if (statusFilter && statusFilter !== "All Status" && statusFilter !== "Pending") return false
       return true
     })
   }, [tasks, statusFilter, today])
@@ -180,7 +230,7 @@ export function UpcomingTasksTable({ onTaskClick, memberFilter, deptFilter, stat
               {upcomingTasks.map((task) => (
                 <tr
                   key={task.id}
-                  onClick={() => onTaskClick && onTaskClick(convertToScheduleTask(task))}
+                  onClick={() => onTaskClick && onTaskClick(convertToScheduleTask(task, today))}
                   className="transition-colors hover:bg-muted/30 cursor-pointer"
                 >
                   <td className="px-5 py-3.5">
@@ -203,9 +253,14 @@ export function UpcomingTasksTable({ onTaskClick, memberFilter, deptFilter, stat
                     {formatDate(task.dueDate)}
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={cn("px-2.5 py-1 rounded text-[11px] font-semibold whitespace-nowrap", getStatusStyle(task.status))}>
-                      {task.status || "—"}
-                    </span>
+                    {(() => {
+                      const derived = deriveTaskStatus(task.status, task.startDate, task.dueDate, today)
+                      return (
+                        <span className={cn("px-2.5 py-1 rounded text-[11px] font-semibold whitespace-nowrap", getStatusStyle(derived))}>
+                          {derived}
+                        </span>
+                      )
+                    })()}
                   </td>
                 </tr>
               ))}

@@ -1,10 +1,18 @@
 'use client'
 
 import { useAirtable } from "@/hooks/use-airtable"
+import type { AirtableRecord } from "@/lib/types"
+import { cn } from "@/lib/utils"
 import { Calendar } from "lucide-react"
 
-export function UpcomingBatches() {
+interface Props {
+  /** Optional click handler — receives the raw Airtable batch record. */
+  onBatchClick?: (batch: AirtableRecord) => void
+}
+
+export function UpcomingBatches({ onBatchClick }: Props) {
   const today = new Date().toISOString().split('T')[0]
+
   const { data, isLoading } = useAirtable('batches', {
     maxRecords: 6,
     fields: ['Batch Key', 'Brand Name', 'Launch Date', 'All Tests Status', 'Linked Test Names', 'Revenue Added (MRR)'],
@@ -18,6 +26,7 @@ export function UpcomingBatches() {
         <h2 className="text-[13px] font-semibold">Upcoming Batches</h2>
         <p className="text-[12px] text-muted-foreground mt-0.5">Scheduled launch dates</p>
       </div>
+
       <div className="flex flex-col divide-y divide-border">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
@@ -30,22 +39,35 @@ export function UpcomingBatches() {
             </div>
           ))
         ) : (data ?? []).length === 0 ? (
-          <div className="px-5 py-6 text-center text-sm text-muted-foreground">No upcoming batches</div>
+          <div className="px-5 py-6 text-center text-sm text-muted-foreground">
+            No upcoming batches
+          </div>
         ) : (
           (data ?? []).map(r => {
-            const batchKey = String(r.fields['Batch Key'] ?? '')
-            const clientArr = r.fields['Brand Name']
-            const client = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? '')
-            const launchDate = r.fields['Launch Date'] ? new Date(String(r.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+            const clientArr  = r.fields['Brand Name']
+            const client     = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? '')
+            const launchDate = r.fields['Launch Date']
+              ? new Date(String(r.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : '—'
             const tests = Array.isArray(r.fields['Linked Test Names']) ? r.fields['Linked Test Names'].length : 0
+
             return (
-              <div key={r.id} className="px-4 py-3 flex items-center gap-3">
+              <div
+                key={r.id}
+                onClick={() => onBatchClick?.(r)}
+                className={cn(
+                  "px-4 py-3 flex items-center gap-3",
+                  onBatchClick && "cursor-pointer hover:bg-muted/40 transition-colors"
+                )}
+              >
                 <div className="h-8 w-8 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
                   <Calendar className="h-4 w-4 text-sky-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate">{client}</p>
-                  <p className="text-[12px] text-muted-foreground">{launchDate} · {tests} test{tests !== 1 ? 's' : ''}</p>
+                  <p className="text-[12px] text-muted-foreground">
+                    {launchDate} · {tests} test{tests !== 1 ? 's' : ''}
+                  </p>
                 </div>
               </div>
             )

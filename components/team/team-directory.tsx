@@ -52,7 +52,6 @@ const tabs = ["Overview", "Assigned Clients", "Schedule", "Settings"]
 export function TeamDirectory() {
   const { user } = useUser()
   const { data: rawTeam, mutate, isLoading } = useAirtable<Record<string, unknown>>('team', {
-    fields: ['Full Name', 'Email', 'Department', 'Role', 'Status', 'Start Date', 'Slack ID', 'Timezone', 'Bio', 'Clients'],
     sort: [{ field: 'Full Name', direction: 'asc' }],
   })
 
@@ -76,7 +75,13 @@ export function TeamDirectory() {
         const rawName = (f['Full Name'] as string) ?? ''
         const override = editOverrides[r.id] ?? {}
         const name = override.name ?? rawName
-        const employment = (override.employment ?? (f['Status'] as string) ?? 'Active') as Status
+        const employment = (override.employment ?? (f['Employment Status'] as string) ?? 'Active') as Status
+        const clientIds = new Set([
+          ...((f['Dev Client Link'] as string[]) ?? []),
+          ...((f['Design Client Link'] as string[]) ?? []),
+          ...((f['Strategist Client Link'] as string[]) ?? []),
+          ...((f['QA Client Link'] as string[]) ?? []),
+        ])
         return {
           id: r.id,
           name,
@@ -85,13 +90,13 @@ export function TeamDirectory() {
           email: override.email ?? (f['Email'] as string) ?? '',
           employment,
           status: employment,
-          clients: (f['Clients'] as string[] | undefined)?.length ?? 0,
+          clients: override.clients ?? clientIds.size,
           role: override.role ?? (f['Role'] as string) ?? '',
-          startDate: override.startDate ?? (f['Start Date'] as string) ?? '',
-          slackId: override.slackId ?? (f['Slack ID'] as string) ?? '',
-          timezone: override.timezone ?? (f['Timezone'] as string) ?? '',
+          startDate: override.startDate ?? '',
+          slackId: override.slackId ?? (f['Slack Member ID'] as string) ?? '',
+          timezone: override.timezone ?? '',
           assignedClients: [],
-          bio: override.bio ?? (f['Bio'] as string) ?? '',
+          bio: override.bio ?? '',
           schedule: [],
         }
       })
@@ -101,7 +106,7 @@ export function TeamDirectory() {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("Overview")
   const [deptFilter, setDeptFilter] = useState("All Departments")
-  const [statusFilter, setStatusFilter] = useState("All Statuses")
+  const [showInactive, setShowInactive] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -127,10 +132,10 @@ export function TeamDirectory() {
     () => memberList.filter((m) => {
       const matchSearch = m.name.toLowerCase().includes(search.toLowerCase())
       const matchDept = deptFilter === "All Departments" || m.department === deptFilter
-      const matchStatus = statusFilter === "All Statuses" || m.status === statusFilter
+      const matchStatus = showInactive ? true : m.status === 'Active'
       return matchSearch && matchDept && matchStatus
     }),
-    [search, deptFilter, statusFilter, memberList]
+    [search, deptFilter, showInactive, memberList]
   )
 
   const member = memberList.find((m) => m.id === selectedId) ?? memberList[0] ?? null
@@ -147,11 +152,8 @@ export function TeamDirectory() {
             'Email': data.email,
             'Role': data.role || undefined,
             'Department': data.department,
-            'Status': data.employment,
-            ...(data.startDate ? { 'Start Date': data.startDate } : {}),
-            ...(data.slackId ? { 'Slack ID': data.slackId } : {}),
-            ...(data.timezone ? { 'Timezone': data.timezone } : {}),
-            ...(data.bio ? { 'Bio': data.bio } : {}),
+            'Employment Status': data.employment,
+            ...(data.slackId ? { 'Slack Member ID': data.slackId } : {}),
           },
         }),
       })
@@ -196,11 +198,8 @@ export function TeamDirectory() {
             'Email': data.email,
             'Role': data.role || undefined,
             'Department': data.department,
-            'Status': data.employment,
-            ...(data.startDate ? { 'Start Date': data.startDate } : {}),
-            ...(data.slackId ? { 'Slack ID': data.slackId } : {}),
-            ...(data.timezone ? { 'Timezone': data.timezone } : {}),
-            ...(data.bio ? { 'Bio': data.bio } : {}),
+            'Employment Status': data.employment,
+            ...(data.slackId ? { 'Slack Member ID': data.slackId } : {}),
           },
         }),
       })
@@ -299,9 +298,17 @@ export function TeamDirectory() {
               className="w-full h-9 pl-8 pr-3 text-[13px] rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
-          <div className="flex gap-2">
-            <SelectField value={deptFilter} onChange={setDeptFilter} options={["All Departments", "Strategy", "QA", "Development", "Management", "Design"]} containerClassName="flex-1 min-w-0" />
-            <SelectField value={statusFilter} onChange={setStatusFilter} options={["All Statuses", "Active", "Inactive"]} containerClassName="flex-1 min-w-0" />
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectField value={deptFilter} onChange={setDeptFilter} options={["All Departments", "Strategy", "QA", "Development", "Management", "Design"]} containerClassName="flex-1 min-w-[130px]" className="w-full" />
+            <label className="flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+              />
+              <span className="text-[12px] text-muted-foreground">Show Inactive</span>
+            </label>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -427,25 +434,28 @@ function OverviewTab({ member }: { member: Member }) {
 
 /* ── Assigned Clients Tab ── */
 function AssignedClientsTab({ member }: { member: Member }) {
-  if (member.clients === 0 && member.assignedClients.length === 0) {
+  const safeName = member.name.replace(/"/g, '\\"')
+  const filterExtra = `OR(FIND("${safeName}", {Full Name (from Developer)}) > 0, FIND("${safeName}", {Full Name (from Designer)}) > 0, FIND("${safeName}", {Full Name (from Strategist)}) > 0, FIND("${safeName}", {Full Name (from QA)}) > 0)`
+  const { data: rawClients, isLoading } = useAirtable<Record<string, unknown>>('clients', {
+    filterExtra,
+    sort: [{ field: 'Brand Name', direction: 'asc' }],
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-[13px] text-muted-foreground">
+        Loading clients…
+      </div>
+    )
+  }
+
+  if (!rawClients || rawClients.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="h-20 w-20 rounded-2xl bg-accent/40 flex items-center justify-center mb-4">
           <Users className="h-8 w-8 text-muted-foreground/25" />
         </div>
         <span className="text-[13px] text-muted-foreground">No clients assigned</span>
-      </div>
-    )
-  }
-
-  if (member.assignedClients.length === 0 && member.clients > 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="h-20 w-20 rounded-2xl bg-accent/40 flex items-center justify-center mb-4">
-          <Users className="h-8 w-8 text-muted-foreground/40" />
-        </div>
-        <span className="text-[13px] font-medium text-foreground">{member.clients} {member.clients === 1 ? "client" : "clients"} assigned</span>
-        <span className="text-[12px] text-muted-foreground mt-1">View client details in the Client Directory</span>
       </div>
     )
   }
@@ -457,38 +467,81 @@ function AssignedClientsTab({ member }: { member: Member }) {
           <tr className="border-b border-border bg-accent/30">
             <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
             <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Experiments</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Last Active</th>
+            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tests Run</th>
+            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Role</th>
           </tr>
         </thead>
         <tbody>
-          {member.assignedClients.map((c, i) => (
-            <tr key={c.name} className={cn("border-b border-border/50 transition-colors hover:bg-accent/20", i % 2 === 0 && "bg-accent/10")}>
-              <td className="px-5 py-3.5 text-[13px] font-medium text-foreground">
-                <div className="flex items-center gap-2.5">
-                  <Briefcase className="h-3.5 w-3.5 text-muted-foreground/50" />
-                  {c.name}
-                </div>
-              </td>
-              <td className="px-5 py-3.5">
-                <span className={cn(
-                  "text-[11px] font-medium px-2 py-0.5 rounded-md border",
-                  c.status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-orange-50 text-orange-700 border-orange-200"
-                )}>{c.status}</span>
-              </td>
-              <td className="px-5 py-3.5 text-[13px] text-foreground">{c.experiments}</td>
-              <td className="px-5 py-3.5 text-[13px] text-muted-foreground">{c.lastActive}</td>
-            </tr>
-          ))}
+          {rawClients.map((r, i) => {
+            const f = r.fields as Record<string, unknown>
+            const name = (f['Brand Name'] as string) ?? '—'
+            const status = (f['Client Status'] as string) === 'Active' ? 'Active' : 'Inactive'
+            const tests = (f['Total Tests Run'] as number) ?? 0
+            // determine this member's role for this client
+            const devName = (f['Full Name (from Developer)'] as string) ?? ''
+            const desName = (f['Full Name (from Designer)'] as string) ?? ''
+            const stratName = (f['Full Name (from Strategist)'] as string) ?? ''
+            const qaName = (f['Full Name (from QA)'] as string) ?? ''
+            const role = devName.includes(member.name) ? 'Developer'
+              : desName.includes(member.name) ? 'Designer'
+              : stratName.includes(member.name) ? 'Strategist'
+              : qaName.includes(member.name) ? 'QA'
+              : '—'
+            return (
+              <tr key={r.id} className={cn("border-b border-border/50 transition-colors hover:bg-accent/20", i % 2 === 0 && "bg-accent/10")}>
+                <td className="px-5 py-3.5 text-[13px] font-medium text-foreground">
+                  <div className="flex items-center gap-2.5">
+                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground/50" />
+                    {name}
+                  </div>
+                </td>
+                <td className="px-5 py-3.5">
+                  <span className={cn(
+                    "text-[11px] font-medium px-2 py-0.5 rounded-md border",
+                    status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-orange-50 text-orange-700 border-orange-200"
+                  )}>{status}</span>
+                </td>
+                <td className="px-5 py-3.5 text-[13px] text-foreground">{tests}</td>
+                <td className="px-5 py-3.5 text-[13px] text-muted-foreground">{role}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
   )
 }
 
+const deptToType: Record<string, ScheduleTask['type']> = {
+  Strategy: 'strategy', Design: 'design', Development: 'dev', QA: 'qa', Management: 'review',
+}
+
 /* ── Schedule Tab ── */
 function ScheduleTab({ member }: { member: Member }) {
-  const schedule = member.schedule
+  const safeName = member.name.replace(/"/g, '\\"')
+  const { data: rawTasks } = useAirtable<Record<string, unknown>>('tasks', {
+    filterExtra: `FIND("${safeName}", {Assigned to}) > 0`,
+  })
+
+  const schedule = useMemo<ScheduleTask[]>(() => {
+    return (rawTasks ?? []).flatMap(r => {
+      const f = r.fields as Record<string, unknown>
+      const dateStr = (f['Start Date'] as string) ?? ''
+      if (!dateStr) return []
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return []
+      return [{
+        day: d.getDate(),
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        title: (f['Client Facing Name'] as string) ?? (f['Team Facing Name'] as string) ?? 'Task',
+        client: (f['Brand Name (from Client)'] as string) ?? '',
+        time: '',
+        type: deptToType[(f['Department'] as string) ?? ''] ?? 'review',
+      }]
+    })
+  }, [rawTasks])
+
   const [calYear, setCalYear] = useState(2026)
   const [calMonth, setCalMonth] = useState(1)
   const [todayInfo, setTodayInfo] = useState<{ d: number; m: number; y: number } | null>(null)

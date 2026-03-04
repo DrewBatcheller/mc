@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Loader2 } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Loader2, Camera } from 'lucide-react'
 
 interface AccountSettingsModalProps {
   open: boolean
   onClose: () => void
 }
 
-function updateLocalSession(updates: { name?: string; email?: string }) {
+function updateLocalSession(updates: { name?: string; email?: string; avatarUrl?: string }) {
   if (typeof window === 'undefined') return
   try {
     const raw = localStorage.getItem('mc_session')
@@ -28,6 +28,9 @@ function updateLocalSession(updates: { name?: string; email?: string }) {
     }
     if (updates.email) {
       session.user.email = updates.email
+    }
+    if (updates.avatarUrl !== undefined) {
+      session.user.avatarUrl = updates.avatarUrl
     }
     localStorage.setItem('mc_session', JSON.stringify(session))
   } catch {
@@ -50,6 +53,12 @@ export function AccountSettingsModal({ open, onClose }: AccountSettingsModalProp
   const [lastName, setLastName] = useState('')
   const [teamEmail, setTeamEmail] = useState('')
 
+  // ── Avatar ─────────────────────────────────────────────────────────────────
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [isFetching, setIsFetching] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +73,8 @@ export function AccountSettingsModal({ open, onClose }: AccountSettingsModalProp
     setSavedOk(false)
     setNewPassword('')
     setConfirmPassword('')
+    setAvatarFile(null)
+    setAvatarPreview(null)
 
     const resource = isClient ? 'clients' : 'team'
     const recordId = isClient ? user.clientId : user.id
@@ -90,6 +101,14 @@ export function AccountSettingsModal({ open, onClose }: AccountSettingsModalProp
           setLastName((f['Last Name'] as string) ?? '')
           setTeamEmail((f['Email'] as string) ?? user.email ?? '')
         }
+        // Read avatar URL from attachment field and refresh localStorage
+        const avatarField = f['Avatar']
+        const attachments = Array.isArray(avatarField) ? avatarField : []
+        const freshUrl: string | undefined = (attachments[0] as { url?: string } | undefined)?.url
+        if (freshUrl) {
+          updateLocalSession({ avatarUrl: freshUrl })
+          refreshUser()
+        }
       })
       .catch(() => {
         // Fallback to session data if fetch fails
@@ -106,6 +125,47 @@ export function AccountSettingsModal({ open, onClose }: AccountSettingsModalProp
       })
       .finally(() => setIsFetching(false))
   }, [open, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => setAvatarPreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  async function handleAvatarUpload() {
+    if (!avatarFile || !user) return
+    setIsUploadingAvatar(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', avatarFile, avatarFile.name)
+      const res = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        headers: {
+          'x-user-role': user.role,
+          'x-user-id': user.id,
+          ...(user.clientId ? { 'x-client-id': user.clientId } : {}),
+        },
+        body: fd,
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `Upload failed: ${res.status}`)
+      }
+      const { url } = await res.json()
+      updateLocalSession({ avatarUrl: url })
+      refreshUser()
+      setAvatarFile(null)
+      setAvatarPreview(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Avatar upload failed')
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
 
   async function handleSave() {
     if (!user) return
@@ -190,6 +250,7 @@ export function AccountSettingsModal({ open, onClose }: AccountSettingsModalProp
   }
 
   const avatarInitials = user?.avatarInitials ?? user?.name?.slice(0, 2).toUpperCase() ?? 'MC'
+  const currentAvatarUrl = avatarPreview ?? user?.avatarUrl
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
@@ -198,16 +259,63 @@ export function AccountSettingsModal({ open, onClose }: AccountSettingsModalProp
           <DialogTitle className="text-base">Account Settings</DialogTitle>
         </DialogHeader>
 
-        {/* Avatar preview */}
+        {/* Avatar preview + upload */}
         <div className="flex items-center gap-4 py-1">
-          <Avatar className="h-14 w-14">
-            <AvatarFallback className="bg-foreground text-card text-lg font-semibold">
-              {avatarInitials}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-sm font-medium text-foreground">{user?.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+          <div className="relative group">
+            <Avatar className="h-14 w-14">
+              {currentAvatarUrl && <AvatarImage src={currentAvatarUrl} alt={user?.name ?? ''} className="object-cover" />}
+              <AvatarFallback className="bg-foreground text-card text-lg font-semibold">
+                {avatarInitials}
+              </AvatarFallback>
+            </Avatar>
+            {/* Camera overlay */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Change avatar"
+            >
+              <Camera className="h-4 w-4 text-white" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
+            <p className="text-xs text-muted-foreground capitalize mb-1.5">{user?.role}</p>
+            {avatarFile ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAvatarUpload}
+                  disabled={isUploadingAvatar}
+                  className="h-6 px-2.5 rounded-md bg-foreground text-background text-[11px] font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 transition-opacity"
+                >
+                  {isUploadingAvatar && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {isUploadingAvatar ? 'Uploading…' : 'Upload Photo'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
+                  className="h-6 px-2 rounded-md border border-border text-[11px] font-medium hover:bg-accent transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-[11px] text-sky-600 hover:text-sky-700 font-medium transition-colors"
+              >
+                Change photo
+              </button>
+            )}
           </div>
         </div>
 

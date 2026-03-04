@@ -7,7 +7,7 @@ import { PageSkeleton, DirectorySkeleton } from "@/components/shared/skeleton"
 // Content wrapper with Suspense boundaries for loading states
 export function DashboardContentWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isDirectoryPage = pathname.includes('/directory') || pathname === '/affiliates'
+  const isDirectoryPage = pathname.includes('directory') || pathname === '/affiliates'
   const LoadingComponent = isDirectoryPage ? DirectorySkeleton : PageSkeleton
 
   return isDirectoryPage ? (

@@ -4,40 +4,33 @@ import { useState, useMemo } from "react"
 import { UpcomingTasksTable } from "@/components/team-member/upcoming-tasks-table"
 import { InProgressTasksTable } from "@/components/team-member/in-progress-tasks-table"
 import { TeamSchedule } from "@/components/team/team-schedule"
-import { TaskSubmissionModal } from "@/components/team/task-submission-modal"
-import { ManagementTaskModal, LaunchTestsModal, SubmitStrategyModal } from "@/components/team/specialized-task-modals"
+import { TaskModal } from "@/components/team/task-modal"
+import { ManagementTaskModal, SubmitStrategyModal, PTAModal } from "@/components/team/specialized-task-modals"
 import { SelectField } from "@/components/shared/select-field"
 import { useAirtable } from "@/hooks/use-airtable"
+import type { ScheduleTask } from "@/components/team-member/upcoming-tasks-table"
 
-interface Task {
-  title: string
-  client: string
-  department: string
-  dueDate: string
-  status: "Pending" | "Overdue" | "Complete"
-  assigned: string
-  batchId?: string
-  experiments?: { id: string; name: string; figmaUrl?: string; convertId?: string; qaApproved?: boolean; qaReportUrl?: string }[]
+function taskName(t: ScheduleTask) {
+  return t.teamFacingName || t.title || ""
 }
 
 const DEPARTMENTS = ["All Departments", "Management", "Strategy", "Design", "Development", "QA"]
-const STATUSES = ["All Status", "Pending", "Overdue", "Complete"]
+const STATUSES = ["All Status", "Pending", "In Progress", "Overdue", "Complete"]
 
 export default function ManagementTeamDashboardPage() {
   const [memberFilter, setMemberFilter] = useState("All Members")
   const [deptFilter, setDeptFilter] = useState("All Departments")
   const [statusFilter, setStatusFilter] = useState("All Status")
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<ScheduleTask | null>(null)
 
   /* Fetch live team members for the member filter dropdown */
   const { data: rawTeam } = useAirtable<Record<string, unknown>>('team', {
-    fields: ['Full Name', 'Status'],
     sort: [{ field: 'Full Name', direction: 'asc' }],
   })
 
   const teamMemberOptions = useMemo(() => {
     const names = (rawTeam ?? [])
-      .filter(r => (r.fields['Status'] as string) === 'Active')
+      .filter(r => (r.fields['Employment Status'] as string) === 'Active')
       .map(r => (r.fields['Full Name'] as string) ?? '')
       .filter(Boolean)
     return ['All Members', ...names]
@@ -80,27 +73,31 @@ export default function ManagementTeamDashboardPage() {
         memberFilter={memberFilter}
         deptFilter={deptFilter}
         statusFilter={statusFilter}
+        onTaskClick={setSelectedTask}
       />
 
-      {selectedTask && (
-        <>
-          {selectedTask.department === "Management" && (
-            <ManagementTaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
-          )}
-          {selectedTask.title === "Tests Running" && (
-            <LaunchTestsModal task={selectedTask} onClose={() => setSelectedTask(null)} />
-          )}
-          {selectedTask.title === "Submit Strategy" && (
-            <SubmitStrategyModal task={selectedTask} onClose={() => setSelectedTask(null)} />
-          )}
-          {selectedTask.experiments &&
-            selectedTask.department !== "Management" &&
-            selectedTask.title !== "Tests Running" &&
-            selectedTask.title !== "Submit Strategy" && (
-              <TaskSubmissionModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+      {selectedTask && (() => {
+        const isManagement = selectedTask.department === "Management"
+        const isSubmitStrategy = taskName(selectedTask) === "Submit Strategy"
+        const isPTA = selectedTask.department === "Strategy" &&
+          taskName(selectedTask).includes("Post-Test Analysis")
+        return (
+          <>
+            {isManagement && (
+              <ManagementTaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
             )}
-        </>
-      )}
+            {!isManagement && isSubmitStrategy && (
+              <SubmitStrategyModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+            )}
+            {!isManagement && !isSubmitStrategy && isPTA && (
+              <PTAModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+            )}
+            {!isManagement && !isSubmitStrategy && !isPTA && (
+              <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+            )}
+          </>
+        )
+      })()}
     </>
   )
 }

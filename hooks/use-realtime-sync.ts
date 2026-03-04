@@ -1,8 +1,28 @@
 'use client'
 
+/**
+ * useRealtimeSync — SSE-based broadcast cache invalidation.
+ *
+ * Connects to /api/realtime/events and listens for mutation events pushed by
+ * the server after any Airtable CRUD operation.  On each event it calls SWR's
+ * global mutate() to invalidate every cached key that matches the affected
+ * resource, causing subscribed components to silently re-fetch fresh data.
+ *
+ * Mount once app-wide (see components/realtime/RealtimeSyncMount.tsx).
+ * Optionally scope the onMutation callback to a specific resource.
+ *
+ * Usage:
+ *   useRealtimeSync()                          // global invalidation only
+ *   useRealtimeSync({                          // + scoped callback
+ *     resource: 'experiments',
+ *     onMutation: (e) => console.log(e),
+ *   })
+ */
+
 import { useEffect, useRef } from 'react'
-import { useAirtable } from './use-airtable'
-import type { UserRole } from '@/lib/types'
+import { mutate } from 'swr'
+
+// ─── Event types ──────────────────────────────────────────────────────────────
 
 interface MutationEvent {
   type: 'mutation'
@@ -10,7 +30,6 @@ interface MutationEvent {
   action: 'create' | 'update' | 'delete'
   recordId: string
   timestamp: number
-  data?: any
 }
 
 interface PermissionEvent {
@@ -20,117 +39,96 @@ interface PermissionEvent {
 
 type RealtimeEvent = MutationEvent | PermissionEvent
 
-/**
- * Hook to subscribe to real-time data mutations via WebSocket
- * Automatically revalidates SWR cache when mutations occur
- * 
- * Usage:
- *   const { isConnected, lastMutation } = useRealtimeSync({
- *     resource: 'clients',
- *     onMutation: (event) => console.log('Client was updated!')
- *   })
- */
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
 export function useRealtimeSync(options?: {
+  /** If provided, onMutation is only called for events on this resource */
   resource?: string
   onMutation?: (event: MutationEvent) => void
   onPermissionChange?: (event: PermissionEvent) => void
 }) {
-  const socketRef = useRef<any>(null)
-  const isConnectedRef = useRef(false)
-  const lastMutationRef = useRef<MutationEvent | null>(null)
-  const reconnectAttemptsRef = useRef(0)
-  const maxReconnectAttempts = 5
-  const reconnectDelayMs = 2000
+  const isConnectedRef      = useRef(false)
+  const esRef               = useRef<EventSource | null>(null)
+  const reconnectDelayRef   = useRef(2_000)
+  const reconnectTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let isMounted = true
-    let connectTimeout: NodeJS.Timeout
 
-    const connectSocket = async () => {
-      try {
-        // Dynamically import Socket.io client only on client-side
-        const { io } = await import('socket.io-client')
+    function connect() {
+      if (!isMounted) return
 
+      const es = new EventSource('/api/realtime/events')
+      esRef.current = es
+
+      es.onopen = () => {
+        if (!isMounted) return
+        isConnectedRef.current  = true
+        reconnectDelayRef.current = 2_000 // reset back-off on successful connect
+        console.log('[RealtimeSync] SSE connected')
+      }
+
+      es.onmessage = (e: MessageEvent<string>) => {
         if (!isMounted) return
 
-        const socket = io({
-          path: '/api/socket/io',
-          reconnection: true,
-          reconnectionDelay: reconnectDelayMs,
-          reconnectionDelayMax: 10000,
-          reconnectionAttempts: maxReconnectAttempts,
-        })
+        let event: RealtimeEvent
+        try {
+          event = JSON.parse(e.data) as RealtimeEvent
+        } catch {
+          return
+        }
 
-        socketRef.current = socket
+        // Ignore the initial "connected" acknowledgement
+        if ((event as { type: string }).type === 'connected') return
 
-        socket.on('connect', () => {
-          if (!isMounted) return
-          console.log('[RealtimeSync] Connected to WebSocket')
-          isConnectedRef.current = true
-          reconnectAttemptsRef.current = 0
+        if (event.type === 'mutation') {
+          const { resource } = event
 
-          // Authenticate with server
-          socket.emit('authenticate', {
-            role: (localStorage.getItem('userRole') || 'team') as UserRole,
-            userId: localStorage.getItem('userId') || '',
-            clientId: localStorage.getItem('clientId') || undefined,
-          })
-        })
+          // ── Invalidate all SWR keys that belong to this resource ──────────
+          // SWR keys are [url, headers] tuples; match on the URL segment.
+          mutate(
+            (key) =>
+              Array.isArray(key) &&
+              typeof key[0] === 'string' &&
+              key[0].includes(`/api/airtable/${resource}`)
+          )
 
-        socket.on('disconnect', () => {
-          if (!isMounted) return
-          console.log('[RealtimeSync] Disconnected from WebSocket')
-          isConnectedRef.current = false
-        })
-
-        socket.on('data-mutation', (event: MutationEvent) => {
-          if (!isMounted) return
-
-          console.log('[RealtimeSync] Received mutation:', event)
-          lastMutationRef.current = event
-
-          // If specific resource was requested, only trigger callback for that resource
-          if (!options?.resource || event.resource === options.resource) {
+          // ── Scoped callback (optional) ────────────────────────────────────
+          if (!options?.resource || options.resource === resource) {
             options?.onMutation?.(event)
           }
-        })
-
-        socket.on('permission-changed', (event: PermissionEvent) => {
-          if (!isMounted) return
-          console.log('[RealtimeSync] Permission changed')
-          options?.onPermissionChange?.(event)
-        })
-
-        socket.on('error', (error: any) => {
-          console.error('[RealtimeSync] Socket error:', error)
-        })
-
-      } catch (error) {
-        console.error('[RealtimeSync] Failed to connect:', error)
-        
-        // Retry connection with exponential backoff
-        if (reconnectAttemptsRef.current < maxReconnectAttempts && isMounted) {
-          reconnectAttemptsRef.current++
-          const delay = reconnectDelayMs * Math.pow(1.5, reconnectAttemptsRef.current - 1)
-          connectTimeout = setTimeout(connectSocket, delay)
         }
+
+        if (event.type === 'permission-changed') {
+          options?.onPermissionChange?.(event)
+        }
+      }
+
+      es.onerror = () => {
+        if (!isMounted) return
+        isConnectedRef.current = false
+        es.close()
+        esRef.current = null
+
+        // Exponential back-off reconnection (max 30 s)
+        const delay = reconnectDelayRef.current
+        reconnectDelayRef.current = Math.min(delay * 1.5, 30_000)
+        console.log(`[RealtimeSync] Disconnected — reconnecting in ${delay}ms`)
+        reconnectTimerRef.current = setTimeout(connect, delay)
       }
     }
 
-    connectSocket()
+    connect()
 
     return () => {
       isMounted = false
-      clearTimeout(connectTimeout)
-      if (socketRef.current) {
-        socketRef.current.disconnect()
-      }
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
+      esRef.current?.close()
     }
-  }, [options?.resource, options?.onMutation, options?.onPermissionChange])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Stable connection for component lifetime — callbacks captured via ref
 
   return {
     isConnected: isConnectedRef.current,
-    lastMutation: lastMutationRef.current,
-    socket: socketRef.current,
   }
 }

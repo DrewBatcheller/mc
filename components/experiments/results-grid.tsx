@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Search,
   LayoutGrid,
@@ -25,10 +25,15 @@ const statusConfig: Record<Status, { icon: typeof CheckCircle2; color: string; b
   Unsuccessful: { icon: XCircle, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-200", dot: "bg-rose-500" },
   Inconclusive: { icon: HelpCircle, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", dot: "bg-amber-500" },
 }
-export function ResultsGrid() {
+export function ResultsGrid({ initialClientName, hideClientFilter }: { initialClientName?: string; hideClientFilter?: boolean } = {}) {
   const [view, setView] = useState<"grid" | "list">("grid")
   const [search, setSearch] = useState("")
-  const [clientFilter, setClientFilter] = useState("All Clients")
+  const [clientFilter, setClientFilter] = useState(initialClientName ?? "All Clients")
+
+  // Sync filter when the parent client changes (e.g. navigating between clients in directory)
+  useEffect(() => {
+    setClientFilter(initialClientName ?? "All Clients")
+  }, [initialClientName])
   const [statusFilter, setStatusFilter] = useState("All")
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -83,7 +88,7 @@ export function ResultsGrid() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3 flex-wrap">
         <SelectField value={statusFilter} onChange={setStatusFilter} options={["All", "Successful", "Unsuccessful", "Inconclusive"]} />
-        <SelectField value={clientFilter} onChange={setClientFilter} options={clients} />
+        {!hideClientFilter && <SelectField value={clientFilter} onChange={setClientFilter} options={clients} />}
         <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -183,6 +188,7 @@ export function ResultsGrid() {
 
       {selectedResult && (
         <ExperimentDetailsModal
+          isOpen={!!selected}
           experiment={{
             name: selectedResult.name,
             client: selectedResult.client,

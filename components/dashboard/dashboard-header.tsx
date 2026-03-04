@@ -1,7 +1,7 @@
 "use client"
 
 import { Bell, Menu, X, LayoutDashboard, FlaskConical, Users, KanbanSquare, UserCircle, DollarSign, Target, Handshake, Clock, Settings, LogOut, CheckCircle2, Lightbulb, Zap, BarChart2, Archive } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
@@ -186,7 +186,8 @@ export function DashboardHeader() {
     fields: ['Notification Title', 'Notification Description', 'Status', 'Created Time', 'Display Time', 'Priority', 'Action URL', 'Type', 'Archive'],
     sort: [{ field: 'Created Time', direction: 'desc' }],
     noCache: true,
-    refreshInterval: 60000,
+    refreshInterval: 60_000,     // poll every 60 seconds
+    revalidateOnFocus: true,     // also refresh when returning to the tab
   })
 
   const [notifOverrides, setNotifOverrides] = useState<Map<string, { unread?: boolean; archived?: boolean }>>(new Map())
@@ -510,6 +511,9 @@ export function DashboardHeader() {
               aria-label="User menu"
             >
               <Avatar className="h-7 w-7">
+                {user?.avatarUrl && (
+                  <AvatarImage src={user.avatarUrl} alt={user.name ?? ''} className="object-cover" />
+                )}
                 <AvatarFallback className="bg-foreground text-card text-[11px] font-semibold">
                   {avatarInitials}
                 </AvatarFallback>

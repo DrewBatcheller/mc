@@ -24,7 +24,15 @@ export function UserContextProvider({ children }: { children: React.ReactNode })
 
   const readSession = useCallback(() => {
     const currentUser = getCurrentUser()
-    setUser(currentUser)
+    setUser(prev => {
+      if (!currentUser) return null
+      // If it's the same user, carry over server-fetched permissions so they
+      // aren't lost on refreshUser() calls (localStorage doesn't store permissions).
+      if (prev?.id === currentUser.id) {
+        return { ...currentUser, permissions: prev.permissions }
+      }
+      return currentUser
+    })
     setIsLoading(false)
   }, [])
 

@@ -13,6 +13,7 @@ export interface AuthUser {
   department?: string  // Team members: "Management", "Strategy", etc.
   clientId?: string    // Set when role === 'client'
   avatarInitials?: string
+  avatarUrl?: string           // URL from Profile Photo (team) or Avatar (client) attachment field
   permissions?: UserPermissions  // Fetched from Airtable Permissions table
 }
 

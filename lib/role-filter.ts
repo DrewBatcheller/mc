@@ -106,7 +106,7 @@ export function buildRoleFilter(
 
     // ── Tasks ────────────────────────────────────────────────────────────────
     case 'tasks': {
-      if (role === 'management') return ''
+      if (role === 'management' || role === 'sales') return ''
       if (role === 'strategy') return ''
       if (role === 'team' && userId) {
         return eq('Assigned To (Record ID)', userId)
@@ -119,13 +119,13 @@ export function buildRoleFilter(
 
     // ── Leads ────────────────────────────────────────────────────────────────
     case 'leads': {
-      if (role === 'management' || role === 'strategy') return ''
+      if (role === 'management' || role === 'strategy' || role === 'sales') return ''
       return null  // team and client don't see leads
     }
 
     // ── Call Record ───────────────────────────────────────────────────────────
     case 'call-record': {
-      if (role === 'management' || role === 'strategy') return ''
+      if (role === 'management' || role === 'strategy' || role === 'sales') return ''
       return null
     }
 
@@ -155,7 +155,7 @@ export function buildRoleFilter(
 
     // ── Clients ───────────────────────────────────────────────────────────────
     case 'clients': {
-      if (role === 'management' || role === 'strategy') return ''
+      if (role === 'management' || role === 'strategy' || role === 'sales') return ''
       if (role === 'client' && clientId) {
         // A client user can only fetch their own record
         return `RECORD_ID() = "${clientId}"`
@@ -172,9 +172,9 @@ export function buildRoleFilter(
       return null
     }
 
-    // ── Team ──���───────────────────────────────────────────────────────────────
+    // ── Team ─────────────────────────────────────────────────────────────────
     case 'team': {
-      if (role === 'management' || role === 'strategy') return ''
+      if (role === 'management' || role === 'strategy' || role === 'sales') return ''
       if (role === 'team' && userId) {
         return `RECORD_ID() = "${userId}"`
       }
@@ -202,6 +202,13 @@ export function buildRoleFilter(
     // ── Onboard QA ────────────────────────────────────────────────────────────
     case 'onboard-qa': {
       if (role === 'management' || role === 'strategy') return ''
+      return null
+    }
+
+    // ── Notes ─────────────────────────────────────────────────────────────────
+    case 'notes': {
+      // All internal staff can create and manage notes; clients cannot
+      if (role === 'management' || role === 'strategy' || role === 'sales' || role === 'team') return ''
       return null
     }
 

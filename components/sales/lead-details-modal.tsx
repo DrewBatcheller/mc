@@ -1,98 +1,91 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Save, Trash2, Pencil } from "lucide-react"
+import { X, Check, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 
+/* ── Types ──────────────────────────────────────────────────────────────────── */
+
 interface Lead {
-  email: string
-  name: string
-  stage: string
-  timezone: string
-  phone: string
-  company: string
-  website: string
-  dealValue: string
-  source: string
-  medium: string
-  created: string
+  email:     string
+  name:      string
+  stage:     string
+  timezone:  string
+  phone:     string
+  company:   string
+  website:   string
+  dealValue: string  // display string e.g. "$5,000" or "-"
+  source:    string
+  medium:    string
+  created:   string  // formatted display date
 }
 
 interface LeadDetailsModalProps {
-  isOpen: boolean
-  lead?: Lead | null
-  onClose: () => void
-  onSave?: (lead: Lead) => void
+  isOpen:    boolean
+  lead?:     Lead | null
+  onClose:   () => void
+  onSave?:   (lead: Lead) => void
   onDelete?: (lead: Lead) => void
 }
 
-const stageOptions = ["Open", "Qualifying Call", "Sales Call", "Onboarding Call", "Closed", "Maybe", "No Show", "Churned / Rejected"]
-const sourceOptions = ["direct", "fb", "ig", "email", "referral", "other"]
-const mediumOptions = ["-", "organic", "paid", "referral"]
+/* ── Config ─────────────────────────────────────────────────────────────────── */
 
-const stageBadgeColors: Record<string, string> = {
-  "Open": "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  "Qualifying Call": "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  "Sales Call": "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  "Onboarding Call": "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
-  "Closed": "bg-green-500/10 text-green-600 border-green-500/20",
-  "Maybe": "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
-  "No Show": "bg-gray-500/10 text-gray-600 border-gray-500/20",
-  "Churned / Rejected": "bg-red-500/10 text-red-600 border-red-500/20",
+const stageOptions  = ["Open", "Qualifying Call", "Sales Call", "Onboarding Call", "Closed", "Maybe", "No Show", "Churned / Rejected"]
+const sourceOptions = ["—", "direct", "fb", "ig", "email", "referral", "other"]
+const mediumOptions = ["—", "organic", "paid", "referral"]
+
+const stageBg: Record<string, string> = {
+  "Open":               "bg-slate-50",
+  "Qualifying Call":    "bg-violet-50",
+  "Sales Call":         "bg-amber-50",
+  "Onboarding Call":    "bg-emerald-50",
+  "Closed":             "bg-sky-50",
+  "Maybe":              "bg-gray-50",
+  "No Show":            "bg-rose-50",
+  "Churned / Rejected": "bg-rose-50",
 }
 
-const sourceBadgeColors: Record<string, string> = {
-  "direct": "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
-  "fb": "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  "ig": "bg-pink-500/10 text-pink-600 border-pink-500/20",
-  "email": "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  "referral": "bg-green-500/10 text-green-600 border-green-500/20",
-  "other": "bg-gray-500/10 text-gray-600 border-gray-500/20",
+const stageDot: Record<string, string> = {
+  "Open":               "bg-slate-400",
+  "Qualifying Call":    "bg-violet-500",
+  "Sales Call":         "bg-amber-500",
+  "Onboarding Call":    "bg-emerald-500",
+  "Closed":             "bg-sky-500",
+  "Maybe":              "bg-gray-400",
+  "No Show":            "bg-rose-400",
+  "Churned / Rejected": "bg-rose-600",
 }
+
+/* ── Empty form ─────────────────────────────────────────────────────────────── */
+
+const EMPTY_LEAD: Lead = {
+  email: "", name: "", stage: "Open", timezone: "",
+  phone: "", company: "", website: "", dealValue: "",
+  source: "", medium: "", created: "",
+}
+
+/* ── Component ──────────────────────────────────────────────────────────────── */
 
 export function LeadDetailsModal({ isOpen, lead, onClose, onSave, onDelete }: LeadDetailsModalProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState<Lead>(
-    lead || {
-      email: "",
-      name: "",
-      stage: "Open",
-      timezone: "",
-      phone: "",
-      company: "",
-      website: "",
-      dealValue: "-",
-      source: "direct",
-      medium: "-",
-      created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    }
-  )
+  const [formData,  setFormData]  = useState<Lead>(lead ?? EMPTY_LEAD)
 
-  const isCreateMode = !lead
-  const isDisplayMode = lead && !isEditing
+  const isCreateMode  = !lead
+  const isDisplayMode = !!lead && !isEditing
 
   useEffect(() => {
     if (lead) {
       setFormData(lead)
       setIsEditing(false)
     } else {
-      setFormData({
-        email: "",
-        name: "",
-        stage: "Open",
-        timezone: "",
-        phone: "",
-        company: "",
-        website: "",
-        dealValue: "-",
-        source: "direct",
-        medium: "-",
-        created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      })
+      setFormData(EMPTY_LEAD)
       setIsEditing(true)
     }
   }, [lead])
+
+  const set = (key: keyof Lead, val: string) =>
+    setFormData(prev => ({ ...prev, [key]: val }))
 
   const handleSave = () => {
     onSave?.(formData)
@@ -110,270 +103,266 @@ export function LeadDetailsModal({ isOpen, lead, onClose, onSave, onDelete }: Le
 
   if (!isOpen) return null
 
+  const headerBg  = stageBg[formData.stage]  ?? "bg-slate-50"
+  const headerDot = stageDot[formData.stage] ?? "bg-slate-400"
+
+  const INPUT_CLS  = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+
+  /* ── View-mode field helper ── */
+  const Field = ({ label, value }: { label: string; value?: string }) => (
+    <div>
+      <p className="text-[11px] text-muted-foreground font-medium mb-0.5">{label}</p>
+      <p className="text-[13px] text-foreground">{value || "—"}</p>
+    </div>
+  )
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-background rounded-lg border border-border shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-border flex items-start justify-between gap-4 shrink-0">
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-foreground leading-tight">
-                {isCreateMode ? "Create New Lead" : formData.name || formData.email}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+
+        {/* ── Header — color tracks stage ── */}
+        <div className={cn(
+          "rounded-t-xl px-5 py-4 border-b border-border flex items-start justify-between gap-3 shrink-0 transition-colors",
+          headerBg
+        )}>
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <span className={cn("mt-1 h-2.5 w-2.5 rounded-full shrink-0 transition-colors", headerDot)} />
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-semibold text-foreground leading-tight truncate">
+                {isCreateMode ? "New Lead" : (formData.name || formData.email || "Lead")}
               </h2>
-              {!isCreateMode && formData.dealValue && formData.dealValue !== "-" && (
-                <span className="text-sm font-semibold text-green-600 bg-green-500/10 px-2.5 py-1 rounded-md border border-green-500/20">
-                  {formData.dealValue}
-                </span>
-              )}
+              <p className="text-[13px] text-muted-foreground mt-0.5 truncate">
+                {isCreateMode
+                  ? "Add a new lead to the pipeline"
+                  : (formData.email || formData.company || formData.stage)}
+              </p>
             </div>
-            {!isCreateMode && <p className="text-[13px] text-muted-foreground mt-1">{formData.email}</p>}
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+            className="shrink-0 h-7 w-7 rounded-lg flex items-center justify-center hover:bg-black/10 transition-colors"
           >
-            <X className="h-4 w-4 text-muted-foreground" />
+            <X className="h-4 w-4 text-foreground/60" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Contact Information */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Contact Information</h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Name</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder="John Doe"
-                    />
-                  ) : (
-                    <p className="text-[13px] text-foreground">{formData.name || "-"}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Email</label>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder="john@example.com"
-                    />
-                  ) : (
-                    <p className="text-[13px] text-foreground">{formData.email || "-"}</p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Phone</label>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder="+1 (555) 123-4567"
-                    />
-                  ) : (
-                    <p className="text-[13px] text-foreground">{formData.phone || "-"}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Timezone</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={formData.timezone}
-                      onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder="EST"
-                    />
-                  ) : formData.timezone ? (
-                    <span className="inline-flex px-2.5 py-1 rounded-md border border-border bg-accent/30 text-[12px] font-medium text-foreground">
-                      {formData.timezone}
-                    </span>
-                  ) : (
-                    <p className="text-[13px] text-muted-foreground">-</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* ── Scrollable body ── */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
-          <div className="h-px bg-border" />
-
-          {/* Company Information */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Company Information</h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Company</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={formData.company}
-                      onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder="Acme Inc"
-                    />
-                  ) : (
-                    <p className="text-[13px] text-foreground">{formData.company || "-"}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Website</label>
-                  {isEditing ? (
-                    <input
-                      type="url"
-                      value={formData.website}
-                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder="https://example.com"
-                    />
-                  ) : (
-                    <p className="text-[13px] text-foreground">{formData.website || "-"}</p>
-                  )}
-                </div>
+          {isDisplayMode ? (
+            /* ───── VIEW MODE ───── */
+            <>
+              {/* Row 1: Email + Phone */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Email"  value={formData.email} />
+                <Field label="Phone"  value={formData.phone} />
               </div>
-            </div>
-          </div>
 
-          <div className="h-px bg-border" />
+              {/* Row 2: Company + Timezone */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Company / Brand" value={formData.company} />
+                <Field label="Timezone"        value={formData.timezone} />
+              </div>
 
-          {/* Lead Details */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Lead Details</h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Website */}
+              {formData.website && (
                 <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Stage</label>
-                  {isEditing ? (
-                    <SelectField
-                      value={formData.stage}
-                      onChange={(v) => setFormData({ ...formData, stage: v })}
-                      options={stageOptions}
-                      containerClassName="w-full"
-                      className="w-full"
-                    />
-                  ) : (
-                    <span className={cn(
-                      "inline-flex px-2.5 py-1 rounded-md border text-[12px] font-medium",
-                      stageBadgeColors[formData.stage] || "bg-accent/30 text-foreground border-border"
-                    )}>
-                      {formData.stage}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Deal Value</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={formData.dealValue}
-                      onChange={(e) => setFormData({ ...formData, dealValue: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder="$5,000"
-                    />
-                  ) : (
-                    <p className="text-[13px] text-foreground">{formData.dealValue || "-"}</p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Source</label>
-                  {isEditing ? (
-                    <SelectField
-                      value={formData.source}
-                      onChange={(v) => setFormData({ ...formData, source: v })}
-                      options={sourceOptions}
-                      containerClassName="w-full"
-                      className="w-full"
-                    />
-                  ) : (
-                    <span className={cn(
-                      "inline-flex px-2.5 py-1 rounded-md border text-[12px] font-medium",
-                      sourceBadgeColors[formData.source] || "bg-accent/30 text-foreground border-border"
-                    )}>
-                      {formData.source}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Medium</label>
-                  {isEditing ? (
-                    <SelectField
-                      value={formData.medium}
-                      onChange={(v) => setFormData({ ...formData, medium: v })}
-                      options={mediumOptions}
-                      containerClassName="w-full"
-                      className="w-full"
-                    />
-                  ) : (
-                    <span className="inline-flex px-2.5 py-1 rounded-md border border-border bg-accent/30 text-[12px] font-medium text-foreground">
-                      {formData.medium}
-                    </span>
-                  )}
-                </div>
-              </div>
-              {!isCreateMode && (
-                <div>
-                  <label className="text-[12px] text-muted-foreground font-medium block mb-1.5">Created</label>
-                  <p className="text-[13px] text-foreground">{formData.created}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium mb-0.5">Website</p>
+                  <a
+                    href={formData.website.startsWith("http") ? formData.website : `https://${formData.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[13px] text-sky-600 hover:underline truncate block"
+                  >
+                    {formData.website}
+                  </a>
                 </div>
               )}
-            </div>
-          </div>
+
+              {/* Pill badges row */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {/* Stage pill */}
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium border border-border",
+                  stageBg[formData.stage] ?? "bg-accent"
+                )}>
+                  <span className={cn("h-1.5 w-1.5 rounded-full", headerDot)} />
+                  {formData.stage}
+                </span>
+
+                {/* Deal Value */}
+                {formData.dealValue && formData.dealValue !== "-" && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-medium border border-emerald-200 bg-emerald-50 text-emerald-700">
+                    {formData.dealValue}
+                  </span>
+                )}
+
+                {/* Source */}
+                {formData.source && formData.source !== "-" && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-medium border border-border bg-accent text-muted-foreground">
+                    {formData.source}
+                  </span>
+                )}
+
+                {/* Medium */}
+                {formData.medium && formData.medium !== "-" && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-medium border border-border bg-accent text-muted-foreground">
+                    {formData.medium}
+                  </span>
+                )}
+              </div>
+
+              {/* Created date */}
+              {formData.created && (
+                <p className="text-[12px] text-muted-foreground">
+                  Added {formData.created}
+                </p>
+              )}
+            </>
+          ) : (
+            /* ───── EDIT / CREATE MODE ───── */
+            <>
+              {/* Full Name */}
+              <div>
+                <p className="text-[11px] text-muted-foreground font-medium mb-1">
+                  Full Name {isCreateMode && <span className="text-red-400">*</span>}
+                </p>
+                <input
+                  autoFocus={isCreateMode}
+                  type="text"
+                  value={formData.name}
+                  onChange={e => set("name", e.target.value)}
+                  placeholder="Jane Smith"
+                  className={INPUT_CLS}
+                />
+              </div>
+
+              {/* Email + Phone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground font-medium mb-1">Email</p>
+                  <input type="email" value={formData.email} onChange={e => set("email", e.target.value)}
+                    placeholder="jane@example.com" className={INPUT_CLS} />
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground font-medium mb-1">Phone</p>
+                  <input type="tel" value={formData.phone} onChange={e => set("phone", e.target.value)}
+                    placeholder="+1 (555) 000-0000" className={INPUT_CLS} />
+                </div>
+              </div>
+
+              {/* Company + Timezone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground font-medium mb-1">Company / Brand</p>
+                  <input type="text" value={formData.company} onChange={e => set("company", e.target.value)}
+                    placeholder="Acme Inc" className={INPUT_CLS} />
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground font-medium mb-1">Timezone</p>
+                  <input type="text" value={formData.timezone} onChange={e => set("timezone", e.target.value)}
+                    placeholder="EST" className={INPUT_CLS} />
+                </div>
+              </div>
+
+              {/* Website */}
+              <div>
+                <p className="text-[11px] text-muted-foreground font-medium mb-1">Website</p>
+                <input type="text" value={formData.website} onChange={e => set("website", e.target.value)}
+                  placeholder="https://example.com" className={INPUT_CLS} />
+              </div>
+
+              {/* Stage pill + Deal Value row */}
+              <div className="flex flex-wrap items-center gap-2">
+                <SelectField
+                  value={formData.stage}
+                  onChange={v => set("stage", v)}
+                  options={stageOptions}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[12px] font-medium border-border",
+                    stageBg[formData.stage] ?? "bg-accent"
+                  )}
+                />
+                <div className="flex items-center gap-1.5 flex-1 min-w-[120px]">
+                  <span className="text-[12px] text-muted-foreground shrink-0">Deal</span>
+                  <input
+                    type="text"
+                    value={formData.dealValue}
+                    onChange={e => set("dealValue", e.target.value)}
+                    placeholder="$5,000"
+                    className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              {/* Source + Medium */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground font-medium mb-1">UTM Source</p>
+                  <SelectField
+                    value={formData.source || "—"}
+                    onChange={v => set("source", v === "—" ? "" : v)}
+                    options={sourceOptions}
+                    containerClassName="w-full"
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground font-medium mb-1">UTM Medium</p>
+                  <SelectField
+                    value={formData.medium || "—"}
+                    onChange={v => set("medium", v === "—" ? "" : v)}
+                    options={mediumOptions}
+                    containerClassName="w-full"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-between shrink-0">
-          {isDisplayMode && (
+        {/* ── Footer ── */}
+        <div className="px-5 py-3 border-t border-border flex items-center gap-2 shrink-0">
+          {isDisplayMode ? (
             <>
               <button
                 onClick={() => onDelete?.(lead!)}
-                className="flex items-center gap-1.5 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors"
+                className="flex items-center gap-1.5 text-[13px] font-medium text-destructive hover:opacity-80 transition-opacity"
               >
-                <Trash2 className="h-4 w-4" />
-                Delete Lead
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
               </button>
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity"
+                className="ml-auto px-4 py-1.5 text-[13px] font-medium rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5"
               >
                 <Pencil className="h-3.5 w-3.5" />
                 Edit Lead
               </button>
             </>
-          )}
-          {!isDisplayMode && (
+          ) : (
             <>
               <button
                 onClick={handleCancel}
-                className="text-sm font-medium text-foreground hover:text-muted-foreground transition-colors"
+                className="px-4 py-1.5 text-[13px] font-medium rounded-lg border border-border hover:bg-accent transition-colors text-muted-foreground"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity"
+                className="ml-auto px-4 py-1.5 text-[13px] font-medium rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5"
               >
-                <Save className="h-3.5 w-3.5" />
+                <Check className="h-3.5 w-3.5" />
                 {isCreateMode ? "Create Lead" : "Save Changes"}
               </button>
             </>
           )}
         </div>
+
       </div>
     </div>
   )

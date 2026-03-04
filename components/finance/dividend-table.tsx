@@ -1,10 +1,11 @@
 "use client"
 
-import { ArrowUpDown, Pencil, Trash2, AlertCircle } from "lucide-react"
+import { ArrowUpDown, Pencil, Trash2, AlertCircle, X } from "lucide-react"
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { useAirtable } from "@/hooks/use-airtable"
 import { parseCurrency } from "@/lib/transforms"
+import { SelectField } from "@/components/shared/select-field"
 
 type SortKey = "month" | "totalDividend" | "connorDividend" | "connorPaid" | "jaydenDividend" | "jaydenPaid"
 type SortDirection = "asc" | "desc"
@@ -269,9 +270,8 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
     ...(!readOnly ? [{ label: "Actions", align: "center" as const, width: "w-[14%]" }] : []),
   ]
 
-  const inputCls = "w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
-  const selectCls = "w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
-  const labelCls = "block text-[13px] font-medium text-foreground mb-1.5"
+  const inputCls = "w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+  const labelCls = "block text-[11px] font-medium text-muted-foreground mb-1"
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -407,29 +407,39 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
 
       {/* Edit/Create Dividend Modal */}
       {(editingDividend || showCreateModal) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-md">
-            <div className="px-6 py-4 border-b border-border">
-              <h3 className="text-base font-semibold text-foreground">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseModal} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
+              <h3 className="text-[15px] font-semibold text-foreground">
                 {editingDividend ? "Edit Dividend Entry" : "Add New Dividend Entry"}
               </h3>
+              <button onClick={handleCloseModal} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent transition-colors">
+                <X className="h-4 w-4 text-foreground/60" />
+              </button>
             </div>
-            <div className="px-6 py-4 space-y-4">
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
               {/* Month & Year — linked P&L entry */}
               <div>
                 <label className={labelCls}>Month &amp; Year (P&amp;L Entry)</label>
-                <select
-                  value={selectedPnlId}
-                  onChange={(e) => setSelectedPnlId(e.target.value)}
-                  className={selectCls}
+                <SelectField
+                  value={
+                    !rawPnl
+                      ? 'Loading…'
+                      : selectedPnlId
+                        ? (pnlOptions.find(o => o.id === selectedPnlId)?.label ?? 'Select month…')
+                        : 'Select month…'
+                  }
+                  onChange={(v) => {
+                    const opt = pnlOptions.find(o => o.label === v)
+                    setSelectedPnlId(opt?.id ?? '')
+                  }}
+                  options={rawPnl ? ['Select month…', ...pnlOptions.map(o => o.label)] : ['Loading…']}
+                  containerClassName="w-full"
+                  className="w-full"
                   disabled={!rawPnl}
-                >
-                  <option value="">{rawPnl ? 'Select month…' : 'Loading…'}</option>
-                  {pnlOptions.map(o => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Dividend amounts */}
@@ -476,7 +486,7 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                     type="checkbox"
                     checked={formData.connorPaid}
                     onChange={(e) => setFormData({...formData, connorPaid: e.target.checked})}
-                    className="rounded border border-border"
+                    className="h-4 w-4 rounded border-border accent-foreground cursor-pointer"
                   />
                   <span className="text-[13px] text-foreground">Connor Paid</span>
                 </label>
@@ -485,23 +495,23 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                     type="checkbox"
                     checked={formData.jaydenPaid}
                     onChange={(e) => setFormData({...formData, jaydenPaid: e.target.checked})}
-                    className="rounded border border-border"
+                    className="h-4 w-4 rounded border-border accent-foreground cursor-pointer"
                   />
                   <span className="text-[13px] text-foreground">Jayden Paid</span>
                 </label>
               </div>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2 shrink-0">
               <button
                 onClick={handleCloseModal}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveDividend}
                 disabled={isSaving}
-                className="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 rounded-lg bg-foreground text-background hover:opacity-90 text-[13px] font-medium transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isSaving ? "Saving…" : editingDividend ? "Update" : "Create"}
               </button>
@@ -512,9 +522,10 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-sm">
-            <div className="px-6 py-4 border-b border-border">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-sm">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border">
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
                 <div>
@@ -525,16 +536,16 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                 </div>
               </div>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
               >
                 Delete
               </button>

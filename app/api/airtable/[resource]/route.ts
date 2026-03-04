@@ -152,13 +152,38 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Allow clients to create experiment ideas
-    // All other resources require management/strategy
-    const canCreateIdeas = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'client')
-    const canCreateOthers = (ctx.role === 'management' || ctx.role === 'strategy')
+    // Role-based creation permissions:
+    //   experiment-ideas  → management, strategy, client
+    //   notes             → management, strategy, sales, team  (all internal staff)
+    //   tasks             → management, strategy, sales  (sales can create their own tasks)
+    //   leads             → management, strategy, sales  (sales team manages the pipeline)
+    //   notifications     → management, strategy, sales, team  (for task assignment notifications)
+    //   everything else   → management, strategy only
+    const canCreateIdeas         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'client')
+    const canCreateNotes         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team')
+    const canCreateTasks         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales')
+    const canCreateLeads         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales')
+    const canCreateNotifications = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team')
+    const canCreateOthers        = (ctx.role === 'management' || ctx.role === 'strategy')
 
     if (resource === 'experiment-ideas') {
       if (!canCreateIdeas) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'notes') {
+      if (!canCreateNotes) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'tasks') {
+      if (!canCreateTasks) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'leads') {
+      if (!canCreateLeads) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'notifications') {
+      if (!canCreateNotifications) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     } else {

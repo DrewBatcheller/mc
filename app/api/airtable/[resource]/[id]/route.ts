@@ -42,9 +42,9 @@ export async function PATCH(
     const ctx = extractQueryContext(request.headers)
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // All roles can update their own notifications (mark read / archive)
-    // All other resources require management or strategy
-    if (resource !== 'notifications' && (ctx.role === 'client' || ctx.role === 'team')) {
+    // All roles can update their own notifications and notes
+    // All other resources require management, strategy, or sales
+    if (resource !== 'notifications' && resource !== 'notes' && (ctx.role === 'client' || ctx.role === 'team')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -78,7 +78,11 @@ export async function DELETE(
     const ctx = extractQueryContext(request.headers)
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (ctx.role === 'client' || ctx.role === 'team') {
+    // Clients can never delete; team members can only delete notes
+    if (ctx.role === 'client') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (ctx.role === 'team' && resource !== 'notes') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

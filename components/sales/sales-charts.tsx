@@ -291,14 +291,7 @@ export function DaysToCloseChart() {
                   tickLine={false}
                   tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
                   dx={-4}
-                  width={36}
-                  label={{
-                    value: "Days to Close",
-                    angle: -90,
-                    position: "insideLeft",
-                    offset: 12,
-                    style: { fontSize: 11, fill: "hsl(220, 8%, 46%)" },
-                  }}
+                  width={42}
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}

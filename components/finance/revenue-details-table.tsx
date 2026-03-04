@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowUpDown, Pencil, Trash2, AlertCircle } from "lucide-react"
+import { ArrowUpDown, Pencil, Trash2, AlertCircle, X } from "lucide-react"
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
@@ -395,17 +395,21 @@ export function RevenueDetailsTable({
 
       {/* Create / Edit modal */}
       {(editingRow !== null || showCreateModal) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-border sticky top-0 bg-card">
-              <h3 className="text-base font-semibold text-foreground">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseModal} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
+              <h3 className="text-[15px] font-semibold text-foreground">
                 {editingRow ? "Edit Revenue Entry" : "Add New Revenue Entry"}
               </h3>
+              <button onClick={handleCloseModal} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent transition-colors">
+                <X className="h-4 w-4 text-foreground/60" />
+              </button>
             </div>
-            <div className="px-6 py-4 space-y-4">
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
               {/* Client — linked record dropdown */}
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-1.5">Client</label>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">Client</label>
                 <SelectField
                   value={selectedClientName || "Select a client"}
                   onChange={(v) => {
@@ -424,35 +428,35 @@ export function RevenueDetailsTable({
 
               {/* Date */}
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-1.5">Date</label>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">Date</label>
                 <input
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
 
               {/* Amount USD + Fees USD */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">Amount USD</label>
+                  <label className="block text-[11px] font-medium text-muted-foreground mb-1">Amount USD</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.amountUsd}
                     onChange={(e) => setFormData({ ...formData, amountUsd: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">Fees USD</label>
+                  <label className="block text-[11px] font-medium text-muted-foreground mb-1">Fees USD</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.feesUsd}
                     onChange={(e) => setFormData({ ...formData, feesUsd: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
               </div>
@@ -460,50 +464,50 @@ export function RevenueDetailsTable({
               {/* Conversion Rate + Amount CAD */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">Conversion Rate</label>
+                  <label className="block text-[11px] font-medium text-muted-foreground mb-1">Conversion Rate</label>
                   <input
                     type="number"
                     step="0.0001"
                     value={formData.conversionRate}
                     onChange={(e) => setFormData({ ...formData, conversionRate: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">Amount CAD</label>
+                  <label className="block text-[11px] font-medium text-muted-foreground mb-1">Amount CAD</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.amountCad}
                     onChange={(e) => setFormData({ ...formData, amountCad: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
               </div>
 
               {/* Fees CAD */}
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-1.5">Fees CAD</label>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">Fees CAD</label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.feesCad}
                   onChange={(e) => setFormData({ ...formData, feesCad: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2 sticky bottom-0 bg-card">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2 shrink-0">
               <button
                 onClick={handleCloseModal}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveRevenue}
                 disabled={!selectedClientId || !formData.date || isSaving}
-                className="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 rounded-lg bg-foreground text-background hover:opacity-90 text-[13px] font-medium transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isSaving ? 'Saving…' : editingRow ? "Update" : "Create"}
               </button>
@@ -514,9 +518,10 @@ export function RevenueDetailsTable({
 
       {/* Delete confirmation */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-sm">
-            <div className="px-6 py-4 border-b border-border">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-sm">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border">
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
                 <div>
@@ -527,16 +532,16 @@ export function RevenueDetailsTable({
                 </div>
               </div>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
               >
                 Delete
               </button>

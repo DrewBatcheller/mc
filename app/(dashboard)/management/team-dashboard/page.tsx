@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { UpcomingTasksTable } from "@/components/team-member/upcoming-tasks-table"
 import { InProgressTasksTable } from "@/components/team-member/in-progress-tasks-table"
 import { TeamSchedule } from "@/components/team/team-schedule"
 import { TaskSubmissionModal } from "@/components/team/task-submission-modal"
 import { ManagementTaskModal, LaunchTestsModal, SubmitStrategyModal } from "@/components/team/specialized-task-modals"
 import { SelectField } from "@/components/shared/select-field"
+import { useAirtable } from "@/hooks/use-airtable"
 
 interface Task {
   title: string
@@ -19,7 +20,6 @@ interface Task {
   experiments?: { id: string; name: string; figmaUrl?: string; convertId?: string; qaApproved?: boolean; qaReportUrl?: string }[]
 }
 
-const TEAM_MEMBERS = ["All Members", "Alex M.", "Jordan T.", "Sam R.", "Casey P."]
 const DEPARTMENTS = ["All Departments", "Management", "Strategy", "Design", "Development", "QA"]
 const STATUSES = ["All Status", "Pending", "Overdue", "Complete"]
 
@@ -28,6 +28,20 @@ export default function ManagementTeamDashboardPage() {
   const [deptFilter, setDeptFilter] = useState("All Departments")
   const [statusFilter, setStatusFilter] = useState("All Status")
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+
+  /* Fetch live team members for the member filter dropdown */
+  const { data: rawTeam } = useAirtable<Record<string, unknown>>('team', {
+    fields: ['Full Name', 'Status'],
+    sort: [{ field: 'Full Name', direction: 'asc' }],
+  })
+
+  const teamMemberOptions = useMemo(() => {
+    const names = (rawTeam ?? [])
+      .filter(r => (r.fields['Status'] as string) === 'Active')
+      .map(r => (r.fields['Full Name'] as string) ?? '')
+      .filter(Boolean)
+    return ['All Members', ...names]
+  }, [rawTeam])
 
   return (
     <>
@@ -41,7 +55,7 @@ export default function ManagementTeamDashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SelectField value={memberFilter} onChange={setMemberFilter} options={TEAM_MEMBERS} />
+          <SelectField value={memberFilter} onChange={setMemberFilter} options={teamMemberOptions} />
           <SelectField value={deptFilter} onChange={setDeptFilter} options={DEPARTMENTS} />
           <SelectField value={statusFilter} onChange={setStatusFilter} options={STATUSES} />
         </div>

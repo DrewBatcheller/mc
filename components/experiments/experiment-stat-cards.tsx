@@ -14,9 +14,10 @@ function parseCur(v: unknown): number {
   ) || 0
 }
 
-export function ExperimentStatCards() {
+export function ExperimentStatCards({ clientId }: { clientId?: string }) {
   const { data, isLoading } = useAirtable('experiments', {
     fields: ['Test Status', 'Revenue Added (MRR) (Regular Format)'],
+    filterExtra: clientId ? `{Record ID (from Brand Name)} = "${clientId}"` : undefined,
   })
 
   const exps = data ?? []

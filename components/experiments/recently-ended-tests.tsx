@@ -11,7 +11,6 @@ const statusStyles: Record<string, string> = {
 }
 
 // ─── Airtable → modal shape mapper ───────────────────────────────────────────
-// Maps only the fields we fetch here; the modal will show "—" for the rest.
 function toExperiment(r: AirtableRecord) {
   const f = r.fields
   const clientArr = f['Brand Name (from Brand Name)']
@@ -28,7 +27,7 @@ function toExperiment(r: AirtableRecord) {
     status:       String(f['Test Status'] ?? ''),
     revenue:      String(f['Revenue Added (MRR)'] ?? '$0'),
     launchDate:   fmtDate(f['Launch Date']),
-    endDate:      fmtDate(f['End Date']),
+    endDate:      fmtDate(f['PTA (Scheduled Finish)']),
     placement:    String(f['Placement'] ?? ''),
     placementUrl: f['Placement URL'] ? String(f['Placement URL']) : undefined,
     devices:      String(f['Devices'] ?? ''),
@@ -44,10 +43,20 @@ function toExperiment(r: AirtableRecord) {
 // ─── Component ────────────────────────────────────────────────────────────────
 interface Props {
   onExperimentClick?: (experiment: ReturnType<typeof toExperiment>) => void
+  clientId?: string
 }
 
-export function RecentlyEndedTests({ onExperimentClick }: Props) {
+export function RecentlyEndedTests({ onExperimentClick, clientId }: Props) {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const today = new Date().toISOString().split('T')[0]
+
+  // PTA (Scheduled Finish) is the "ended" date — filter to past 30 days, terminal statuses only
+  const statusFilter = `OR({Test Status} = "Successful", {Test Status} = "Unsuccessful", {Test Status} = "Inconclusive")`
+  const dateFilter   = `AND(NOT(IS_BEFORE({PTA (Scheduled Finish)}, "${thirtyDaysAgo}")), IS_BEFORE({PTA (Scheduled Finish)}, "${today}"))`
+  const clientFilter = clientId ? `{Record ID (from Brand Name)} = "${clientId}"` : null
+  const filterExtra  = clientFilter
+    ? `AND(${statusFilter}, ${dateFilter}, ${clientFilter})`
+    : `AND(${statusFilter}, ${dateFilter})`
 
   const { data, isLoading } = useAirtable('experiments', {
     maxRecords: 8,
@@ -56,7 +65,7 @@ export function RecentlyEndedTests({ onExperimentClick }: Props) {
       'Brand Name (from Brand Name)',
       'Test Status',
       'Launch Date',
-      'End Date',
+      'PTA (Scheduled Finish)',
       'Revenue Added (MRR)',
       'Placement',
       'Placement URL',
@@ -66,8 +75,8 @@ export function RecentlyEndedTests({ onExperimentClick }: Props) {
       'Primary Goal',
       'Hypothesis',
     ],
-    sort: [{ field: 'End Date', direction: 'desc' }],
-    filterExtra: `AND(OR({Test Status} = "Successful", {Test Status} = "Unsuccessful", {Test Status} = "Inconclusive"), {End Date} >= "${thirtyDaysAgo}")`,
+    sort: [{ field: 'PTA (Scheduled Finish)', direction: 'desc' }],
+    filterExtra,
   })
 
   return (
@@ -91,11 +100,11 @@ export function RecentlyEndedTests({ onExperimentClick }: Props) {
           </div>
         ) : (
           (data ?? []).map(r => {
-            const name    = String(r.fields['Test Description'] ?? '')
+            const name      = String(r.fields['Test Description'] ?? '')
             const clientArr = r.fields['Brand Name (from Brand Name)']
-            const client  = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? '')
-            const status  = String(r.fields['Test Status'] ?? '')
-            const revenue = String(r.fields['Revenue Added (MRR)'] ?? '$0')
+            const client    = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? '')
+            const status    = String(r.fields['Test Status'] ?? '')
+            const revenue   = String(r.fields['Revenue Added (MRR)'] ?? '$0')
 
             return (
               <div

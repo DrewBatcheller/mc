@@ -10,6 +10,15 @@ import { ExperimentDetailsModal } from '@/components/experiments/experiment-deta
 const PAGE_SIZE = 2
 
 // ── Status styling ─────────────────────────────────────────────────────────────
+// Safe formatter: strips ISO time to avoid UTC→local day shift on midnight-UTC Airtable dates
+function formatDateSafe(raw: string): string {
+  const ymd = raw.split('T')[0]
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return raw
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`
+}
+
 const statusBadge: Record<string, string> = {
   "Successful":             "bg-emerald-50 border-emerald-200 text-emerald-700",
   "Unsuccessful":           "bg-rose-50 border-rose-200 text-rose-700",
@@ -83,8 +92,8 @@ function toModalExperiment(r: { id: string; fields: Record<string, unknown> }): 
     endDate:        String(r.fields['End Date'] ?? ''),
     whatHappened:   String(r.fields['Describe what happened & what we learned'] ?? ''),
     nextSteps:      String(r.fields['Next Steps (Action)'] ?? ''),
-    controlImage:   getAttachmentUrl(r.fields['Control ImageE']),
-    variantImage:   getAttachmentUrl(r.fields['Variant ImageE']),
+    controlImage:   getAttachmentUrl(r.fields['Control Image']),
+    variantImage:   getAttachmentUrl(r.fields['Variant Image']),
     resultImage:    getAttachmentUrl(r.fields['PTA Result Image']),
     resultVideo:    getAttachmentUrl(r.fields['Post-Test Analysis (Loom)']),
   }
@@ -149,10 +158,10 @@ export function RecentExperiments({ clientIds = [] }: { clientIds?: string[] }) 
               ? r.fields['Revenue Added (MRR) (Regular Format)'] as number
               : 0
             const launchDate = r.fields['Launch Date']
-              ? new Date(String(r.fields['Launch Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              ? formatDateSafe(String(r.fields['Launch Date']))
               : null
             const endDate = r.fields['End Date']
-              ? new Date(String(r.fields['End Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              ? formatDateSafe(String(r.fields['End Date']))
               : null
 
             return (

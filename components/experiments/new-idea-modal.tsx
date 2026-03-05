@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SelectField } from '@/components/shared/select-field'
@@ -99,19 +99,20 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
       // Map form data to Airtable field names
       const airtableFields = {
         'Test Description': formData.title,
+        'Brand Name': formData.client,
+        'Is Experiment': false,
         'Placement': formData.placementLabel,
         'Placement URL': formData.placementUrl,
         'Hypothesis': formData.hypothesis,
         'Rationale': formData.rationale,
-        'Primary Goals': formData.primaryGoals.join(', '),
+        'Category Primary Goals': formData.primaryGoals,
         'Devices': formData.devices,
-        'GEOs': formData.countries.join(', '),
-        'Weighting': formData.weighting,
+        'GEOs': formData.countries,
+        'Variants Weight': formData.weighting,
         'Design Brief': formData.designBrief,
         'Development Brief': formData.developmentBrief,
         'Media/Links': formData.mediaLinks,
         'Walkthrough Video URL': formData.walkthroughUrl,
-        'Brand Name': formData.client,
       }
 
       const response = await fetch('/api/airtable/experiment-ideas', {
@@ -159,11 +160,20 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
     }
   }
 
+  useEffect(() => {
+    if (!isOpen) return
+    const handle = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) onClose()
+    }
+    document.addEventListener('keydown', handle)
+    return () => document.removeEventListener('keydown', handle)
+  }, [isOpen, isSubmitting, onClose])
+
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-lg">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-lg" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="sticky top-0 flex items-center justify-between p-6 border-b border-border bg-card">
           <h2 className="text-lg font-semibold text-foreground">Add an Experiment Idea</h2>

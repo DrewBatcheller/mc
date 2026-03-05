@@ -10,6 +10,15 @@ interface Props {
   clientId?: string
 }
 
+// Safe formatter: strips ISO time to avoid UTC→local day shift on midnight-UTC Airtable dates
+function formatDateSafe(raw: string): string {
+  const ymd = raw.split('T')[0]
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return raw
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`
+}
+
 const statusColors: Record<string, string> = {
   Live:          "bg-emerald-50 text-emerald-700 border-emerald-200",
   "In Progress": "bg-sky-50 text-sky-700 border-sky-200",
@@ -89,9 +98,7 @@ export function UpcomingBatches({ onBatchClick, clientId }: Props) {
             const clientArr   = r.fields['Brand Name']
             const client      = Array.isArray(clientArr) ? String(clientArr[0] ?? '') : String(clientArr ?? '')
             const launchRaw   = r.fields['Launch Date'] ? String(r.fields['Launch Date']) : null
-            const launchDate  = launchRaw
-              ? new Date(launchRaw).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              : '—'
+            const launchDate  = launchRaw ? formatDateSafe(launchRaw) : '—'
             const daysUntil   = launchRaw ? getDaysUntil(launchRaw) : null
             const tests       = Array.isArray(r.fields['Linked Test Names']) ? r.fields['Linked Test Names'].length : 0
             const allStatus   = r.fields['All Tests Status'] ? String(r.fields['All Tests Status']) : null

@@ -52,33 +52,40 @@ export function buildRoleFilter(
 
   switch (resource) {
     // ── Experiments ─────────────────────────────────────────────────────────
+    // Active experiments only — {Is Experiment} must be checked (true).
+    // Unsynced ideas live in the same table but have {Is Experiment} unchecked,
+    // and are served exclusively through the 'experiment-ideas' resource below.
     case 'experiments': {
-      if (role === 'management') return ''  // no filter
-      if (role === 'strategy') return ''    // strategy sees all experiments
+      const isExp = `{Is Experiment} = TRUE()`
+      if (role === 'management') return isExp
+      if (role === 'strategy') return isExp
       if (role === 'team' && userId) {
         // Team members see experiments where they are assigned
-        return or(
+        return and(isExp, or(
           containsId('Developer', userId),
           containsId('Designer', userId),
           containsId('Strategist', userId),
           containsId('QA', userId)
-        )
+        ))
       }
       if (role === 'client' && clientId) {
-        return eq('Record ID (from Brand Name)', clientId)
+        return and(isExp, `FIND("${clientId}", CONCATENATE({Brand Name})) > 0`)
       }
       return null
     }
 
     // ── Experiment Ideas ─────────────────────────────────────────────────────
+    // Ideas live in the Experiments table with {Is Experiment} unchecked.
+    // This resource slug maps to the Experiments table (see lib/types.ts).
     case 'experiment-ideas': {
-      if (role === 'management' || role === 'strategy') return ''
+      const isIdea = `NOT({Is Experiment})`
+      if (role === 'management' || role === 'strategy') return isIdea
       if (role === 'team' && userId) {
-        return containsId('Assigned To', userId)
+        return and(isIdea, containsId('Assigned To', userId))
       }
       if (role === 'client' && clientId) {
-        // Check both the new Client field and old Record ID (from Brand Name) field for backward compatibility
-        return `OR(FIND("${clientId}", CONCATENATE({Client})) > 0, {Record ID (from Brand Name)} = "${clientId}")`
+        // Brand Name is a linked record field; Airtable stores record IDs, so FIND matches the clientId
+        return and(isIdea, `FIND("${clientId}", CONCATENATE({Brand Name})) > 0`)
       }
       return null
     }

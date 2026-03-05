@@ -200,10 +200,11 @@ export async function POST(
     const body = await request.json()
     let fields = body.fields ?? body
 
-    // For clients creating experiment ideas, enforce client data isolation
+    // For clients creating experiment ideas, enforce client data isolation.
+    // Ideas live in the Experiments table with Is Experiment unchecked (false).
     if (resource === 'experiment-ideas' && ctx.role === 'client' && ctx.clientId) {
-      // Client can only create ideas for their own client record
-      fields['Client'] = [ctx.clientId]
+      fields['Brand Name'] = [ctx.clientId]
+      fields['Is Experiment'] = false
     }
 
     const { createRecord: createRecordFn } = await import('@/lib/airtable')

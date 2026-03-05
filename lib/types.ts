@@ -60,7 +60,7 @@ export const TABLE_NAMES = {
   clients: 'Clients',
   contacts: 'Contacts',
   experiments: 'Experiments',
-  'experiment-ideas': 'Experiment Ideas',
+  'experiment-ideas': 'Experiments',
   batches: 'Batches',
   variants: 'Variants',
   tasks: 'Tasks',

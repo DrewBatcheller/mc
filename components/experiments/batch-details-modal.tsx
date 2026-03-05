@@ -6,6 +6,15 @@ import { cn } from "@/lib/utils"
 import { useAirtable } from "@/hooks/use-airtable"
 import type { AirtableRecord } from "@/lib/types"
 
+// Safe formatter: strips ISO time to avoid UTC→local day shift on midnight-UTC Airtable dates
+function formatDateSafe(raw: string): string {
+  const ymd = raw.split('T')[0]
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return raw
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`
+}
+
 const statusConfig: Record<string, { bg: string; text: string; border: string }> = {
   Successful:    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
   Unsuccessful:  { bg: "bg-rose-50",    text: "text-rose-700",    border: "border-rose-200"    },
@@ -73,7 +82,7 @@ export function BatchDetailsModal({ isOpen, batch, onClose }: Props) {
   const client     = Array.isArray(clientArr) ? String(clientArr[0] ?? '') : String(clientArr ?? '')
   const allStatus  = f['All Tests Status'] ? String(f['All Tests Status']) : null
   const launchDate = f['Launch Date']
-    ? new Date(String(f['Launch Date'])).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    ? formatDateSafe(String(f['Launch Date']))
     : null
   const revenue    = f['Revenue Added (MRR)'] ? String(f['Revenue Added (MRR)']) : null
 

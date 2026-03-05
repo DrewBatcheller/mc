@@ -85,14 +85,15 @@ interface Batch {
 /* ── Status helpers ── */
 const statusStyles: Record<string, string> = {
   "In Progress": "bg-sky-50 text-sky-700",
-  Live: "bg-emerald-50 text-emerald-700",
-  Mixed: "bg-amber-50 text-amber-700",
-  Pending: "bg-accent text-muted-foreground",
-  "No Tests": "bg-accent text-muted-foreground",
-  Unsuccessful: "bg-rose-50 text-rose-700",
-  Blocked: "bg-red-50 text-red-700",
-  Successful: "bg-emerald-50 text-emerald-700",
-  Inconclusive: "bg-amber-50 text-amber-700",
+  Live:          "bg-emerald-50 text-emerald-700",
+  Completed:     "bg-violet-50 text-violet-700",
+  Pending:       "bg-accent text-muted-foreground",
+  Mixed:         "bg-amber-50 text-amber-700",
+  "No Tests":    "bg-accent text-muted-foreground",
+  Unsuccessful:  "bg-rose-50 text-rose-700",
+  Blocked:       "bg-red-50 text-red-700",
+  Successful:    "bg-emerald-50 text-emerald-700",
+  Inconclusive:  "bg-amber-50 text-amber-700",
   "Live - Collecting Data": "bg-emerald-50 text-emerald-700",
 }
 
@@ -118,14 +119,33 @@ const launchActionStatus: Record<string, string> = {
 const allStatuses = ["All Statuses", "Pending", "In Progress", "Live", "Completed"]
 
 /* ── Mappers ── */
+
+// Safe date formatter: strips ISO time component and avoids UTC→local timezone shift.
+// Airtable stores date-only fields as midnight UTC ("2025-03-15T00:00:00.000Z").
+// Using new Date() + toLocaleDateString() shifts them back by 1 day in UTC- timezones.
+// Instead, we parse the YYYY-MM-DD string directly and never invoke Date parsing.
+function formatDateSafe(raw: string): string {
+  const ymd = raw.split('T')[0]
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return raw
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`
+}
+
+function getImageUrl(field: unknown): string | undefined {
+  if (Array.isArray(field) && field.length > 0) return (field[0] as { url?: string }).url ?? String(field[0])
+  if (typeof field === 'string' && field) return field
+  return undefined
+}
+
 function mapExperiment(rec: AirtableRecord): Experiment {
   const f = rec.fields
   const devices = Array.isArray(f['Devices'])
     ? (f['Devices'] as string[]).join(', ')
     : String(f['Devices'] ?? '')
-  const geos = Array.isArray(f['Geos'])
-    ? (f['Geos'] as string[]).join(', ')
-    : String(f['Geos'] ?? '')
+  const geos = Array.isArray(f['GEOs'])
+    ? (f['GEOs'] as string[]).join(', ')
+    : String(f['GEOs'] ?? '')
   return {
     id: rec.id,
     name: String(f['Test Description'] ?? 'Untitled'),
@@ -135,13 +155,15 @@ function mapExperiment(rec: AirtableRecord): Experiment {
     placementUrl: f['Placement URL'] ? String(f['Placement URL']) : undefined,
     devices,
     geos,
-    variants: f['Number of Variants'] != null ? String(f['Number of Variants']) : '-',
-    revenue: f['Revenue Added (MRR)'] ? String(f['Revenue Added (MRR)']) : '$0',
-    revenueAddedMrr: f['Revenue Added (MRR)'] ? String(f['Revenue Added (MRR)']) : undefined,
-    primaryGoals: f['Primary Goal'] ? [String(f['Primary Goal'])] : undefined,
+    variants: '-',
+    revenue: f['Revenue Added (MRR) (Regular Format)'] ? `$${f['Revenue Added (MRR) (Regular Format)']}` : '$0',
+    revenueAddedMrr: f['Revenue Added (MRR) (Regular Format)'] ? `$${f['Revenue Added (MRR) (Regular Format)']}` : undefined,
+    primaryGoals: Array.isArray(f['Category Primary Goals'])
+      ? (f['Category Primary Goals'] as string[])
+      : f['Category Primary Goals'] ? [String(f['Category Primary Goals'])] : undefined,
     hypothesis: f['Hypothesis'] ? String(f['Hypothesis']) : undefined,
-    launchDate: f['Launch Date'] ? String(f['Launch Date']) : undefined,
-    endDate: f['PTA (Scheduled Finish)'] ? String(f['PTA (Scheduled Finish)']) : undefined,
+    launchDate: f['Launch Date'] ? formatDateSafe(String(f['Launch Date'])) : undefined,
+    endDate: f['End Date'] ? formatDateSafe(String(f['End Date'])) : undefined,
   }
 }
 
@@ -159,8 +181,7 @@ function mapBatch(rec: AirtableRecord, expMap: Map<string, Experiment>): Batch {
     .filter((e): e is Experiment => !!e)
   const launchRaw = f['Launch Date'] ? String(f['Launch Date']) : ''
   const finishRaw = f['PTA (Scheduled Finish)'] ? String(f['PTA (Scheduled Finish)']) : ''
-  const fmt = (d: string) =>
-    d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+  const fmt = (d: string): string => d ? formatDateSafe(d) : '—'
   return {
     id: rec.id,
     batchKey: String(f['Batch Key'] ?? ''),
@@ -169,7 +190,9 @@ function mapBatch(rec: AirtableRecord, expMap: Map<string, Experiment>): Batch {
     launchDate: fmt(launchRaw),
     launchDateRaw: launchRaw ? launchRaw.split('T')[0] : '',
     finishDate: fmt(finishRaw),
-    status: String(f['All Tests Status'] ?? 'Pending'),
+    status: f['Calculated Batch Status']
+      ? String(f['Calculated Batch Status'])
+      : mapBatchStatus(String(f['All Tests Status'] ?? 'Pending')),
     tests: experiments.length,
     revenueImpact: f['Revenue Added (MRR)'] ? String(f['Revenue Added (MRR)']) : '$0',
     experimentIds,
@@ -189,6 +212,7 @@ export function ClientTracker() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set())
   const [isMutating, setIsMutating] = useState(false)
 
@@ -211,36 +235,19 @@ export function ClientTracker() {
   const { data: batchRecords, isLoading: batchLoading, mutate: mutateBatches } = useAirtable('batches', {
     fields: [
       'Batch Key', 'Brand Name', 'Launch Date', 'PTA (Scheduled Finish)',
-      'All Tests Status', 'Experiments Attached', 'Revenue Added (MRR)',
+      'All Tests Status', 'Calculated Batch Status', 'Experiments Attached', 'Revenue Added (MRR)',
       'Record ID (from Client)',
     ],
     sort: [{ field: 'Launch Date', direction: 'desc' }],
   })
 
-  // Collect unique experiment IDs across all batches for a single bulk fetch
-  const allExpIds = useMemo(() => {
-    const ids: string[] = []
-    for (const b of batchRecords ?? []) {
-      const attached = b.fields['Experiments Attached']
-      if (Array.isArray(attached)) ids.push(...(attached as string[]))
-    }
-    return [...new Set(ids)]
-  }, [batchRecords])
-
-  const expFilter = useMemo(() => {
-    if (allExpIds.length === 0) return undefined
-    if (allExpIds.length === 1) return `RECORD_ID() = "${allExpIds[0]}"`
-    return `OR(${allExpIds.map(id => `RECORD_ID() = "${id}"`).join(', ')})`
-  }, [allExpIds])
-
   const { data: expRecords, isLoading: expLoading, mutate: mutateExperiments } = useAirtable('experiments', {
     fields: [
       'Test Description', 'Test Status', 'Placement', 'Placement URL',
-      'Devices', 'Geos', 'Number of Variants', 'Revenue Added (MRR)',
-      'Primary Goal', 'Hypothesis', 'Launch Date', 'PTA (Scheduled Finish)',
+      'Devices', 'GEOs', 'Revenue Added (MRR) (Regular Format)',
+      'Category Primary Goals', 'Hypothesis', 'Launch Date', 'End Date',
     ],
-    filterExtra: expFilter,
-    enabled: allExpIds.length > 0,
+    enabled: !batchLoading,
   })
 
   // Build experiment ID → Experiment lookup map
@@ -256,7 +263,7 @@ export function ClientTracker() {
     [batchRecords, expMap]
   )
 
-  const isLoading = batchLoading || (allExpIds.length > 0 && expLoading)
+  const isLoading = batchLoading || expLoading
 
   // ── Derived stats ────────────────────────────────────────────────────────────
   const allExperiments = useMemo(() => batches.flatMap(b => b.experiments), [batches])
@@ -304,7 +311,7 @@ export function ClientTracker() {
         b.experiments.some(e => e.name.toLowerCase().includes(q))
       )
     }
-    if (statusFilter !== "All Statuses") result = result.filter(b => mapBatchStatus(b.status) === statusFilter)
+    if (statusFilter !== "All Statuses") result = result.filter(b => b.status === statusFilter)
     if (clientFilter !== "All Clients") result = result.filter(b => b.client === clientFilter)
     return result
   }, [batches, search, statusFilter, clientFilter])
@@ -344,7 +351,7 @@ export function ClientTracker() {
       if (batch.experiments.length === 0) {
         rows.push([
           batch.client, batch.batchKey, batch.launchDate, batch.finishDate,
-          mapBatchStatus(batch.status), String(batch.tests),
+          batch.status, String(batch.tests),
           ...Array(14).fill(""),
         ])
         continue
@@ -352,7 +359,7 @@ export function ClientTracker() {
       for (const exp of batch.experiments) {
         rows.push([
           batch.client, batch.batchKey, batch.launchDate, batch.finishDate,
-          mapBatchStatus(batch.status), String(batch.tests),
+          batch.status, String(batch.tests),
           exp.name, exp.description, exp.status, exp.placement, exp.placementUrl ?? "",
           exp.devices, exp.geos, exp.variants, exp.revenue,
           exp.hypothesis ?? "", (exp.primaryGoals ?? []).join("; "),
@@ -424,7 +431,7 @@ export function ClientTracker() {
       await fetch(`/api/airtable/experiments/${convertExperimentModal.id}`, {
         method: 'PATCH',
         headers: authHeaders,
-        body: JSON.stringify({ fields: { 'Test Status': 'Idea: Pending', 'Batch': [] } }),
+        body: JSON.stringify({ fields: { 'Is Experiment': false, 'Batch': [] } }),
       })
       await Promise.all([mutateExperiments(), mutateBatches()])
     } finally {
@@ -442,7 +449,7 @@ export function ClientTracker() {
           fetch(`/api/airtable/experiments/${exp.id}`, {
             method: 'PATCH',
             headers: authHeaders,
-            body: JSON.stringify({ fields: { 'Test Status': 'Idea: Pending', 'Batch': [] } }),
+            body: JSON.stringify({ fields: { 'Is Experiment': false, 'Batch': [] } }),
           })
         )
       )
@@ -497,6 +504,45 @@ export function ClientTracker() {
       setNewBatchDate("")
     }
   }, [selectBatchModal, newBatchDate, authHeaders, handleMoveExperiments])
+
+  // ── Open experiment modal (lazy-loads rich detail fields) ────────────────────
+  const openExperimentModal = useCallback(async (exp: Experiment, batch: Batch) => {
+    // Show modal immediately with basic table data
+    setSelectedExperiment(exp)
+    setSelectedBatch(batch)
+    setIsModalOpen(true)
+    setIsDetailLoading(true)
+
+    // Fetch full record details (images, rationale, results, etc.)
+    try {
+      const res = await fetch(`/api/airtable/experiments/${exp.id}`, {
+        headers: authHeaders as Record<string, string>,
+      })
+      if (!res.ok) return
+      const { record } = await res.json()
+      if (!record?.fields) return
+      const f = record.fields as Record<string, unknown>
+      setSelectedExperiment(prev =>
+        prev?.id === exp.id
+          ? {
+              ...prev,
+              rationale:    f['Rationale']    ? String(f['Rationale'])    : undefined,
+              deployed:     f['Deployed'] === true ? true : undefined,
+              whatHappened: f['Describe what happened & what we learned'] ? String(f['Describe what happened & what we learned']) : undefined,
+              nextSteps:    f['Next Steps (Action)']  ? String(f['Next Steps (Action)'])  : undefined,
+              controlImage: getImageUrl(f['Control Image']),
+              variantImage: getImageUrl(f['Variant Image']),
+              resultImage:  getImageUrl(f['PTA Result Image']),
+              resultVideo:  getImageUrl(f['Post-Test Analysis (Loom)']),
+            }
+          : prev
+      )
+    } catch {
+      // Modal still works fine with just the basic data
+    } finally {
+      setIsDetailLoading(false)
+    }
+  }, [authHeaders])
 
   // ── Skeleton rows ─────────────────────────────────────────────────────────────
   const skeletonRows = Array.from({ length: 5 }).map((_, i) => (
@@ -618,9 +664,9 @@ export function ClientTracker() {
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <span className={cn(
                           "text-[12px] font-medium px-2.5 py-1 rounded-md",
-                          statusStyles[mapBatchStatus(batch.status)] || "bg-accent text-foreground"
+                          statusStyles[batch.status] || "bg-accent text-foreground"
                         )}>
-                          {mapBatchStatus(batch.status)}
+                          {batch.status}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
@@ -716,11 +762,7 @@ export function ClientTracker() {
                                   <tr
                                     key={exp.id}
                                     className="border-b border-border/40 last:border-0 hover:bg-accent/20 transition-colors cursor-pointer"
-                                    onClick={() => {
-                                      setSelectedExperiment(exp)
-                                      setSelectedBatch(batch)
-                                      setIsModalOpen(true)
-                                    }}
+                                    onClick={() => openExperimentModal(exp, batch)}
                                   >
                                     <td className="px-6 py-3 pl-14">
                                       <div className="flex flex-col gap-0.5">
@@ -789,7 +831,8 @@ export function ClientTracker() {
         isOpen={isModalOpen}
         experiment={selectedExperiment}
         batchKey={selectedBatch ? `${selectedBatch.client} | ${selectedBatch.launchDate}` : undefined}
-        onClose={() => setIsModalOpen(false)}
+        isLoadingDetails={isDetailLoading}
+        onClose={() => { setIsModalOpen(false); setIsDetailLoading(false) }}
       />
 
       {/* ── Edit Launch Date Modal ── */}

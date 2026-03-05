@@ -17,7 +17,6 @@ interface ClientIdea {
   placement: string
   placementUrl?: string
   primaryGoals: string[]
-  priority: string
   isPending?: boolean
 }
 
@@ -36,13 +35,12 @@ const columns: { key: SortKey | null; label: string }[] = [
   { key: "testDescription", label: "Test Description" },
   { key: "placement", label: "Placement" },
   { key: null, label: "Primary Goals" },
-  { key: null, label: "Priority" },
 ]
 
 export function ClientIdeasTable() {
   const { user } = useUser()
   const { data: rawIdeas, mutate } = useAirtable('experiment-ideas', {
-    fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Primary Goals', 'Priority'],
+    fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Category Primary Goals'],
   })
   const { toast } = useToast()
 
@@ -65,8 +63,7 @@ export function ClientIdeasTable() {
       rationale: record.fields['Rationale'] as string || '',
       placement: record.fields['Placement'] as string || '',
       placementUrl: record.fields['Placement URL'] as string,
-      primaryGoals: (record.fields['Primary Goals'] as string[]) || [],
-      priority: String(record.fields['Priority'] || ''),
+      primaryGoals: (record.fields['Category Primary Goals'] as string[]) || [],
       isPending: false,
     }))
   }, [rawIdeas])
@@ -152,7 +149,9 @@ export function ClientIdeasTable() {
                       key={i}
                       className={cn(
                         "px-4 py-3 text-[12px] font-medium text-muted-foreground whitespace-nowrap text-left",
-                        i === 0 && "w-10 px-0 pl-4"
+                        i === 0 && "w-10 px-0 pl-4",
+                        i === 2 && "w-[160px]",
+                        i === 3 && "w-[220px]"
                       )}
                     >
                       {col.key ? (
@@ -201,8 +200,8 @@ export function ClientIdeasTable() {
                             />
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-[13px] font-medium text-foreground align-middle max-w-[260px]">
-                          <div className="flex items-center gap-2">
+                        <td className="px-4 py-3.5 text-[13px] font-medium text-foreground align-middle min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span className="block truncate">{idea.testDescription}</span>
                             {idea.isPending && (
                               <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
@@ -228,30 +227,6 @@ export function ClientIdeasTable() {
                               </span>
                             ))}
                           </div>
-                        </td>
-                        <td className="px-4 py-3.5 align-middle">
-                          {idea.priority ? (
-                            <div className="flex items-center gap-0.5">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <div
-                                  key={i}
-                                  className={cn(
-                                    "h-2 w-4 rounded-sm",
-                                    i < Number(idea.priority)
-                                      ? Number(idea.priority) >= 4
-                                        ? "bg-emerald-500"
-                                        : Number(idea.priority) >= 3
-                                          ? "bg-amber-400"
-                                          : "bg-rose-400"
-                                      : "bg-muted"
-                                  )}
-                                />
-                              ))}
-                              <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">{idea.priority}/5</span>
-                            </div>
-                          ) : (
-                            <span className="text-[12px] text-muted-foreground">-</span>
-                          )}
                         </td>
                       </tr>
 

@@ -7,6 +7,15 @@ import { cn } from "@/lib/utils"
 
 const PAGE_SIZE = 5
 
+// Safe formatter: strips ISO time to avoid UTC→local day shift on midnight-UTC Airtable dates
+function formatDateSafe(raw: string): string {
+  const ymd = raw.split('T')[0]
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return raw
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[+m[2]-1]} ${+m[3]}`
+}
+
 const categoryColors: Record<string, string> = {
   Strategy:    "bg-blue-50 text-blue-600",
   Design:      "bg-violet-50 text-violet-600",
@@ -74,9 +83,11 @@ export function UpcomingTasks() {
               assignedTo = String(assignedRaw)
             }
             const dueDate   = r.fields['Due Date']
-              ? new Date(String(r.fields['Due Date'])).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              ? formatDateSafe(String(r.fields['Due Date']))
               : '—'
-            const due       = r.fields['Due Date'] ? new Date(String(r.fields['Due Date'])) : null
+            // For urgency check, construct local date from YYYY-MM-DD to avoid timezone shift
+            const dueParts  = r.fields['Due Date'] ? String(r.fields['Due Date']).split('T')[0].split('-').map(Number) : null
+            const due       = dueParts ? new Date(dueParts[0], dueParts[1] - 1, dueParts[2]) : null
             const isUrgent  = due && (due.getTime() - Date.now()) < 1000 * 60 * 60 * 48
 
             return (

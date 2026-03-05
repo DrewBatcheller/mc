@@ -4,6 +4,15 @@ import { useAirtable } from "@/hooks/use-airtable"
 import type { AirtableRecord } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+// Safe formatter: strips ISO time to avoid UTC→local day shift on midnight-UTC Airtable dates
+function formatDateSafe(raw: string): string {
+  const ymd = raw.split('T')[0]
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return raw
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`
+}
+
 const statusStyles: Record<string, string> = {
   Successful:   "bg-emerald-50 text-emerald-700 border-emerald-200",
   Unsuccessful: "bg-rose-50 text-rose-700 border-rose-200",
@@ -17,7 +26,7 @@ function toExperiment(r: AirtableRecord) {
   const client = Array.isArray(clientArr) ? String(clientArr[0] ?? '') : String(clientArr ?? '')
 
   const fmtDate = (v: unknown) =>
-    v ? new Date(String(v)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined
+    v ? formatDateSafe(String(v)) : undefined
 
   return {
     id:           r.id,
@@ -25,17 +34,17 @@ function toExperiment(r: AirtableRecord) {
     description:  String(f['Test Description'] ?? ''),
     client,
     status:       String(f['Test Status'] ?? ''),
-    revenue:      String(f['Revenue Added (MRR)'] ?? '$0'),
+    revenue:      f['Revenue Added (MRR) (Regular Format)'] ? `$${f['Revenue Added (MRR) (Regular Format)']}` : '$0',
     launchDate:   fmtDate(f['Launch Date']),
-    endDate:      fmtDate(f['PTA (Scheduled Finish)']),
+    endDate:      fmtDate(f['End Date']),
     placement:    String(f['Placement'] ?? ''),
     placementUrl: f['Placement URL'] ? String(f['Placement URL']) : undefined,
     devices:      String(f['Devices'] ?? ''),
-    geos:         String(f['Geos'] ?? ''),
-    variants:     String(f['Number of Variants'] ?? ''),
-    primaryGoals: Array.isArray(f['Primary Goal'])
-      ? (f['Primary Goal'] as string[])
-      : f['Primary Goal'] ? [String(f['Primary Goal'])] : [],
+    geos:         String(f['GEOs'] ?? ''),
+    variants:     '',
+    primaryGoals: Array.isArray(f['Category Primary Goals'])
+      ? (f['Category Primary Goals'] as string[])
+      : f['Category Primary Goals'] ? [String(f['Category Primary Goals'])] : [],
     hypothesis:   f['Hypothesis'] ? String(f['Hypothesis']) : undefined,
   }
 }
@@ -50,9 +59,9 @@ export function RecentlyEndedTests({ onExperimentClick, clientId }: Props) {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   const today = new Date().toISOString().split('T')[0]
 
-  // PTA (Scheduled Finish) is the "ended" date — filter to past 30 days, terminal statuses only
+  // End Date is the "ended" date — filter to past 30 days, terminal statuses only
   const statusFilter = `OR({Test Status} = "Successful", {Test Status} = "Unsuccessful", {Test Status} = "Inconclusive")`
-  const dateFilter   = `AND(NOT(IS_BEFORE({PTA (Scheduled Finish)}, "${thirtyDaysAgo}")), IS_BEFORE({PTA (Scheduled Finish)}, "${today}"))`
+  const dateFilter   = `AND(NOT(IS_BEFORE({End Date}, "${thirtyDaysAgo}")), IS_BEFORE({End Date}, "${today}"))`
   const clientFilter = clientId ? `{Record ID (from Brand Name)} = "${clientId}"` : null
   const filterExtra  = clientFilter
     ? `AND(${statusFilter}, ${dateFilter}, ${clientFilter})`
@@ -65,17 +74,16 @@ export function RecentlyEndedTests({ onExperimentClick, clientId }: Props) {
       'Brand Name (from Brand Name)',
       'Test Status',
       'Launch Date',
-      'PTA (Scheduled Finish)',
-      'Revenue Added (MRR)',
+      'End Date',
+      'Revenue Added (MRR) (Regular Format)',
       'Placement',
       'Placement URL',
       'Devices',
-      'Geos',
-      'Number of Variants',
-      'Primary Goal',
+      'GEOs',
+      'Category Primary Goals',
       'Hypothesis',
     ],
-    sort: [{ field: 'PTA (Scheduled Finish)', direction: 'desc' }],
+    sort: [{ field: 'End Date', direction: 'desc' }],
     filterExtra,
   })
 
@@ -104,7 +112,7 @@ export function RecentlyEndedTests({ onExperimentClick, clientId }: Props) {
             const clientArr = r.fields['Brand Name (from Brand Name)']
             const client    = Array.isArray(clientArr) ? clientArr[0] : String(clientArr ?? '')
             const status    = String(r.fields['Test Status'] ?? '')
-            const revenue   = String(r.fields['Revenue Added (MRR)'] ?? '$0')
+            const revenue   = r.fields['Revenue Added (MRR) (Regular Format)'] ? `$${r.fields['Revenue Added (MRR) (Regular Format)']}` : '$0'
 
             return (
               <div

@@ -128,8 +128,8 @@ export function ClientResultsGrid() {
       "Hypothesis",
       "Describe what happened & what we learned",
       "Next Steps (Action)",
-      "Control ImageE",
-      "Variant ImageE",
+      "Control Image",
+      "Variant Image",
       "PTA Result Image",
       "Post-Test Analysis (Loom)",
     ],
@@ -175,13 +175,13 @@ export function ClientResultsGrid() {
           whatHappened:
             (f["Describe what happened & what we learned"] as string) || undefined,
           nextSteps: (f["Next Steps (Action)"] as string) || undefined,
-          controlImage: getAttachmentUrl(f["Control ImageE"]),
-          variantImage: getAttachmentUrl(f["Variant ImageE"]),
+          controlImage: getAttachmentUrl(f["Control Image"]),
+          variantImage: getAttachmentUrl(f["Variant Image"]),
           resultImage: getAttachmentUrl(f["PTA Result Image"]),
           resultVideo: (f["Post-Test Analysis (Loom)"] as string) || undefined,
           thumbnailUrl:
             getAttachmentUrl(f["PTA Result Image"]) ??
-            getAttachmentUrl(f["Control ImageE"]),
+            getAttachmentUrl(f["Control Image"]),
         } satisfies Result
       })
       .filter((r): r is Result => r !== null)

@@ -1190,7 +1190,8 @@ const ideaGoalColors: Record<string, string> = {
 
 function ExperimentIdeasTab({ clientId }: { clientId: string }) {
   const { data: rawIdeas, isLoading } = useAirtable<Record<string, unknown>>('experiment-ideas', {
-    filterExtra: `FIND("${clientId}", CONCATENATE({Record ID (from Brand Name)})) > 0`,
+    // Match via Brand Name linked field (set on unsynced ideas) OR the batch-derived lookup
+    filterExtra: `OR(FIND("${clientId}", CONCATENATE({Brand Name})) > 0, FIND("${clientId}", CONCATENATE({Record ID (from Brand Name)})) > 0)`,
     sort: [{ field: 'Last Modified', direction: 'desc' }],
   })
 
@@ -1207,7 +1208,7 @@ function ExperimentIdeasTab({ clientId }: { clientId: string }) {
 
   const ideas = useMemo(() => (rawIdeas ?? []).map(r => {
     const f = r.fields as Record<string, unknown>
-    const goalsRaw = f['Primary Goals']
+    const goalsRaw = f['Category Primary Goals']
     const goals = Array.isArray(goalsRaw)
       ? (goalsRaw as string[])
       : typeof goalsRaw === 'string' && goalsRaw

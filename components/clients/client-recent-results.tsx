@@ -96,7 +96,7 @@ export function ClientRecentResults({ clientId }: { clientId?: string }) {
     : undefined
 
   const { data: experiments } = useAirtable('experiments', {
-    fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control ImageE', 'Variant ImageE', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
+    fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control Image', 'Variant Image', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
     filterExtra: clientFilter,
   })
 
@@ -124,8 +124,8 @@ export function ClientRecentResults({ clientId }: { clientId?: string }) {
         deployed: e.fields['Deployed'] === true,
         whatHappened: String(e.fields['Describe what happened & what we learned'] || ''),
         nextSteps: String(e.fields['Next Steps (Action)'] || ''),
-        controlImage: getImageUrl(e.fields['Control ImageE']),
-        variantImage: getImageUrl(e.fields['Variant ImageE']),
+        controlImage: getImageUrl(e.fields['Control Image']),
+        variantImage: getImageUrl(e.fields['Variant Image']),
         resultImage: getImageUrl(e.fields['PTA Result Image']),
         resultVideo: getImageUrl(e.fields['Post-Test Analysis (Loom)']),
       }))

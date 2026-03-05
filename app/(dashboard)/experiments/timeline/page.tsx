@@ -1,4 +1,4 @@
-import { ClientTimeline } from "@/components/clients/client-timeline"
+import { ExperimentsTimeline } from "@/components/experiments/experiments-timeline"
 
 export default function TimelinePage() {
   return (
@@ -8,11 +8,11 @@ export default function TimelinePage() {
           Timeline
         </h1>
         <p className="text-[13px] text-muted-foreground mt-0.5">
-          Visual production lifecycle. Track the linear progress of every experiment as it moves through each phase of development toward its scheduled launch date.
+          Visual production lifecycle. Track batches across clients, hover for details, and click any batch to explore its experiments.
         </p>
       </div>
 
-      <ClientTimeline />
+      <ExperimentsTimeline />
     </>
   )
 }

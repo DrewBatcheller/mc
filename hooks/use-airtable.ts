@@ -40,11 +40,19 @@ export interface UseAirtableResult<T> {
 }
 
 // ─── Fetcher ──────────────────────────────────────────────────────────────────
+class FetchError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function fetcher(url: string, headers: HeadersInit) {
   const res = await fetch(url, { headers })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `Request failed: ${res.status}`)
+    throw new FetchError(body.error ?? `Request failed: ${res.status}`, res.status)
   }
   return res.json()
 }
@@ -80,6 +88,14 @@ export function useAirtable<T = Record<string, unknown>>(
       revalidateOnFocus,
       revalidateOnReconnect: false,
       dedupingInterval: 60_000,   // suppress duplicate fetches for 60s
+      onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
+        // Don't retry on 4xx errors (bad filters, auth failures, etc.)
+        const status = (err as FetchError).status
+        if (status && status >= 400 && status < 500) return
+        // Retry transient errors up to 3 times with exponential backoff
+        if (retryCount >= 3) return
+        setTimeout(() => revalidate({ retryCount }), 5000 * 2 ** retryCount)
+      },
     }
   )
 

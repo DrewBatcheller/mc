@@ -431,7 +431,14 @@ export function ClientTracker() {
       await fetch(`/api/airtable/experiments/${convertExperimentModal.id}`, {
         method: 'PATCH',
         headers: authHeaders,
-        body: JSON.stringify({ fields: { 'Is Experiment': false, 'Batch': [] } }),
+        body: JSON.stringify({ fields: {
+          'Is Experiment': false,
+          'Batch': [],
+          'Strategist': [],
+          'Designer': [],
+          'Developer': [],
+          'QA': [],
+        } }),
       })
       await Promise.all([mutateExperiments(), mutateBatches()])
     } finally {
@@ -449,7 +456,14 @@ export function ClientTracker() {
           fetch(`/api/airtable/experiments/${exp.id}`, {
             method: 'PATCH',
             headers: authHeaders,
-            body: JSON.stringify({ fields: { 'Is Experiment': false, 'Batch': [] } }),
+            body: JSON.stringify({ fields: {
+              'Is Experiment': false,
+              'Batch': [],
+              'Strategist': [],
+              'Designer': [],
+              'Developer': [],
+              'QA': [],
+            } }),
           })
         )
       )

@@ -17,7 +17,7 @@ const DEFAULT_ROUTE: Record<UserRole, string> = {
   management: '/',
   strategy: '/experiments/dashboard',
   sales: '/sales/overview',
-  team: '/team/dashboard',
+  team: '/team',
   client: '/clients/client-dashboard',
 }
 

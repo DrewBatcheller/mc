@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SelectField } from '@/components/shared/select-field'
 import { useUser } from '@/contexts/UserContext'
 import { useToast } from '@/hooks/use-toast'
-import useSWR from 'swr'
+import { useAirtable } from '@/hooks/use-airtable'
 
 interface NewIdeaModalProps {
   isOpen: boolean
@@ -14,8 +14,14 @@ interface NewIdeaModalProps {
   onSuccess?: () => void
 }
 
+interface ClientOption {
+  id: string
+  name: string
+}
+
 interface FormData {
-  client: string
+  client: string       // record ID for linked field
+  clientName: string   // display name for UI
   title: string
   placementLabel: string
   placementUrl: string
@@ -42,8 +48,30 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
   const { toast } = useToast()
   const [showCountriesMenu, setShowCountriesMenu] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Fetch clients for the dropdown — this is an internal-only modal
+  const { data: clientRecords } = useAirtable('clients', {
+    fields: ['Brand Name'],
+    sort: [{ field: 'Brand Name', direction: 'asc' }],
+    enabled: isOpen,
+  })
+
+  const clientOptions = useMemo<ClientOption[]>(() => {
+    if (!clientRecords) return []
+    return clientRecords.map(r => ({
+      id: r.id,
+      name: String((r.fields as Record<string, unknown>)['Brand Name'] ?? ''),
+    })).filter(c => c.name)
+  }, [clientRecords])
+
+  const clientSelectOptions = useMemo(
+    () => ['Select a client...', ...clientOptions.map(c => c.name)],
+    [clientOptions]
+  )
+
   const [formData, setFormData] = useState<FormData>({
-    client: user?.brandName || '',
+    client: '',
+    clientName: '',
     title: '',
     placementLabel: '',
     placementUrl: '',
@@ -97,9 +125,10 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
     
     try {
       // Map form data to Airtable field names
+      // Brand Name is a linked record field — needs [recordId] format
       const airtableFields = {
         'Test Description': formData.title,
-        'Brand Name': formData.client,
+        'Brand Name': [formData.client],
         'Is Experiment': false,
         'Placement': formData.placementLabel,
         'Placement URL': formData.placementUrl,
@@ -119,6 +148,10 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-user-role': user?.role ?? '',
+          'x-user-id': user?.id ?? '',
+          'x-user-name': user?.name ?? '',
+          ...(user?.clientId ? { 'x-client-id': user.clientId } : {}),
         },
         body: JSON.stringify({ fields: airtableFields }),
       })
@@ -134,7 +167,8 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
       
       // Reset form
       setFormData({
-        client: user?.brandName || '',
+        client: user?.clientId || '',
+        clientName: user?.name || '',
         title: '',
         placementLabel: '',
         placementUrl: '',
@@ -194,10 +228,20 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
             <label className="text-sm font-medium text-foreground block mb-1">
               Client <span className="text-rose-600">*</span>
             </label>
-            <p className="text-[12px] text-muted-foreground mb-3">Your experiment ideas will be submitted for {user?.brandName}.</p>
-            <div className="px-3 py-2 border border-border rounded-lg bg-muted text-foreground text-sm">
-              {user?.brandName || 'Loading...'}
-            </div>
+            <p className="text-[12px] text-muted-foreground mb-3">Select which client this idea is for.</p>
+            <SelectField
+              value={formData.clientName || 'Select a client...'}
+              onChange={(name) => {
+                const match = clientOptions.find(c => c.name === name)
+                if (match) {
+                  handleChange('client', match.id)
+                  handleChange('clientName', match.name)
+                }
+              }}
+              options={clientSelectOptions}
+              containerClassName="w-full"
+              disabled={isSubmitting}
+            />
           </div>
 
           {/* Experiment Title */}

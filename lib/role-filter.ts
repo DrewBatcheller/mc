@@ -50,6 +50,11 @@ export function buildRoleFilter(
 ): string | null {
   const { role, userId, userName, clientId } = ctx
 
+  // Debug: log client context so we can verify headers arrive correctly
+  if (role === 'client') {
+    console.log(`[role-filter] resource=${resource} role=${role} clientId=${clientId ?? 'MISSING'} userName=${userName ?? 'MISSING'}`)
+  }
+
   switch (resource) {
     // ── Experiments ─────────────────────────────────────────────────────────
     // Active experiments only — {Is Experiment} must be checked (true).
@@ -57,19 +62,12 @@ export function buildRoleFilter(
     // and are served exclusively through the 'experiment-ideas' resource below.
     case 'experiments': {
       const isExp = `{Is Experiment} = TRUE()`
-      if (role === 'management') return isExp
-      if (role === 'strategy') return isExp
-      if (role === 'team' && userId) {
-        // Team members see experiments where they are assigned
-        return and(isExp, or(
-          containsId('Developer', userId),
-          containsId('Designer', userId),
-          containsId('Strategist', userId),
-          containsId('QA', userId)
-        ))
-      }
+      // Any role with Experiments section access sees all experiments.
+      // Section access is governed by the Permissions table, not per-user scoping.
+      if (role === 'management' || role === 'strategy' || role === 'team') return isExp
       if (role === 'client' && clientId) {
-        return and(isExp, `FIND("${clientId}", CONCATENATE({Brand Name})) > 0`)
+        // Clients are scoped to their own brand only.
+        return and(isExp, containsId('Record ID (from Brand Name)', clientId))
       }
       return null
     }
@@ -80,12 +78,15 @@ export function buildRoleFilter(
     case 'experiment-ideas': {
       const isIdea = `NOT({Is Experiment})`
       if (role === 'management' || role === 'strategy') return isIdea
-      if (role === 'team' && userId) {
-        return and(isIdea, containsId('Assigned To', userId))
+      if (role === 'team') {
+        // Ideas are pre-experiment — Developer/Designer/Strategist/QA fields are
+        // typically empty until an idea is promoted to an experiment.
+        // Team members see all ideas so they can review what's in the pipeline.
+        return isIdea
       }
       if (role === 'client' && clientId) {
-        // Brand Name is a linked record field; Airtable stores record IDs, so FIND matches the clientId
-        return and(isIdea, `FIND("${clientId}", CONCATENATE({Brand Name})) > 0`)
+        // {Record ID (from Brand Name)} is a lookup that stores the actual record ID.
+        return and(isIdea, containsId('Record ID (from Brand Name)', clientId))
       }
       return null
     }
@@ -113,11 +114,11 @@ export function buildRoleFilter(
 
     // ── Tasks ────────────────────────────────────────────────────────────────
     case 'tasks': {
+      // Section access is governed by the Permissions table.
+      // Per-user scoping (e.g. "my tasks") is handled by the component's filterExtra.
       if (role === 'management' || role === 'sales') return ''
       if (role === 'strategy') return ''
-      if (role === 'team' && userId) {
-        return eq('Assigned To (Record ID)', userId)
-      }
+      if (role === 'team') return ''
       if (role === 'client' && clientId) {
         return eq('Record ID (from Client)', clientId)
       }
@@ -181,10 +182,11 @@ export function buildRoleFilter(
 
     // ── Team ─────────────────────────────────────────────────────────────────
     case 'team': {
+      // All internal roles can fetch team records (needed for assignment dropdowns
+      // in experiments, task modals, etc.). Page-level access control prevents
+      // team members from reaching /management/team-directory.
       if (role === 'management' || role === 'strategy' || role === 'sales') return ''
-      if (role === 'team' && userId) {
-        return `RECORD_ID() = "${userId}"`
-      }
+      if (role === 'team') return ''
       return null
     }
 

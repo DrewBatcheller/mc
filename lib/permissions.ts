@@ -219,7 +219,7 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
       icon: 'UserCircle',
       label: 'Team',
       subItems: [
-        { label: 'My Dashboard', href: '/team/dashboard' },
+        { label: 'My Dashboard', href: '/team' },
         { label: 'Directory', href: '/team/directory' },
       ],
     },
@@ -240,7 +240,7 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
       icon: 'UserCircle',
       label: 'Team',
       subItems: [
-        { label: 'My Dashboard', href: '/team/dashboard' },
+        { label: 'My Dashboard', href: '/team' },
         { label: 'Schedule', href: '/team/schedule' },
         { label: 'Directory', href: '/team/directory' },
       ],
@@ -267,7 +267,7 @@ export const DEFAULT_ROUTE: Record<UserRole, string> = {
   management: '/',
   strategy: '/experiments/dashboard',
   sales: '/sales/overview',
-  team: '/team/dashboard',
+  team: '/team',
   client: '/clients/client-dashboard',
 }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, Fragment } from "react"
-import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Loader } from "lucide-react"
+import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Loader, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAirtable } from "@/hooks/use-airtable"
 import { NewIdeaModal } from "@/components/clients/new-idea-modal"
@@ -35,6 +35,7 @@ const columns: { key: SortKey | null; label: string }[] = [
   { key: "testDescription", label: "Test Description" },
   { key: "placement", label: "Placement" },
   { key: null, label: "Primary Goals" },
+  { key: null, label: "Sync" },
 ]
 
 export function ClientIdeasTable() {
@@ -228,6 +229,21 @@ export function ClientIdeasTable() {
                             ))}
                           </div>
                         </td>
+                        <td className="px-4 py-3.5 text-center align-middle">
+                          {!idea.isPending && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSyncIdea(idea)
+                                setSyncModalOpen(true)
+                              }}
+                              className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors inline-flex items-center justify-center"
+                              title="Sync idea to a batch"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          )}
+                        </td>
                       </tr>
 
                       {isExpanded && (
@@ -302,6 +318,11 @@ export function ClientIdeasTable() {
           onClose={() => {
             setSyncModalOpen(false)
             setSyncIdea(null)
+          }}
+          onSuccess={() => {
+            setSyncModalOpen(false)
+            setSyncIdea(null)
+            mutate()
           }}
           idea={syncIdea}
         />

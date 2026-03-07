@@ -1170,7 +1170,7 @@ function SubmitIdeasInner() {
                             title="Edit idea">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button type="button" onClick={() => syncIdeaToBatch(idea.id)}
+                          <button type="button" onClick={() => syncIdeaToBatch(idea.id, idea)}
                             disabled={syncingId === idea.id}
                             className="h-8 px-3 rounded-lg bg-sky-500 text-white text-[12px] font-medium hover:bg-sky-600 transition-colors disabled:opacity-50 flex items-center gap-1.5">
                             {syncingId === idea.id
@@ -1273,16 +1273,16 @@ function SubmitIdeasInner() {
                     .filter(([id]) => !serverExpIds.has(id))
                     .map(([id, idea]) => (
                     <div key={id}
-                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                      className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                            <p className="text-[13px] font-medium text-emerald-800 truncate">{idea.name}</p>
+                            <p className="text-[13px] font-medium text-neutral-800 truncate">{idea.name}</p>
                           </div>
                           <div className="flex items-center gap-2 mt-1 ml-[22px]">
                             {idea.placement && (
-                              <span className="text-[11px] text-emerald-600/70">{idea.placement}</span>
+                              <span className="text-[11px] text-neutral-400">{idea.placement}</span>
                             )}
                             {idea.goals.slice(0, 3).map(g => (
                               <span key={g} className={cn(
@@ -1294,7 +1294,7 @@ function SubmitIdeasInner() {
                         </div>
                         <button type="button" onClick={() => unsyncFromBatch(id)}
                           disabled={removingId === id}
-                          className="h-7 w-7 flex items-center justify-center rounded-lg text-emerald-600 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 shrink-0"
+                          className="h-7 w-7 flex items-center justify-center rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 shrink-0"
                           title="Remove from batch">
                           {removingId === id
                             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

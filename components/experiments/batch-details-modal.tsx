@@ -57,21 +57,29 @@ export function BatchDetailsModal({ isOpen, batch, onClose }: Props) {
     }
   }, [isOpen, onClose])
 
-  // Use record IDs from the batch's linked "Experiments Attached" field — Airtable returns
-  // linked record fields as arrays of record IDs, so we can filter directly by RECORD_ID().
+  // Try linked record IDs first; fall back to filtering experiments by their Batch field
   const rawExpIds = batch?.fields['Experiments Attached']
   const experimentIds: string[] = Array.isArray(rawExpIds) ? (rawExpIds as string[]) : []
+  const batchId = batch?.id ?? ''
 
-  const expFilter = experimentIds.length === 1
+  // Primary: filter by record IDs from linked field
+  const idFilter = experimentIds.length === 1
     ? `RECORD_ID() = "${experimentIds[0]}"`
     : experimentIds.length > 1
       ? `OR(${experimentIds.map(id => `RECORD_ID() = "${id}"`).join(', ')})`
       : undefined
 
+  // Fallback: find experiments whose Batch linked field contains this batch record ID
+  const batchRefFilter = !idFilter && batchId
+    ? `FIND("${batchId}", ARRAYJOIN({Batch})) > 0`
+    : undefined
+
+  const expFilter = idFilter ?? batchRefFilter
+
   const { data: experiments, isLoading: expsLoading } = useAirtable('experiments', {
     fields: ['Test Description', 'Test Status', 'Placement', 'Revenue Added (MRR)'],
     filterExtra: expFilter,
-    enabled: experimentIds.length > 0 && isOpen,
+    enabled: !!expFilter && isOpen,
   })
 
   if (!isOpen || !batch) return null

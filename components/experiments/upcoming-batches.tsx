@@ -19,17 +19,6 @@ function formatDateSafe(raw: string): string {
   return `${months[+m[2]-1]} ${+m[3]}, ${m[1]}`
 }
 
-const statusColors: Record<string, string> = {
-  Live:          "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "In Progress": "bg-sky-50 text-sky-700 border-sky-200",
-  Pending:       "bg-gray-100 text-gray-600 border-gray-200",
-  Complete:      "bg-violet-50 text-violet-700 border-violet-200",
-  Design:        "bg-sky-50 text-sky-700 border-sky-200",
-  Development:   "bg-violet-50 text-violet-700 border-violet-200",
-  QA:            "bg-amber-50 text-amber-700 border-amber-200",
-  Launch:        "bg-emerald-50 text-emerald-700 border-emerald-200",
-}
-
 function getDaysUntil(launchDate: string): string {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -95,13 +84,10 @@ export function UpcomingBatches({ onBatchClick, clientId }: Props) {
         ) : (
           (data ?? []).map(r => {
             const batchKey    = String(r.fields['Batch Key'] ?? '—')
-            const clientArr   = r.fields['Brand Name']
-            const client      = Array.isArray(clientArr) ? String(clientArr[0] ?? '') : String(clientArr ?? '')
             const launchRaw   = r.fields['Launch Date'] ? String(r.fields['Launch Date']) : null
             const launchDate  = launchRaw ? formatDateSafe(launchRaw) : '—'
             const daysUntil   = launchRaw ? getDaysUntil(launchRaw) : null
             const tests       = Array.isArray(r.fields['Linked Test Names']) ? r.fields['Linked Test Names'].length : 0
-            const allStatus   = r.fields['All Tests Status'] ? String(r.fields['All Tests Status']) : null
             const isClickable = !!onBatchClick
 
             const daysColor = daysUntil === 'Overdue'
@@ -128,21 +114,14 @@ export function UpcomingBatches({ onBatchClick, clientId }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold text-foreground truncate leading-tight">{batchKey}</p>
                   <p className="text-[12px] text-muted-foreground mt-0.5 truncate">
-                    {client}
-                    {tests > 0 && <span className="text-muted-foreground/60"> · {tests} test{tests !== 1 ? 's' : ''}</span>}
+                    {tests > 0 && <span>{tests} test{tests !== 1 ? 's' : ''}</span>}
+                    {tests > 0 && launchRaw && <span className="text-muted-foreground/60"> · </span>}
+                    {launchRaw && <span>{launchDate}</span>}
                   </p>
                 </div>
 
-                {/* Right side: status + days + chevron */}
+                {/* Right side: days + chevron */}
                 <div className="flex items-center gap-2 shrink-0">
-                  {allStatus && (
-                    <span className={cn(
-                      "text-[11px] font-medium px-2 py-0.5 rounded-full border hidden sm:inline-block",
-                      statusColors[allStatus] ?? "bg-gray-100 text-gray-600 border-gray-200"
-                    )}>
-                      {allStatus}
-                    </span>
-                  )}
                   {daysUntil && (
                     <span className={cn(
                       "text-[11px] font-semibold px-2 py-0.5 rounded-full border tabular-nums",

@@ -57,10 +57,10 @@ export function BatchDetailsModal({ isOpen, batch, onClose }: Props) {
     }
   }, [isOpen, onClose])
 
-  // Try linked record IDs first; fall back to filtering experiments by their Batch field
+  // Try linked record IDs first; fall back to matching by Batch Key (primary field)
   const rawExpIds = batch?.fields['Experiments Attached']
   const experimentIds: string[] = Array.isArray(rawExpIds) ? (rawExpIds as string[]) : []
-  const batchId = batch?.id ?? ''
+  const batchKey = String(batch?.fields['Batch Key'] ?? '')
 
   // Primary: filter by record IDs from linked field
   const idFilter = experimentIds.length === 1
@@ -69,12 +69,14 @@ export function BatchDetailsModal({ isOpen, batch, onClose }: Props) {
       ? `OR(${experimentIds.map(id => `RECORD_ID() = "${id}"`).join(', ')})`
       : undefined
 
-  // Fallback: find experiments whose Batch linked field contains this batch record ID
-  const batchRefFilter = !idFilter && batchId
-    ? `FIND("${batchId}", ARRAYJOIN({Batch})) > 0`
+  // Fallback: find experiments whose Batch linked field matches this batch's key.
+  // Airtable filterByFormula evaluates linked fields as primary field values (Batch Key),
+  // NOT record IDs — so we match on the display name.
+  const batchKeyFilter = !idFilter && batchKey
+    ? `{Batch} = "${batchKey.replace(/"/g, '\\"')}"`
     : undefined
 
-  const expFilter = idFilter ?? batchRefFilter
+  const expFilter = idFilter ?? batchKeyFilter
 
   const { data: experiments, isLoading: expsLoading } = useAirtable('experiments', {
     fields: ['Test Description', 'Test Status', 'Placement', 'Revenue Added (MRR)'],
@@ -85,7 +87,7 @@ export function BatchDetailsModal({ isOpen, batch, onClose }: Props) {
   if (!isOpen || !batch) return null
 
   const f = batch.fields
-  const batchKey   = String(f['Batch Key']   ?? 'Batch')
+  const batchKeyLabel = String(f['Batch Key'] ?? 'Batch')
   const clientArr  = f['Brand Name']
   const client     = Array.isArray(clientArr) ? String(clientArr[0] ?? '') : String(clientArr ?? '')
   const allStatus  = f['All Tests Status'] ? String(f['All Tests Status']) : null
@@ -113,7 +115,7 @@ export function BatchDetailsModal({ isOpen, batch, onClose }: Props) {
                 <FlaskConical className="h-4 w-4 text-sky-600" />
               </div>
               <div>
-                <h2 className="text-[15px] font-semibold text-foreground leading-tight">{batchKey}</h2>
+                <h2 className="text-[15px] font-semibold text-foreground leading-tight">{batchKeyLabel}</h2>
                 <p className="text-[13px] text-muted-foreground mt-0.5">{client}</p>
               </div>
             </div>

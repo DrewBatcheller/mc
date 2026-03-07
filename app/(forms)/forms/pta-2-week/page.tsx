@@ -373,10 +373,22 @@ function PTA2WeekInner() {
     enabled: experimentIds.length > 0 && !preview,
   })
 
-  // Fetch all variants for this batch
-  const variantFilter = batchId && !preview
-    ? `FIND("${batchId}", CONCATENATE({Batch Record ID (from Experiments)})) > 0`
-    : undefined
+  // Fetch all variants scoped to these experiments — match by experiment name
+  // (the proven pattern from live-tests.tsx; Airtable lookup fields in
+  // filterByFormula resolve to actual values, so name-matching works reliably)
+  const experimentNames = useMemo(
+    () => (rawExperiments ?? []).map(r => String((r.fields as Record<string, unknown>)['Test Description'] ?? '')).filter(Boolean),
+    [rawExperiments],
+  )
+
+  const variantFilter = useMemo(() => {
+    if (preview || experimentNames.length === 0) return undefined
+    const clauses = experimentNames.map(name => {
+      const safe = name.replace(/'/g, "\\'")
+      return `{Test Description (from Experiments)} = '${safe}'`
+    })
+    return clauses.length === 1 ? clauses[0] : `OR(${clauses.join(', ')})`
+  }, [experimentNames, preview])
 
   const { data: rawVariants, isLoading: variantsLoading } = useAirtable<Record<string, unknown>>('variants', {
     fields: [
@@ -387,7 +399,7 @@ function PTA2WeekInner() {
       'RPV', 'RPV Improvement %', 'RPV Improvement Confidence', 'AOV',
     ],
     filterExtra: variantFilter,
-    enabled: !!variantFilter,
+    enabled: !!variantFilter && !preview,
   })
 
   // ── Derived data ──────────────────────────────────────────────────────────

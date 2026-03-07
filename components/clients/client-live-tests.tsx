@@ -10,7 +10,13 @@ import { useAirtable } from "@/hooks/use-airtable"
 
 const parsePct = (v: unknown): number => {
   if (v === null || v === undefined || v === "") return 0
-  return parseFloat(String(v).replace(/%/g, "").trim()) || 0
+  const str = String(v)
+  const num = parseFloat(str.replace(/%/g, "").trim()) || 0
+  // If the string already had a % symbol, the number is already in percent form
+  if (str.includes("%")) return num
+  // Raw decimal from Airtable percent field — scale to whole percent
+  if (num > 0 && num <= 1) return Math.round(num * 100)
+  return num
 }
 
 const parseDollar = (v: unknown): number => {

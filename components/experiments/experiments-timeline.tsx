@@ -126,6 +126,19 @@ const STATUS_STYLES: Record<string, { bar: string; badge: string }> = {
 
 const DAY_MS = 86_400_000
 
+/** Add (or subtract) n business days from a date, skipping weekends. */
+function addBusinessDays(date: Date, n: number): Date {
+  const result = new Date(date)
+  const dir = n >= 0 ? 1 : -1
+  let remaining = Math.abs(n)
+  while (remaining > 0) {
+    result.setDate(result.getDate() + dir)
+    const dow = result.getDay()
+    if (dow !== 0 && dow !== 6) remaining--
+  }
+  return result
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function ExperimentsTimeline() {
@@ -299,17 +312,16 @@ export function ExperimentsTimeline() {
     return true
   }), [batches, clientFilter, search])
 
-  // ── Gantt: only batches whose date range overlaps the current window ───────
+  // ── Gantt: only batches whose full lifecycle overlaps the current window ────
+  // Full lifecycle: Strategy Ideas (launch − 12 biz days) → PTA end (launch + 14d + 2 biz days)
   const ganttBatches = useMemo(() => filtered.filter(b => {
     const launchD = parseIsoDate(b.launchDate)
-    const designD = parseIsoDate(b.designStartDate)
-    const bStart  = designD ?? launchD
-    const bEnd    = launchD
-    if (!bStart && !bEnd) return false
-    const s = (bStart ?? bEnd)!
-    const e = (bEnd   ?? bStart)!
-    // Overlaps window if: bStart <= windowEnd && bEnd >= windowStart
-    return s.getTime() <= windowEnd.getTime() && e.getTime() >= windowStart.getTime()
+    if (!launchD) return false
+    const strategyStart = addBusinessDays(launchD, -12)
+    const dataEnd       = new Date(launchD.getTime() + 14 * DAY_MS)
+    const ptaEnd        = addBusinessDays(dataEnd, 2)
+    // Overlaps window if: start <= windowEnd && end >= windowStart
+    return strategyStart.getTime() <= windowEnd.getTime() && ptaEnd.getTime() >= windowStart.getTime()
   }), [filtered, windowStartMs, windowDays]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Upcoming / past split for the batch card list ─────────────────────────
@@ -351,8 +363,17 @@ export function ExperimentsTimeline() {
 
               {/* Gantt header: legend + window controls */}
               <div className="px-5 py-3 border-b border-border flex items-center justify-between gap-4 flex-wrap">
-                {/* Legend */}
-                <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+                {/* Legend — phases + status colors */}
+                <div className="flex items-center gap-4 flex-wrap text-[11px] text-muted-foreground">
+                  {/* Phase segments legend */}
+                  <div className="flex items-center gap-1">
+                    <span className="h-2 w-4 rounded-sm inline-block bg-sky-500/50" />
+                    <span className="h-2 w-4 rounded-sm inline-block bg-sky-500" />
+                    <span className="h-2 w-4 rounded-sm inline-block bg-sky-500/35" />
+                    <span className="ml-1">Strategy · Live · PTA</span>
+                  </div>
+                  <span className="text-border">|</span>
+                  {/* Status colors */}
                   {[
                     ['bg-emerald-500', 'Successful'],
                     ['bg-rose-400',   'Unsuccessful'],
@@ -466,22 +487,25 @@ export function ExperimentsTimeline() {
                     </div>
                   ) : (
                     ganttBatches.map(batch => {
-                      const launchD  = parseIsoDate(batch.launchDate)
-                      const designD  = parseIsoDate(batch.designStartDate)
-                      // If no Design Start Date, treat launch date as a point event (1-day bar)
-                      const startD   = designD ?? launchD
-                      const endD     = launchD
+                      const launchD = parseIsoDate(batch.launchDate)
+                      if (!launchD) return null
 
-                      // Clamp both endpoints to window
-                      const leftPct = startD
-                        ? Math.max(0, (startD.getTime() - windowStart.getTime()) / totalMs * 100)
-                        : 0
-                      const rightPct = endD
-                        ? Math.min(100, (endD.getTime() - windowStart.getTime()) / totalMs * 100)
-                        : leftPct
-                      // Ensure a minimum visual width so point-events are tappable
-                      const widthPct  = Math.max(1, rightPct - leftPct)
-                      const isPoint   = !designD && !!launchD  // launch-only event → pill dot
+                      // Full lifecycle dates
+                      const strategyStart = addBusinessDays(launchD, -12)
+                      const dataEnd       = new Date(launchD.getTime() + 14 * DAY_MS)
+                      const ptaEnd        = addBusinessDays(dataEnd, 2)
+
+                      // Overall bar position (clamped to window)
+                      const leftPct  = Math.max(0, (strategyStart.getTime() - windowStart.getTime()) / totalMs * 100)
+                      const rightPct = Math.min(100, (ptaEnd.getTime() - windowStart.getTime()) / totalMs * 100)
+                      const widthPct = Math.max(1, rightPct - leftPct)
+
+                      // Phase proportions within the bar
+                      const totalBarMs = ptaEnd.getTime() - strategyStart.getTime()
+                      const preLaunchFrac  = totalBarMs > 0 ? (launchD.getTime() - strategyStart.getTime()) / totalBarMs : 0
+                      const dataCollFrac   = totalBarMs > 0 ? (dataEnd.getTime() - launchD.getTime()) / totalBarMs : 0
+                      // ptaFrac = remainder
+
                       const status    = dominantStatus(batch.allTestsStatus)
                       const style     = STATUS_STYLES[status] ?? STATUS_STYLES.Unknown
                       const isExpanded = expandedBatch === batch.id
@@ -526,27 +550,31 @@ export function ExperimentsTimeline() {
                                 style={{ left: `${todayPct}%` }}
                               />
                             )}
-                            {/* Batch bar / point marker */}
-                            {(startD || endD) && (
+                            {/* Phased lifecycle bar */}
+                            <div
+                              className="absolute z-20 h-6 rounded-md overflow-hidden flex group-hover:h-7 group-hover:shadow-md transition-all duration-150"
+                              style={{ left: `${leftPct}%`, width: `${widthPct}%`, minWidth: '8px' }}
+                            >
+                              {/* Pre-launch: Strategy Ideas → Launch (lighter) */}
                               <div
-                                className={cn(
-                                  "absolute z-20 flex items-center justify-center transition-all duration-150",
-                                  isPoint
-                                    // Point event (no design date): round pill dot
-                                    ? cn("h-4 w-4 rounded-full group-hover:scale-125 shadow-sm", style.bar)
-                                    // Full bar
-                                    : cn("h-6 rounded-md px-2 overflow-hidden group-hover:h-7 group-hover:shadow-md", style.bar)
-                                )}
-                                style={isPoint
-                                  ? { left: `calc(${leftPct}% - 8px)` }
-                                  : { left: `${leftPct}%`, width: `${widthPct}%`, minWidth: '8px' }
-                                }
-                              >
-                                {!isPoint && (
-                                  <span className="text-[10px] font-medium text-white truncate">{batch.batchKey}</span>
-                                )}
-                              </div>
-                            )}
+                                className={cn("h-full opacity-50", style.bar)}
+                                style={{ width: `${preLaunchFrac * 100}%` }}
+                              />
+                              {/* Data Collection: Launch → Launch + 2 weeks (full color) */}
+                              <div
+                                className={cn("h-full", style.bar)}
+                                style={{ width: `${dataCollFrac * 100}%` }}
+                              />
+                              {/* PTA Post-Analysis: remaining (muted) */}
+                              <div
+                                className={cn("h-full opacity-35", style.bar)}
+                                style={{ flex: 1 }}
+                              />
+                              {/* Batch key label overlaid */}
+                              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white truncate px-2 pointer-events-none">
+                                {batch.batchKey}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )
@@ -649,6 +677,14 @@ function TooltipCard({ batch, x, y }: { batch: Batch; x: number; y: number }) {
   const left   = Math.min(x + 16, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 296)
   const top    = Math.max(8, y - 140)
 
+  // Compute lifecycle dates for tooltip
+  const launchD = parseIsoDate(batch.launchDate)
+  const strategyStart = launchD ? addBusinessDays(launchD, -12) : null
+  const dataEnd       = launchD ? new Date(launchD.getTime() + 14 * DAY_MS) : null
+  const ptaEnd        = dataEnd ? addBusinessDays(dataEnd, 2) : null
+
+  const fmtD = (d: Date | null) => d ? `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : '—'
+
   return (
     <div
       className="fixed z-50 pointer-events-none bg-popover border border-border rounded-xl shadow-xl p-3.5 w-72"
@@ -663,12 +699,10 @@ function TooltipCard({ batch, x, y }: { batch: Batch; x: number; y: number }) {
         </span>
       </div>
       <div className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-        {batch.designStartDate && (
-          <span>Design Start: <span className="text-foreground">{formatDate(batch.designStartDate)}</span></span>
-        )}
-        {batch.launchDate && (
-          <span>Launch: <span className="text-foreground">{formatDate(batch.launchDate)}</span></span>
-        )}
+        <span>Strategy Start: <span className="text-foreground">{fmtD(strategyStart)}</span></span>
+        <span>Launch: <span className="text-foreground">{formatDate(batch.launchDate)}</span></span>
+        <span>Data Collection Ends: <span className="text-foreground">{fmtD(dataEnd)}</span></span>
+        <span>PTA Complete: <span className="text-foreground">{fmtD(ptaEnd)}</span></span>
         {batch.revenue > 0 && (
           <span className="text-emerald-600 font-medium">MRR Added: {formatRevenue(batch.revenue)}</span>
         )}
@@ -730,7 +764,6 @@ function BatchCard({
           </div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[11px] text-muted-foreground">
             <span>{batch.client}</span>
-            {batch.designStartDate && <span>• Design: {formatDate(batch.designStartDate)}</span>}
             {batch.launchDate && <span>• Launch: {formatDate(batch.launchDate)}</span>}
             <span>• {batch.experimentIds.length} test{batch.experimentIds.length !== 1 ? 's' : ''}</span>
           </div>

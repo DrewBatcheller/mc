@@ -6,9 +6,17 @@ import { useState, useMemo } from "react"
 import { SelectField } from "@/components/shared/select-field"
 import { useAirtable } from "@/hooks/use-airtable"
 
-// Variants table stores Traffic % as e.g. "25%" — strip the symbol before parsing
-const parsePct = (v: unknown): number =>
-  parseFloat(String(v ?? '').replace(/%/g, '').trim()) || 0
+// Airtable percent fields return raw decimals (0.5 = 50%); scale up when needed
+const parsePct = (v: unknown): number => {
+  if (v == null || v === '') return 0
+  const str = String(v)
+  const num = parseFloat(str.replace(/%/g, '').trim()) || 0
+  // If the string already had a % symbol, the number is already in percent form
+  if (str.includes('%')) return num
+  // Raw decimal from Airtable percent field — scale to whole percent
+  if (num > 0 && num <= 1) return Math.round(num * 100)
+  return num
+}
 
 export function LiveTests() {
   const [search, setSearch] = useState("")

@@ -70,7 +70,7 @@ interface AirtableExp {
   devBrief: string
   figmaUrl: string
   walkthroughUrl: string
-  clientApproval: boolean | null
+  feedbackStatus: string | null
   convertId: string
 }
 
@@ -188,7 +188,7 @@ export function TaskModal({ task, onClose }: TaskModalProps) {
       fields: [
         "Test Description", "Placement", "Placement URL", "Devices", "Media/Links",
         "Design Brief", "Development Brief", "FIGMA Url", "Walkthrough Video URL",
-        "Client Approval", "Convert Experiment ID", "Batch Record ID",
+        "Feedback Status", "Convert Experiment ID", "Batch Record ID",
       ],
       filterExtra,
       enabled: !!task.batchRecordId,
@@ -227,8 +227,8 @@ export function TaskModal({ task, onClose }: TaskModalProps) {
         devBrief: (f["Development Brief"] as string) ?? "",
         figmaUrl: (f["FIGMA Url"] as string) ?? "",
         walkthroughUrl: (f["Walkthrough Video URL"] as string) ?? "",
-        clientApproval:
-          typeof f["Client Approval"] === "boolean" ? (f["Client Approval"] as boolean) : null,
+        feedbackStatus:
+          typeof f["Feedback Status"] === "string" ? (f["Feedback Status"] as string) : null,
         convertId: (f["Convert Experiment ID"] as string) ?? "",
       }
     })
@@ -366,7 +366,7 @@ export function TaskModal({ task, onClose }: TaskModalProps) {
     setQAState(prev => ({ ...prev, [exp.id]: { ...state, saving: true } }))
     try {
       const fields: Record<string, unknown> = {
-        "Client Approval": state.result === "pass",
+        "Feedback Status": state.result === "pass" ? "QA Approved" : "QA Rejected",
       }
       if (state.result === "fail" && state.reportUrl) {
         fields["Walkthrough Video URL"] = state.reportUrl

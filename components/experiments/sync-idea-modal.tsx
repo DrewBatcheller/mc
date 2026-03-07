@@ -331,7 +331,6 @@ export function SyncIdeaModal({ isOpen, onClose, onSuccess, idea }: SyncIdeaModa
     setIsSubmitting(true)
     try {
       const fields: Record<string, unknown> = {
-        'Is Experiment': true,
         'Batch': [selectedBatchId],
       }
       if (strategistId) fields['Strategist'] = [strategistId]

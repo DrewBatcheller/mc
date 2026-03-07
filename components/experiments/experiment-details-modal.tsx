@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { X, ExternalLink, Check, Play, MapPin, Monitor, Globe, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/contexts/UserContext"
+import { NotesPanel } from "@/components/shared/notes-panel"
 
 // ─── Safe date formatter ───────────────────────────────────────────────────────
 // Airtable stores date-only fields as midnight UTC ("2025-03-15T00:00:00.000Z").
@@ -76,6 +78,7 @@ function Shimmer({ className }: { className?: string }) {
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface Experiment {
+  id?: string
   name: string
   description: string
   status: string
@@ -98,6 +101,7 @@ interface Experiment {
   controlImage?: string
   variantImage?: string
   resultImage?: string
+  noteIds?: string[]
   resultVideo?: string
   variantData?: {
     name: string
@@ -135,8 +139,23 @@ export function ExperimentDetailsModal({
   onClose: () => void
   isLoadingDetails?: boolean
 }) {
+  const { user } = useUser()
+  const [activeTab, setActiveTab] = useState<"details" | "notes">("details")
+
+  const authHeaders: Record<string, string> = user
+    ? {
+        "Content-Type": "application/json",
+        "x-user-role": user.role,
+        "x-user-id": user.id,
+        "x-user-name": user.name,
+        ...(user.clientId ? { "x-client-id": user.clientId } : {}),
+      }
+    : { "Content-Type": "application/json" }
+
   useEffect(() => {
     if (!isOpen) return
+    // Reset to details tab when modal opens
+    setActiveTab("details")
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
     }
@@ -206,9 +225,50 @@ export function ExperimentDetailsModal({
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>
+
+          {/* Tab bar */}
+          {(
+            <div className="flex gap-1 mt-3 -mb-4 border-b border-border -mx-6 px-6">
+              <button
+                onClick={() => setActiveTab("details")}
+                className={cn(
+                  "pb-2 px-3 text-[12px] font-medium border-b-2 transition-colors",
+                  activeTab === "details"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Details
+              </button>
+              <button
+                onClick={() => setActiveTab("notes")}
+                className={cn(
+                  "pb-2 px-3 text-[12px] font-medium border-b-2 transition-colors",
+                  activeTab === "notes"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Notes
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Body ────────────────────────────────────────────────────────────── */}
+        {activeTab === "notes" && experiment.id ? (
+          <div className="px-6 py-5 flex-1 overflow-y-auto">
+            <NotesPanel
+              linkedField="Experiments"
+              linkedRecordId={experiment.id}
+              authHeaders={authHeaders}
+              placeholder="Write a note about this experiment…"
+              noteIds={experiment.noteIds}
+              mode={user?.role === "client" ? "read-only" : "full"}
+              showVisibilityToggle={user?.role !== "client"}
+            />
+          </div>
+        ) : (
         <div className="px-6 py-5 flex flex-col gap-6">
 
           {/* ① Dates — very top, before everything else */}
@@ -516,6 +576,7 @@ export function ExperimentDetailsModal({
           )}
 
         </div>
+        )}
       </div>
     </div>
   )

@@ -91,7 +91,7 @@ export function RevenueDetailsTable({
 
   // Fetch active clients for dropdown — keep filterByFormula, drop fields[]
   const { data: rawClients } = useAirtable('clients', {
-    filterByFormula: "{Client Status}='Active'",
+    filterExtra: "{Client Status}='Active'",
   })
 
   // { id, name } pairs for the client dropdown

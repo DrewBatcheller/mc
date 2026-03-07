@@ -24,6 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { listRecords, listAllRecords, AirtableError, createRecord } from '@/lib/airtable'
 import { buildRoleFilter, extractQueryContext } from '@/lib/role-filter'
 import { getOrSet, cacheKey, invalidatePattern, TTL } from '@/lib/cache'
@@ -103,11 +104,17 @@ export async function GET(
     // ── Cache ────────────────────────────────────────────────────────────────
     const noCache = searchParams.get('noCache') === 'true'
     const fieldsSuffix = fields.length > 0 ? fields.slice().sort().join(',') : ''
+    // Hash the full filter formula to avoid cache collisions.
+    // Previously we truncated to 50 chars, which caused RECORD_ID() filters
+    // with overlapping prefixes to share cache entries and return stale results.
+    const filterHash = filterByFormula
+      ? createHash('md5').update(filterByFormula).digest('hex').slice(0, 16)
+      : ''
     const key = cacheKey(
       resource,
       ctx.role,
       ctx.clientId ?? ctx.userId,
-      [filterByFormula?.slice(0, 50), fieldsSuffix].filter(Boolean).join('|') || undefined
+      [filterHash, fieldsSuffix].filter(Boolean).join('|') || undefined
     )
 
     // Auto-paginate when no maxRecords cap — returns all matching records
@@ -160,10 +167,11 @@ export async function POST(
     //   notifications     → management, strategy, sales, team  (for task assignment notifications)
     //   everything else   → management, strategy only
     const canCreateIdeas         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'client')
-    const canCreateNotes         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team')
+    const canCreateNotes         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team' || ctx.role === 'client')
     const canCreateTasks         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales')
     const canCreateLeads         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales')
     const canCreateNotifications = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team')
+    const canCreateDelays        = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team')
     const canCreateOthers        = (ctx.role === 'management' || ctx.role === 'strategy')
 
     if (resource === 'experiment-ideas') {
@@ -186,6 +194,10 @@ export async function POST(
       if (!canCreateNotifications) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
+    } else if (resource === 'delays') {
+      if (!canCreateDelays) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     } else {
       if (!canCreateOthers) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -201,10 +213,9 @@ export async function POST(
     let fields = body.fields ?? body
 
     // For clients creating experiment ideas, enforce client data isolation.
-    // Ideas live in the Experiments table with Is Experiment unchecked (false).
+    // Ideas are records with no Batch — the absence of a Batch makes them ideas.
     if (resource === 'experiment-ideas' && ctx.role === 'client' && ctx.clientId) {
       fields['Brand Name'] = [ctx.clientId]
-      fields['Is Experiment'] = false
     }
 
     const { createRecord: createRecordFn } = await import('@/lib/airtable')

@@ -12,6 +12,7 @@ interface SectionPermissions {
   management: boolean
   team: boolean
   affiliates: boolean
+  forms: boolean
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
@@ -24,6 +25,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: true,
     team: false,
     affiliates: true,
+    forms: true,
   },
   strategy: {
     finances: false,
@@ -34,6 +36,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: true,
     team: false,
     affiliates: true,
+    forms: false,
   },
   sales: {
     finances: false,
@@ -44,6 +47,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: false,
     team: true,
     affiliates: false,
+    forms: false,
   },
   team: {
     finances: false,
@@ -54,6 +58,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: false,
     team: true,
     affiliates: false,
+    forms: false,
   },
   client: {
     finances: false,
@@ -64,6 +69,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: false,
     team: false,
     affiliates: false,
+    forms: false,
   },
 }
 
@@ -145,6 +151,7 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
         { label: 'Team Directory', href: '/management/team-directory' },
         { label: 'Team Dashboard', href: '/management/team-dashboard' },
         { label: 'Schedule', href: '/management/schedule' },
+        { label: 'Forms Directory', href: '/management/forms' },
       ],
     },
     { icon: 'Handshake', label: 'Affiliates', href: '/affiliates' },
@@ -281,10 +288,11 @@ export const ACCESSIBLE_PREFIXES: Record<UserRole, string[]> = {
     '/clients',
     '/affiliates',
     '/management',
+    '/forms',
   ],
-  sales: ['/sales', '/team'],
-  team: ['/experiments', '/team'],
-  client: ['/clients/client-dashboard', '/clients/client-ideas', '/clients/experiments-overview', '/clients/client-live-tests', '/clients/client-results'],
+  sales: ['/sales', '/team', '/forms'],
+  team: ['/experiments', '/team', '/forms'],
+  client: ['/clients/client-dashboard', '/clients/client-ideas', '/clients/experiments-overview', '/clients/client-live-tests', '/clients/client-results', '/forms'],
 }
 
 export function canAccessRoute(role: UserRole, pathname: string): boolean {

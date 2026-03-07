@@ -129,7 +129,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess }: NewIdeaModalProps) 
       const airtableFields = {
         'Test Description': formData.title,
         'Brand Name': [formData.client],
-        'Is Experiment': false,
         'Placement': formData.placementLabel,
         'Placement URL': formData.placementUrl,
         'Hypothesis': formData.hypothesis,

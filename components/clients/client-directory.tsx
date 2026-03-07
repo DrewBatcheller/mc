@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Search, Plus, Pencil, Trash2, FileText, ChevronUp, ChevronDown, X, ExternalLink } from "lucide-react"
 import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
 import { ResultsGrid } from "@/components/experiments/results-grid"
+import { NotesPanel } from "@/components/shared/notes-panel"
 import { cn } from "@/lib/utils"
 import { MetricCard } from "@/components/shared/metric-card"
 import { ContentCard } from "@/components/shared/content-card"
@@ -52,19 +53,14 @@ interface Client {
 interface Contact {
   id: string
   clientId: string
-  fullName: string
+  firstName: string
+  lastName: string
   email: string
   userType: "Main Point of Contact" | "C-Suite" | "Management" | "Finance" | "Marketing" | "Legal" | "Contractor"
   slackMemberId: string
   companySlackChannelId: string
   receiveNotifications: boolean
   callRecords: number
-}
-
-interface Note {
-  id: string
-  note: string
-  createdTime: string
 }
 
 /* ── Helpers ── */
@@ -613,178 +609,14 @@ function DetailField({ label, value }: { label: string; value: string | React.Re
 
 /* ── Notes Section (inside Client Details) ── */
 function NotesSection({ clientId, authHeaders }: { clientId: string; authHeaders: HeadersInit }) {
-  const { data: rawNotes, mutate } = useAirtable<Record<string, unknown>>('notes', {
-    filterExtra: `FIND("${clientId}", CONCATENATE({Client})) > 0`,
-    sort: [{ field: 'Created Time', direction: 'desc' }],
-  })
-
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
-  const [optimisticNotes, setOptimisticNotes] = useState<Note[]>([])
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState("")
-  const [newNote, setNewNote] = useState("")
-  const [isAdding, setIsAdding] = useState(false)
-
-  const notes = useMemo<Note[]>(() => {
-    const fetched = (rawNotes ?? [])
-      .filter(r => !deletedIds.has(r.id))
-      .map(r => ({
-        id: r.id,
-        note: (r.fields['Note'] as string) ?? '',
-        createdTime: r.createdTime ?? (r.fields['Created Time'] as string) ?? '',
-      }))
-    return [...optimisticNotes, ...fetched.filter(n => !optimisticNotes.find(o => o.id === n.id))]
-  }, [rawNotes, deletedIds, optimisticNotes])
-
-  const formatDate = (ts: string) => {
-    if (!ts) return ''
-    try { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
-    catch { return ts }
-  }
-
-  const handleAdd = async () => {
-    const text = newNote.trim()
-    if (!text) return
-    const tempId = `temp_${Date.now()}`
-    const optimistic: Note = { id: tempId, note: text, createdTime: new Date().toISOString() }
-    setOptimisticNotes(prev => [optimistic, ...prev])
-    setNewNote("")
-    setIsAdding(false)
-    try {
-      await fetch('/api/airtable/notes', {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({ fields: { 'Note': text, 'Client': [clientId] } }),
-      })
-      setOptimisticNotes(prev => prev.filter(n => n.id !== tempId))
-      mutate()
-    } catch {
-      setOptimisticNotes(prev => prev.filter(n => n.id !== tempId))
-    }
-  }
-
-  const handleEdit = async (note: Note) => {
-    const text = editText.trim()
-    if (!text || text === note.note) { setEditingId(null); return }
-    setEditingId(null)
-    try {
-      await fetch(`/api/airtable/notes/${note.id}`, {
-        method: 'PATCH',
-        headers: authHeaders,
-        body: JSON.stringify({ fields: { 'Note': text } }),
-      })
-      mutate()
-    } catch { mutate() }
-  }
-
-  const handleDelete = async (noteId: string) => {
-    setDeletedIds(prev => new Set([...prev, noteId]))
-    try {
-      await fetch(`/api/airtable/notes/${noteId}`, { method: 'DELETE', headers: authHeaders })
-      mutate()
-      setDeletedIds(prev => { const s = new Set(prev); s.delete(noteId); return s })
-    } catch {
-      setDeletedIds(prev => { const s = new Set(prev); s.delete(noteId); return s })
-    }
-  }
-
   return (
     <CollapsibleSection title="Notes">
-      <div className="flex flex-col gap-3">
-        {/* Add note toggle */}
-        {!isAdding ? (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="flex items-center gap-1.5 text-[12px] font-medium text-sky-600 hover:text-sky-700 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Note
-          </button>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <textarea
-              autoFocus
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Write a note about this client…"
-              className="w-full min-h-[80px] px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-            />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleAdd}
-                disabled={!newNote.trim()}
-                className="h-7 px-3 rounded-lg bg-foreground text-background text-[12px] font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => { setIsAdding(false); setNewNote("") }}
-                className="h-7 px-3 rounded-lg border border-border text-[12px] font-medium hover:bg-accent transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Notes list */}
-        {notes.length === 0 && !isAdding && (
-          <p className="text-[13px] text-muted-foreground/60">No notes yet</p>
-        )}
-        {notes.map((note) => (
-          <div key={note.id} className="group flex flex-col gap-1 p-3 rounded-lg bg-background border border-border">
-            {editingId === note.id ? (
-              <div className="flex flex-col gap-2">
-                <textarea
-                  autoFocus
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className="w-full min-h-[60px] px-2 py-1 rounded-md border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(note)}
-                    className="h-6 px-2.5 rounded-md bg-foreground text-background text-[11px] font-medium hover:opacity-90"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="h-6 px-2.5 rounded-md border border-border text-[11px] font-medium hover:bg-accent"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-[13px] text-foreground whitespace-pre-wrap flex-1">{note.note}</p>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <button
-                      onClick={() => { setEditingId(note.id); setEditText(note.note) }}
-                      className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-accent transition-colors"
-                      title="Edit note"
-                    >
-                      <Pencil className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(note.id)}
-                      className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-destructive/10 transition-colors"
-                      title="Delete note"
-                    >
-                      <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                    </button>
-                  </div>
-                </div>
-                {note.createdTime && (
-                  <p className="text-[11px] text-muted-foreground">{formatDate(note.createdTime)}</p>
-                )}
-              </>
-            )}
-          </div>
-        ))}
-      </div>
+      <NotesPanel
+        linkedField="Client"
+        linkedRecordId={clientId}
+        authHeaders={authHeaders}
+        placeholder="Write a note about this client…"
+      />
     </CollapsibleSection>
   )
 }
@@ -822,7 +654,8 @@ function ContactsTab({
         return {
           id: r.id,
           clientId,
-          fullName: (f['Full Name'] as string) ?? '',
+          firstName: (f['First Name'] as string) ?? '',
+          lastName: (f['Last Name'] as string) ?? '',
           email: (f['User Email'] as string) ?? '',
           userType: ((f['User Type'] as string) ?? 'Main Point of Contact') as Contact['userType'],
           slackMemberId: (f['User Slack Member ID'] as string) ?? '',
@@ -862,7 +695,8 @@ function ContactsTab({
           headers: authHeaders,
           body: JSON.stringify({
             fields: {
-              'Full Name': data.fullName,
+              'First Name': data.firstName,
+              'Last Name': data.lastName,
               'User Email': data.email,
               'User Type': data.userType,
               'User Slack Member ID': data.slackMemberId,
@@ -884,7 +718,8 @@ function ContactsTab({
           headers: authHeaders,
           body: JSON.stringify({
             fields: {
-              'Full Name': data.fullName,
+              'First Name': data.firstName,
+              'Last Name': data.lastName,
               'User Email': data.email,
               'User Type': data.userType,
               'User Slack Member ID': data.slackMemberId,
@@ -942,7 +777,7 @@ function ContactsTab({
             <tbody>
               {contacts.map((contact) => (
                 <tr key={contact.id} className="border-b last:border-0 border-border hover:bg-accent/30">
-                  <td className="px-4 py-3 font-medium text-foreground">{contact.fullName}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{[contact.firstName, contact.lastName].filter(Boolean).join(' ')}</td>
                   <td className="px-4 py-3 text-muted-foreground">{contact.email || "—"}</td>
                   <td className="px-4 py-3">
                     <span className="text-[11px] font-medium px-2 py-0.5 rounded-md border border-border bg-accent text-foreground">
@@ -1000,7 +835,7 @@ function ContactsTab({
           <div className="bg-card border border-border rounded-xl shadow-xl p-6 max-w-sm w-full flex flex-col gap-4">
             <h3 className="text-[15px] font-semibold text-foreground">Delete Contact?</h3>
             <p className="text-[13px] text-muted-foreground">
-              Are you sure you want to delete <span className="font-medium text-foreground">{deletingContact.fullName}</span>? This action cannot be undone.
+              Are you sure you want to delete <span className="font-medium text-foreground">{[deletingContact.firstName, deletingContact.lastName].filter(Boolean).join(' ')}</span>? This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -1044,7 +879,8 @@ function ContactModal({
       ? { ...contact }
       : {
           clientId,
-          fullName: "",
+          firstName: "",
+          lastName: "",
           email: "",
           userType: "Main Point of Contact",
           slackMemberId: "",
@@ -1055,7 +891,7 @@ function ContactModal({
   )
 
   const handleSubmit = () => {
-    if (formData.fullName) {
+    if (formData.firstName) {
       onSave(formData, contact?.id)
     }
   }
@@ -1075,15 +911,27 @@ function ContactModal({
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-medium text-muted-foreground mb-1">Full Name <span className="text-destructive">*</span></label>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">First Name <span className="text-destructive">*</span></label>
               <input
                 type="text"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="John Doe"
+                placeholder="John"
               />
             </div>
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">Last Name</label>
+              <input
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Doe"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-medium text-muted-foreground mb-1">Email</label>
               <input
@@ -1111,7 +959,7 @@ function ContactModal({
               <SelectField
                 value={formData.userType}
                 onChange={(v) => setFormData({ ...formData, userType: v as Contact['userType'] })}
-                options={userTypeOptions}
+                options={[...userTypeOptions]}
                 containerClassName="w-full"
                 className="w-full"
               />
@@ -1161,10 +1009,10 @@ function ContactModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!formData.fullName}
+            disabled={!formData.firstName}
             className={cn(
               "px-4 py-1.5 text-[13px] font-medium rounded-lg transition-opacity",
-              formData.fullName
+              formData.firstName
                 ? "bg-foreground text-background hover:opacity-90"
                 : "bg-foreground/30 text-background cursor-not-allowed"
             )}
@@ -1528,7 +1376,7 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
   )
 }
 
-function StatCard({ label, value, small }: { label: string; value: string | number | React.ReactNode; small?: boolean }) {
+function StatCard({ label, value, small }: { label: string; value: string | number; small?: boolean }) {
   return (
     <MetricCard
       label={label}

@@ -57,36 +57,35 @@ export function buildRoleFilter(
 
   switch (resource) {
     // ── Experiments ─────────────────────────────────────────────────────────
-    // Active experiments only — {Is Experiment} must be checked (true).
-    // Unsynced ideas live in the same table but have {Is Experiment} unchecked,
-    // and are served exclusively through the 'experiment-ideas' resource below.
+    // Experiments are records that have a Batch linked.
+    // Unsynced ideas (no Batch) are served through 'experiment-ideas' below.
     case 'experiments': {
-      const isExp = `{Is Experiment} = TRUE()`
+      const hasBatch = `{Batch} != ""`
       // Any role with Experiments section access sees all experiments.
       // Section access is governed by the Permissions table, not per-user scoping.
-      if (role === 'management' || role === 'strategy' || role === 'team') return isExp
+      if (role === 'management' || role === 'strategy' || role === 'team') return hasBatch
       if (role === 'client' && clientId) {
         // Clients are scoped to their own brand only.
-        return and(isExp, containsId('Record ID (from Brand Name)', clientId))
+        return and(hasBatch, containsId('Record ID (from Brand Name)', clientId))
       }
       return null
     }
 
     // ── Experiment Ideas ─────────────────────────────────────────────────────
-    // Ideas live in the Experiments table with {Is Experiment} unchecked.
+    // Ideas are records with no Batch linked — they haven't been synced yet.
     // This resource slug maps to the Experiments table (see lib/types.ts).
     case 'experiment-ideas': {
-      const isIdea = `NOT({Is Experiment})`
-      if (role === 'management' || role === 'strategy') return isIdea
+      const noBatch = `{Batch} = ""`
+      if (role === 'management' || role === 'strategy') return noBatch
       if (role === 'team') {
         // Ideas are pre-experiment — Developer/Designer/Strategist/QA fields are
         // typically empty until an idea is promoted to an experiment.
         // Team members see all ideas so they can review what's in the pipeline.
-        return isIdea
+        return noBatch
       }
       if (role === 'client' && clientId) {
         // {Record ID (from Brand Name)} is a lookup that stores the actual record ID.
-        return and(isIdea, containsId('Record ID (from Brand Name)', clientId))
+        return and(noBatch, containsId('Record ID (from Brand Name)', clientId))
       }
       return null
     }
@@ -216,7 +215,17 @@ export function buildRoleFilter(
 
     // ── Notes ─────────────────────────────────────────────────────────────────
     case 'notes': {
-      // All internal staff can create and manage notes; clients cannot
+      // All internal staff can create and manage notes; clients can leave feedback on review forms
+      if (role === 'management' || role === 'strategy' || role === 'sales' || role === 'team') return ''
+      if (role === 'client' && clientId) {
+        return eq('Record ID (from Client)', clientId)
+      }
+      return null
+    }
+
+    // ── Delays ───────────────────────────────────────────────────────────────
+    case 'delays': {
+      // All internal roles can view/create delay records; clients cannot
       if (role === 'management' || role === 'strategy' || role === 'sales' || role === 'team') return ''
       return null
     }

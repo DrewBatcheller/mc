@@ -124,19 +124,19 @@ export function ClientUpcomingLiveExperiments({ clientId }: { clientId?: string 
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-[13px] font-semibold text-foreground flex-1">{exp.fields['Test Description']}</span>
+                        <span className="text-[13px] font-semibold text-foreground flex-1">{String(exp.fields['Test Description'] || '')}</span>
                         <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap', getStatusStyle(status))}>
                           {status}
                         </span>
                       </div>
                       <div className="flex flex-col gap-1 text-[12px]">
-                        {exp.fields['Hypothesis'] && (
+                        {!!exp.fields['Hypothesis'] && (
                           <div className="flex items-start gap-1.5">
                             <span className="text-muted-foreground shrink-0">Hypothesis:</span>
                             <span className="text-foreground line-clamp-1">{String(exp.fields['Hypothesis'] || '')}</span>
                           </div>
                         )}
-                        {exp.fields['Rationale'] && (
+                        {!!exp.fields['Rationale'] && (
                           <div className="flex items-start gap-1.5">
                             <span className="text-muted-foreground shrink-0">Rationale:</span>
                             <span className="text-foreground line-clamp-1">{String(exp.fields['Rationale'] || '')}</span>
@@ -145,9 +145,9 @@ export function ClientUpcomingLiveExperiments({ clientId }: { clientId?: string 
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-1.5">
                             <span className="text-muted-foreground">Launch:</span>
-                            <span className="text-foreground font-medium">{exp.fields['Launch Date']}</span>
+                            <span className="text-foreground font-medium">{String(exp.fields['Launch Date'] || '')}</span>
                           </div>
-                          {exp.fields['End Date'] && (
+                          {!!exp.fields['End Date'] && (
                             <div className="flex items-center gap-1.5">
                               <span className="text-muted-foreground">End:</span>
                               <span className="text-foreground font-medium">{String(exp.fields['End Date'])}</span>

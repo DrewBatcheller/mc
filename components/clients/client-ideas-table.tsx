@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useMemo, Fragment } from "react"
-import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Loader, Send } from "lucide-react"
+import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Loader, Send, FileText, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAirtable } from "@/hooks/use-airtable"
 import { NewIdeaModal } from "@/components/clients/new-idea-modal"
+import { NotesPanel } from "@/components/shared/notes-panel"
 import { SyncIdeaModal } from "./sync-idea-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/contexts/UserContext"
@@ -17,6 +18,8 @@ interface ClientIdea {
   placement: string
   placementUrl?: string
   primaryGoals: string[]
+  noteIds: string[]
+  noteCount: number
   isPending?: boolean
 }
 
@@ -41,7 +44,7 @@ const columns: { key: SortKey | null; label: string }[] = [
 export function ClientIdeasTable() {
   const { user } = useUser()
   const { data: rawIdeas, mutate } = useAirtable('experiment-ideas', {
-    fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Category Primary Goals'],
+    fields: ['Test Description', 'Hypothesis', 'Rationale', 'Placement', 'Placement URL', 'Category Primary Goals', 'Notes'],
   })
   const { toast } = useToast()
 
@@ -53,20 +56,36 @@ export function ClientIdeasTable() {
   const [syncIdea, setSyncIdea] = useState<ClientIdea | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [pendingIdeas, setPendingIdeas] = useState<ClientIdea[]>([])
+  const [notesModalIdea, setNotesModalIdea] = useState<{ id: string; name: string; noteIds: string[] } | null>(null)
+
+  const authHeaders: Record<string, string> = user
+    ? {
+        'Content-Type': 'application/json',
+        'x-user-role': user.role,
+        'x-user-id': user.id,
+        'x-user-name': user.name,
+        ...(user.clientId ? { 'x-client-id': user.clientId } : {}),
+      }
+    : { 'Content-Type': 'application/json' }
 
   // Transform Airtable records to ClientIdea format
   const ideas = useMemo(() => {
     if (!rawIdeas) return []
-    return rawIdeas.map(record => ({
-      id: record.id,
-      testDescription: record.fields['Test Description'] as string || '',
-      hypothesis: record.fields['Hypothesis'] as string || '',
-      rationale: record.fields['Rationale'] as string || '',
-      placement: record.fields['Placement'] as string || '',
-      placementUrl: record.fields['Placement URL'] as string,
-      primaryGoals: (record.fields['Category Primary Goals'] as string[]) || [],
-      isPending: false,
-    }))
+    return rawIdeas.map(record => {
+      const notesRaw = record.fields['Notes']
+      return {
+        id: record.id,
+        testDescription: record.fields['Test Description'] as string || '',
+        hypothesis: record.fields['Hypothesis'] as string || '',
+        rationale: record.fields['Rationale'] as string || '',
+        placement: record.fields['Placement'] as string || '',
+        placementUrl: record.fields['Placement URL'] as string,
+        primaryGoals: (record.fields['Category Primary Goals'] as string[]) || [],
+        noteIds: Array.isArray(notesRaw) ? (notesRaw as string[]) : [],
+        noteCount: Array.isArray(notesRaw) ? (notesRaw as string[]).length : 0,
+        isPending: false,
+      }
+    })
   }, [rawIdeas])
 
   // Combine pending and persisted ideas
@@ -284,6 +303,19 @@ export function ClientIdeasTable() {
                                 </a>
                               </div>
                             )}
+                            {/* Notes hyperlink */}
+                            <div className="mt-3 pl-6">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setNotesModalIdea({ id: idea.id, name: idea.testDescription, noteIds: idea.noteIds }) }}
+                                className="inline-flex items-center gap-1 text-[12px] text-sky-600 hover:text-sky-700 hover:underline transition-colors"
+                              >
+                                <FileText className="h-3 w-3" />
+                                {idea.noteCount > 0
+                                  ? `${idea.noteCount} ${idea.noteCount === 1 ? 'Note' : 'Notes'}`
+                                  : 'Add Note'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -326,6 +358,37 @@ export function ClientIdeasTable() {
           }}
           idea={syncIdea}
         />
+      )}
+
+      {/* Notes modal */}
+      {notesModalIdea && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setNotesModalIdea(null)}>
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[15px] font-semibold text-foreground">Idea Notes</h3>
+                <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{notesModalIdea.name}</p>
+              </div>
+              <button type="button" onClick={() => setNotesModalIdea(null)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0">
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 overflow-y-auto flex-1">
+              <NotesPanel
+                linkedField="Experiments"
+                linkedRecordId={notesModalIdea.id}
+                authHeaders={authHeaders}
+                placeholder="Add a note about this idea…"
+                noteIds={notesModalIdea.noteIds}
+                mode="add-only"
+                onNoteCreated={() => mutate()}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

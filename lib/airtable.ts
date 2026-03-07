@@ -17,14 +17,19 @@ function getHeaders(): HeadersInit {
 
 // ─── Fetch with retries + error handling ─────────────────────────────────────
 async function airtableFetch(url: string, options?: RequestInit): Promise<Response> {
+  // Only cache GET (read) requests — mutations must always reach Airtable
+  const method = (options?.method ?? 'GET').toUpperCase()
+  const isMutation = method !== 'GET'
+
   const res = await fetch(url, {
     ...options,
     headers: {
       ...getHeaders(),
       ...options?.headers,
     },
-    // Next.js cache config: revalidate every 60s by default
-    next: { revalidate: 60 },
+    // Reads: revalidate every 60s via Next.js Data Cache
+    // Mutations: bypass cache entirely so the write always reaches Airtable
+    ...(isMutation ? { cache: 'no-store' as RequestCache } : { next: { revalidate: 60 } }),
   })
 
   if (!res.ok) {

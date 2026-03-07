@@ -15,11 +15,13 @@ import {
   CheckCircle2,
   ArrowLeftRight,
   Download,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 import { ExperimentDetailsModal } from "./experiment-details-modal"
 import { ThankYouAnimation } from "@/components/shared/thank-you-animation"
+import { NotesPanel } from "@/components/shared/notes-panel"
 import { useAirtable } from "@/hooks/use-airtable"
 import { useUser } from "@/contexts/UserContext"
 import type { AirtableRecord } from "@/lib/types"
@@ -64,6 +66,8 @@ interface Experiment {
   endDate?: string
   deployed?: boolean
   whatHappened?: string
+  noteIds?: string[]
+  noteCount?: number
   [key: string]: unknown
 }
 
@@ -80,6 +84,8 @@ interface Batch {
   revenueImpact: string
   experimentIds: string[]
   experiments: Experiment[]
+  noteIds: string[]
+  noteCount: number
 }
 
 /* ── Status helpers ── */
@@ -164,6 +170,8 @@ function mapExperiment(rec: AirtableRecord): Experiment {
     hypothesis: f['Hypothesis'] ? String(f['Hypothesis']) : undefined,
     launchDate: f['Launch Date'] ? formatDateSafe(String(f['Launch Date'])) : undefined,
     endDate: f['End Date'] ? formatDateSafe(String(f['End Date'])) : undefined,
+    noteIds: Array.isArray(f['Notes']) ? (f['Notes'] as string[]) : [],
+    noteCount: Array.isArray(f['Notes']) ? (f['Notes'] as string[]).length : 0,
   }
 }
 
@@ -197,6 +205,8 @@ function mapBatch(rec: AirtableRecord, expMap: Map<string, Experiment>): Batch {
     revenueImpact: f['Revenue Added (MRR)'] ? String(f['Revenue Added (MRR)']) : '$0',
     experimentIds,
     experiments,
+    noteIds: Array.isArray(f['Notes']) ? (f['Notes'] as string[]) : [],
+    noteCount: Array.isArray(f['Notes']) ? (f['Notes'] as string[]).length : 0,
   }
 }
 
@@ -228,6 +238,9 @@ export function ClientTracker() {
   const [isCreatingNewBatch, setIsCreatingNewBatch] = useState(false)
   const [newBatchDate, setNewBatchDate] = useState("")
   const [showThankYou, setShowThankYou] = useState(false)
+  const [notesModalBatch, setNotesModalBatch] = useState<Batch | null>(null)
+  const [desyncReason, setDesyncReason] = useState("")
+  const [desyncConfirmedNoReason, setDesyncConfirmedNoReason] = useState(false)
 
   const launchMenuRef = useRef<HTMLDivElement>(null)
 
@@ -236,7 +249,7 @@ export function ClientTracker() {
     fields: [
       'Batch Key', 'Brand Name', 'Launch Date', 'PTA (Scheduled Finish)',
       'All Tests Status', 'Calculated Batch Status', 'Experiments Attached', 'Revenue Added (MRR)',
-      'Record ID (from Client)',
+      'Record ID (from Client)', 'Notes',
     ],
     sort: [{ field: 'Launch Date', direction: 'desc' }],
   })
@@ -245,7 +258,7 @@ export function ClientTracker() {
     fields: [
       'Test Description', 'Test Status', 'Placement', 'Placement URL',
       'Devices', 'GEOs', 'Revenue Added (MRR) (Regular Format)',
-      'Category Primary Goals', 'Hypothesis', 'Launch Date', 'End Date',
+      'Category Primary Goals', 'Hypothesis', 'Launch Date', 'End Date', 'Notes',
     ],
     enabled: !batchLoading,
   })
@@ -426,13 +439,17 @@ export function ClientTracker() {
 
   const handleConvertToIdea = useCallback(async () => {
     if (!convertExperimentModal) return
+    // Friendly enforcement: if no reason and not confirmed, ask for confirmation
+    if (!desyncReason.trim() && !desyncConfirmedNoReason) {
+      setDesyncConfirmedNoReason(true)
+      return
+    }
     setIsMutating(true)
     try {
       await fetch(`/api/airtable/experiments/${convertExperimentModal.id}`, {
         method: 'PATCH',
         headers: authHeaders,
         body: JSON.stringify({ fields: {
-          'Is Experiment': false,
           'Batch': [],
           'Strategist': [],
           'Designer': [],
@@ -440,13 +457,27 @@ export function ClientTracker() {
           'QA': [],
         } }),
       })
+      // Create a Note if a reason was provided
+      if (desyncReason.trim() && user) {
+        await fetch('/api/airtable/notes', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ fields: {
+            'Note': desyncReason.trim(),
+            'Experiments': [convertExperimentModal.id],
+            'Created By (Team)': [user.id],
+          } }),
+        })
+      }
       await Promise.all([mutateExperiments(), mutateBatches()])
     } finally {
       setIsMutating(false)
       setConvertExperimentModal(null)
+      setDesyncReason("")
+      setDesyncConfirmedNoReason(false)
       setShowThankYou(true)
     }
-  }, [convertExperimentModal, authHeaders, mutateExperiments, mutateBatches])
+  }, [convertExperimentModal, desyncReason, desyncConfirmedNoReason, authHeaders, user, mutateExperiments, mutateBatches])
 
   const handleDesync = useCallback(async (batch: Batch) => {
     setIsMutating(true)
@@ -457,7 +488,6 @@ export function ClientTracker() {
             method: 'PATCH',
             headers: authHeaders,
             body: JSON.stringify({ fields: {
-              'Is Experiment': false,
               'Batch': [],
               'Strategist': [],
               'Designer': [],
@@ -634,13 +664,16 @@ export function ClientTracker() {
                 <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Finish Date</th>
                 <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Status</th>
                 <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Tests</th>
+                {user?.role !== 'client' && (
+                  <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Notes</th>
+                )}
                 <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? skeletonRows : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-[13px] text-muted-foreground">
+                  <td colSpan={user?.role !== 'client' ? 8 : 7} className="px-4 py-12 text-center text-[13px] text-muted-foreground">
                     No batches found
                   </td>
                 </tr>
@@ -686,6 +719,16 @@ export function ClientTracker() {
                       <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
                         {batch.tests} {batch.tests === 1 ? "test" : "tests"}
                       </td>
+                      {user?.role !== 'client' && (
+                        <td className="px-4 py-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setNotesModalBatch(batch)}
+                            className="text-[12px] text-sky-600 hover:text-sky-700 hover:underline transition-colors"
+                          >
+                            {batch.noteCount} {batch.noteCount === 1 ? 'note' : 'notes'}
+                          </button>
+                        </td>
+                      )}
                       <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {/* Launch menu */}
@@ -756,7 +799,7 @@ export function ClientTracker() {
                     {/* Expanded experiment rows */}
                     {isExpanded && batch.experiments.length > 0 && (
                       <tr>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={user?.role !== 'client' ? 9 : 8} className="p-0">
                           <div className="bg-accent/10 border-b border-border">
                             <table className="w-full">
                               <thead>
@@ -768,6 +811,9 @@ export function ClientTracker() {
                                   <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">GEOs</th>
                                   <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Variants</th>
                                   <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-right">Revenue</th>
+                                  {user?.role !== 'client' && (
+                                    <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Notes</th>
+                                  )}
                                   <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-right">Actions</th>
                                 </tr>
                               </thead>
@@ -812,6 +858,11 @@ export function ClientTracker() {
                                     )}>
                                       {exp.revenue}
                                     </td>
+                                    {user?.role !== 'client' && (
+                                      <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">
+                                        {(exp.noteCount ?? 0) > 0 ? `${exp.noteCount}` : '—'}
+                                      </td>
+                                    )}
                                     <td className="px-4 py-3 text-right whitespace-nowrap">
                                       <button
                                         onClick={(e) => {
@@ -1052,17 +1103,70 @@ export function ClientTracker() {
         </div>
       )}
 
+      {/* ── Batch Notes Modal ── */}
+      {notesModalBatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="px-6 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-[15px] font-semibold text-foreground">Batch Notes</h3>
+                <p className="text-[12px] text-muted-foreground mt-0.5">
+                  {notesModalBatch.client} | {notesModalBatch.finishDate}
+                </p>
+              </div>
+              <button
+                onClick={() => setNotesModalBatch(null)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 overflow-y-auto flex-1">
+              <NotesPanel
+                linkedField="Batches"
+                linkedRecordId={notesModalBatch.id}
+                authHeaders={authHeaders}
+                placeholder="Write a note about this batch…"
+                noteIds={notesModalBatch.noteIds}
+                mode={user?.role === 'client' ? 'read-only' : 'full'}
+                showVisibilityToggle={user?.role !== 'client'}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Convert Experiment to Idea Modal ── */}
       {convertExperimentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-background rounded-lg border border-border p-6 max-w-sm w-full shadow-lg">
+          <div className="bg-background rounded-lg border border-border p-6 max-w-md w-full shadow-lg">
             <h3 className="text-base font-semibold text-foreground mb-2">Convert Experiment to Idea?</h3>
             <p className="text-[13px] text-muted-foreground mb-4">
               &quot;{convertExperimentModal.name}&quot; will be removed from its batch and converted back into a test idea.
             </p>
+
+            <textarea
+              value={desyncReason}
+              onChange={(e) => { setDesyncReason(e.target.value); setDesyncConfirmedNoReason(false) }}
+              placeholder="Why are you converting this back to an idea? (recommended)"
+              className="w-full min-h-[80px] px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] focus:outline-none focus:ring-1 focus:ring-ring resize-none mb-4"
+            />
+
+            {desyncConfirmedNoReason && !desyncReason.trim() && (
+              <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <p className="text-[12px] text-amber-800 font-medium">
+                  Are you sure you want to convert without providing any reason?
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setConvertExperimentModal(null)}
+                onClick={() => {
+                  setConvertExperimentModal(null)
+                  setDesyncReason("")
+                  setDesyncConfirmedNoReason(false)
+                }}
                 disabled={isMutating}
                 className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded transition-colors disabled:opacity-50"
               >
@@ -1073,7 +1177,7 @@ export function ClientTracker() {
                 disabled={isMutating}
                 className="px-3 py-2 text-sm font-medium bg-sky-600 text-white hover:bg-sky-700 rounded transition-colors disabled:opacity-50"
               >
-                {isMutating ? 'Converting…' : 'Convert to Idea'}
+                {isMutating ? 'Converting…' : desyncConfirmedNoReason && !desyncReason.trim() ? 'Convert Anyway' : 'Convert to Idea'}
               </button>
             </div>
           </div>

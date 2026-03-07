@@ -44,7 +44,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     }
 
     if (requiredRole && user?.role !== requiredRole) {
-      if (!redirectedRef.current) {
+      if (!redirectedRef.current && user) {
         redirectedRef.current = true
         router.replace(FALLBACK_ROUTES[user.role])
       }

@@ -4,6 +4,7 @@
  */
 
 export interface UserPermissions {
+  [key: string]: boolean
   finances: boolean
   financesViewOnly: boolean
   sales: boolean
@@ -13,6 +14,7 @@ export interface UserPermissions {
   management: boolean
   team: boolean
   affiliates: boolean
+  forms: boolean
 }
 
 export interface PermissionsRecord {

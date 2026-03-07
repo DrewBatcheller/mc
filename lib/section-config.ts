@@ -38,7 +38,7 @@ export const SECTION_DEFINITIONS: Record<string, SectionDefinition> = {
     label: 'Management',
     // Visible to users with 'management' OR 'clients' Airtable permission
     permissionKeys: ['management', 'clients'],
-    routes: ['/management', '/management/team-directory', '/management/team-dashboard', '/management/client-directory', '/management/client-dashboard'],
+    routes: ['/management', '/management/team-directory', '/management/team-dashboard', '/management/client-directory', '/management/client-dashboard', '/management/forms'],
   },
   team: {
     id: 'team',

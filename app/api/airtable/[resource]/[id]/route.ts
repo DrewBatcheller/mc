@@ -43,8 +43,11 @@ export async function PATCH(
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // All roles can update their own notifications and notes
+    // Team can PATCH experiments, clients, and delays (needed for hosted form submissions)
     // All other resources require management, strategy, or sales
-    if (resource !== 'notifications' && resource !== 'notes' && (ctx.role === 'client' || ctx.role === 'team')) {
+    if (resource !== 'notifications' && resource !== 'notes' && resource !== 'experiments'
+        && resource !== 'clients' && resource !== 'delays'
+        && (ctx.role === 'client' || ctx.role === 'team')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

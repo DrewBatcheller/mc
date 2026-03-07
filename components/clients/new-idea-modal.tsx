@@ -99,7 +99,6 @@ export function NewIdeaModal({ isOpen, onClose, onSuccess, clientName, clientId,
       const airtableFields = {
         'Test Description': formData.title,
         'Brand Name': [clientId],
-        'Is Experiment': false,
         'Placement': formData.placementLabel,
         'Placement URL': normalizeUrl(formData.placementUrl),
         'Hypothesis': formData.hypothesis,

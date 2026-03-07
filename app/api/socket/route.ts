@@ -1,17 +1,21 @@
-import { NextApiRequest, NextApiResponse } from 'next'
-import { initializeSocketIO } from '@/lib/websocket-server'
+/**
+ * Socket.io endpoint — DEPRECATED.
+ *
+ * Real-time sync has been migrated to SSE (Server-Sent Events) at
+ * /api/realtime/events. This route is kept as a stub to avoid 404s
+ * from any lingering client references.
+ *
+ * The previous implementation used the Pages Router `res.socket.server`
+ * pattern which is incompatible with the App Router.
+ */
+
+import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * Socket.io HTTP upgrade handler
- * This endpoint handles the WebSocket protocol upgrade from HTTP
- */
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!res.socket.server.io) {
-    console.log('[Socket.io] Initializing Socket.io server...')
-    res.socket.server.io = initializeSocketIO(res.socket.server)
-  }
-
-  res.end()
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Socket.io endpoint is deprecated. Use /api/realtime/events (SSE) instead.' },
+    { status: 410 }
+  )
 }

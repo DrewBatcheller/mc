@@ -127,7 +127,7 @@ export function RoleSidebar() {
     const currentSectionIds = initialOpenSections
     const missingSection = currentSectionIds.find(id => !openSections.includes(id))
     if (missingSection) {
-      setOpenSections(prev => [...new Set([...prev, ...currentSectionIds])])
+      setOpenSections(prev => [...new Set([...(prev ?? []), ...currentSectionIds])])
     }
   }, [pathname, accessibleSections, initialOpenSections, openSections])
 
@@ -136,9 +136,10 @@ export function RoleSidebar() {
   }
 
   function toggleSection(sectionId: string) {
-    setOpenSections((prev) =>
-      prev.includes(sectionId) ? prev.filter((s) => s !== sectionId) : [...prev, sectionId]
-    )
+    setOpenSections((prev) => {
+      if (!prev) return [sectionId]
+      return prev.includes(sectionId) ? prev.filter((s) => s !== sectionId) : [...prev, sectionId]
+    })
   }
 
   function handleCollapsedSectionClick(section: typeof accessibleSections[0]) {

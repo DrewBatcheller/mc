@@ -48,6 +48,7 @@ export function useRealtimeSync(options?: {
   onPermissionChange?: (event: PermissionEvent) => void
 }) {
   const isConnectedRef      = useRef(false)
+  const lastMutationRef     = useRef<MutationEvent | null>(null)
   const esRef               = useRef<EventSource | null>(null)
   const reconnectDelayRef   = useRef(2_000)
   const reconnectTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -83,6 +84,9 @@ export function useRealtimeSync(options?: {
 
         if (event.type === 'mutation') {
           const { resource } = event
+
+          // Track last mutation for consumers (e.g. SyncStatus component)
+          lastMutationRef.current = event
 
           // ── Invalidate all SWR keys that belong to this resource ──────────
           // SWR keys are [url, headers] tuples; match on the URL segment.
@@ -130,5 +134,6 @@ export function useRealtimeSync(options?: {
 
   return {
     isConnected: isConnectedRef.current,
+    lastMutation: lastMutationRef.current,
   }
 }

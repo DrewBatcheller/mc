@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useMemo, Fragment } from "react"
-import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Send } from "lucide-react"
+import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Send, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 import { NewIdeaModal } from "./new-idea-modal"
 import { SyncIdeaModal } from "./sync-idea-modal"
+import { NotesPanel } from "@/components/shared/notes-panel"
 import { useAirtable } from "@/hooks/use-airtable"
 import { useUser } from "@/contexts/UserContext"
 
@@ -23,6 +24,8 @@ export interface Idea {
   geos: string
   priority: string
   weighting: string
+  noteIds: string[]
+  noteCount: number
 }
 
 const goalColors: Record<string, string> = {
@@ -45,6 +48,7 @@ const columns: { key: SortKey | null; label: string }[] = [
   { key: null,       label: "Placement" },
   { key: null,       label: "Primary Goals" },
   { key: "priority", label: "Priority" },
+  { key: null,       label: "Notes" },
   { key: null,       label: "Sync" },
 ]
 
@@ -56,7 +60,7 @@ export function IdeasTable() {
       'Test Description', 'Hypothesis', 'Rationale',
       'Placement', 'Placement URL', 'Category Primary Goals',
       'Brand Name (from Brand Name)', 'Record ID (from Brand Name)',
-      'Devices', 'GEOs', 'Variants Weight',
+      'Devices', 'GEOs', 'Variants Weight', 'Notes',
     ],
     sort: [{ field: 'Test Description', direction: 'asc' }],
   })
@@ -69,6 +73,15 @@ export function IdeasTable() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [syncModalOpen, setSyncModalOpen] = useState(false)
   const [syncIdea, setSyncIdea] = useState<Idea | null>(null)
+  const [notesModalIdea, setNotesModalIdea] = useState<Idea | null>(null)
+
+  const authHeaders: Record<string, string> = user ? {
+    'Content-Type': 'application/json',
+    'x-user-role': user.role,
+    'x-user-id': user.id,
+    'x-user-name': user.name,
+    ...(user.clientId ? { 'x-client-id': user.clientId } : {}),
+  } : { 'Content-Type': 'application/json' }
 
   const ideas = useMemo<Idea[]>(() => {
     if (!rawIdeas) return []
@@ -117,6 +130,8 @@ export function IdeasTable() {
         geos,
         priority:  String(f['Priority'] ?? ''),
         weighting: String(f['Variants Weight'] ?? ''),
+        noteIds: Array.isArray(f['Notes']) ? (f['Notes'] as string[]) : [],
+        noteCount: Array.isArray(f['Notes']) ? (f['Notes'] as string[]).length : 0,
       }
     })
   }, [rawIdeas])
@@ -168,6 +183,7 @@ export function IdeasTable() {
       <td className="px-4 py-3.5"><div className="h-4 w-32 rounded bg-muted animate-pulse" /></td>
       <td className="px-4 py-3.5"><div className="h-5 w-24 rounded-md bg-muted animate-pulse" /></td>
       <td className="px-4 py-3.5"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-4 w-14 rounded bg-muted animate-pulse" /></td>
       <td className="px-4 py-3.5"><div className="h-7 w-7 rounded-md bg-muted animate-pulse mx-auto" /></td>
     </tr>
   ))
@@ -219,7 +235,8 @@ export function IdeasTable() {
                         i === 3 && "w-[160px]",
                         i === 4 && "w-[200px]",
                         i === 5 && "w-[90px]",
-                        i === 6 && "w-[52px]"
+                        i === 6 && "w-[80px]",
+                        i === 7 && "w-[52px]"
                       )}
                     >
                       {col.key ? (
@@ -307,6 +324,21 @@ export function IdeasTable() {
                             </div>
                           ) : (
                             <span className="text-[12px] text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 align-middle">
+                          {idea.noteCount > 0 ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setNotesModalIdea(idea)
+                              }}
+                              className="text-[12px] text-sky-600 hover:text-sky-700 hover:underline transition-colors"
+                            >
+                              {idea.noteCount} {idea.noteCount === 1 ? "note" : "notes"}
+                            </button>
+                          ) : (
+                            <span className="text-[12px] text-muted-foreground/40">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3.5 text-center align-middle">
@@ -397,6 +429,36 @@ export function IdeasTable() {
           onSuccess={() => { setSyncModalOpen(false); setSyncIdea(null); mutate() }}
           idea={syncIdea}
         />
+      )}
+
+      {notesModalIdea && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setNotesModalIdea(null)}>
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[15px] font-semibold text-foreground">Idea Notes</h3>
+                <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{notesModalIdea.client} — {notesModalIdea.name}</p>
+              </div>
+              <button
+                onClick={() => setNotesModalIdea(null)}
+                className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors shrink-0 ml-3"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 overflow-y-auto flex-1">
+              <NotesPanel
+                linkedField="Experiments"
+                linkedRecordId={notesModalIdea.id}
+                authHeaders={authHeaders}
+                placeholder="Write a note about this idea…"
+                noteIds={notesModalIdea.noteIds}
+                showVisibilityToggle
+                onNoteCreated={() => mutate()}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

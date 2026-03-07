@@ -21,6 +21,7 @@ interface AirtablePermissionsRow {
   'Management'?: string | boolean
   'Team'?: string | boolean
   'Affiliates'?: string | boolean
+  'Forms'?: string | boolean
 }
 
 /**
@@ -83,6 +84,7 @@ async function lookupPermissionsByView(viewName: string): Promise<UserPermission
       management: toBoolean(fields['Management']),
       team: toBoolean(fields['Team']),
       affiliates: toBoolean(fields['Affiliates']),
+      forms: toBoolean(fields['Forms']),
     }
   } catch (err) {
     console.error(`[permissions] Failed to lookup permission "${viewName}":`, err)
@@ -109,6 +111,7 @@ export async function getAllPermissionViews(): Promise<PermissionsRecord[]> {
         management: toBoolean(r.fields['Management']),
         team: toBoolean(r.fields['Team']),
         affiliates: toBoolean(r.fields['Affiliates']),
+        forms: toBoolean(r.fields['Forms']),
       },
       recordId: r.id,
     }))

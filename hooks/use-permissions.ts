@@ -21,6 +21,7 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   management: false,
   team: false,
   affiliates: false,
+  forms: false,
 }
 
 export function usePermissions() {

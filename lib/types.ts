@@ -79,6 +79,7 @@ export const TABLE_NAMES = {
   notifications: 'Notifications',
   dividends: 'Dividends Paid',
   notes: 'Notes',
+  delays: 'Delays',
 } as const
 
 export type ResourceSlug = keyof typeof TABLE_NAMES

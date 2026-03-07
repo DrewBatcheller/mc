@@ -203,7 +203,7 @@ export function ResultsGrid({
             getAttachmentUrl(f["Control Image"]),
         } satisfies Result
       })
-      .filter((r): r is Result => r !== null)
+      .filter((r) => r !== null) as Result[]
   }, [rawExperiments])
 
   // ── Client list (admin only) ──────────────────────────────────────────────────

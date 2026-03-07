@@ -1,27 +1,40 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { login } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/auth'
 import { DEFAULT_ROUTE } from '@/lib/permissions'
 import { useUser } from '@/contexts/UserContext'
 
-export default function LoginPage() {
+/**
+ * Validate that a redirect URL is safe (same-origin, no open redirect).
+ * Must start with '/' and not start with '//' (protocol-relative URL).
+ */
+function isSafeRedirect(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//')
+}
+
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { refreshUser } = useUser()
 
-  // If already logged in, redirect to the correct dashboard.
+  // Read the ?redirect= param for smart redirect after login
+  const redirectParam = searchParams.get('redirect')
+  const safeRedirect = redirectParam && isSafeRedirect(redirectParam) ? redirectParam : null
+
+  // If already logged in, redirect to the correct destination.
   // Empty dep array intentional: we only want this to run once on mount,
   // not re-run when the router reference changes in dev/HMR.
   useEffect(() => {
     const user = getCurrentUser()
     if (user) {
-      router.replace(DEFAULT_ROUTE[user.role])
+      router.replace(safeRedirect ?? DEFAULT_ROUTE[user.role])
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -35,7 +48,8 @@ export default function LoginPage() {
       // Sync UserContext state from localStorage before navigating so that
       // ProtectedRoute sees an authenticated user immediately on arrival.
       refreshUser()
-      router.push(redirectTo)
+      // Use the ?redirect= param if present and safe, otherwise use the role default
+      router.push(safeRedirect ?? redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.')
     } finally {
@@ -51,6 +65,13 @@ export default function LoginPage() {
           <h1 className="text-3xl font-semibold text-foreground">Welcome back</h1>
           <p className="text-sm text-muted-foreground mt-2">Sign in to your account to continue</p>
         </div>
+
+        {/* Redirect notice */}
+        {safeRedirect && (
+          <div className="mb-4 px-4 py-3 rounded-lg bg-sky-50 border border-sky-200 text-sm text-sky-700">
+            Sign in to continue to your destination.
+          </div>
+        )}
 
         {/* Error message */}
         {error && (
@@ -113,5 +134,17 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="h-6 w-6 border-2 border-sky-600/30 border-t-sky-600 rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

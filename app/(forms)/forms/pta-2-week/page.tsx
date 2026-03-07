@@ -373,22 +373,37 @@ function PTA2WeekInner() {
     enabled: experimentIds.length > 0 && !preview,
   })
 
-  // Fetch all variants scoped to these experiments — match by experiment name
-  // (the proven pattern from live-tests.tsx; Airtable lookup fields in
-  // filterByFormula resolve to actual values, so name-matching works reliably)
+  // Fetch variants for these experiments using experiment record IDs.
+  // We filter via RECORD_ID() against the Experiments linked field on the
+  // Variants table. Airtable linked-record fields in filterByFormula match
+  // on the primary field value — but we CAN use the special RECORD_ID()
+  // comparison on the linked-record cell using a rollup/lookup approach.
+  // Safest strategy: filter by experiment record IDs through the existing
+  // Batch Record ID lookup, OR by experiment names through Test Description lookup.
   const experimentNames = useMemo(
     () => (rawExperiments ?? []).map(r => String((r.fields as Record<string, unknown>)['Test Description'] ?? '')).filter(Boolean),
     [rawExperiments],
   )
 
   const variantFilter = useMemo(() => {
-    if (preview || experimentNames.length === 0) return undefined
-    const clauses = experimentNames.map(name => {
-      const safe = name.replace(/'/g, "\\'")
-      return `{Test Description (from Experiments)} = '${safe}'`
-    })
+    if (preview) return undefined
+    const clauses: string[] = []
+
+    // Strategy 1: match experiment names through lookup (handles array values)
+    for (const name of experimentNames) {
+      const safe = name.replace(/"/g, '\\"')
+      clauses.push(`FIND("${safe}", ARRAYJOIN({Test Description (from Experiments)}, "|||")) > 0`)
+    }
+
+    // Strategy 2 (fallback): match batch record ID through lookup chain
+    // Available immediately (doesn't need experiments to load first)
+    if (clauses.length === 0 && batchId) {
+      clauses.push(`FIND("${batchId}", ARRAYJOIN({Batch Record ID (from Experiments)}, "|||")) > 0`)
+    }
+
+    if (clauses.length === 0) return undefined
     return clauses.length === 1 ? clauses[0] : `OR(${clauses.join(', ')})`
-  }, [experimentNames, preview])
+  }, [batchId, experimentNames, preview])
 
   const { data: rawVariants, isLoading: variantsLoading } = useAirtable<Record<string, unknown>>('variants', {
     fields: [
@@ -400,6 +415,7 @@ function PTA2WeekInner() {
     ],
     filterExtra: variantFilter,
     enabled: !!variantFilter && !preview,
+    noCache: true,
   })
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -458,6 +474,7 @@ function PTA2WeekInner() {
     if (preview) return PREVIEW_VARIANTS
     const map = new Map<string, VariantDetail[]>()
     if (!rawVariants) return map
+    console.log('[PTA2WK] rawVariants count:', rawVariants.length, 'experimentNames:', experimentNames, 'variantFilter:', variantFilter)
     for (const rec of rawVariants) {
       const f = rec.fields as Record<string, unknown>
       const expIds = (f['Experiments'] as string[]) ?? []
@@ -480,13 +497,18 @@ function PTA2WeekInner() {
         rpvImpConfidence: Number(f['RPV Improvement Confidence'] ?? 0),
         aov: Number(f['AOV'] ?? 0),
       }
+      if (expIds.length === 0) {
+        console.log('[PTA2WK] Variant has no Experiments linked:', rec.id, f['Variant Name'], 'raw Experiments field:', f['Experiments'])
+      }
       for (const eid of expIds) {
         if (!map.has(eid)) map.set(eid, [])
-        map.get(eid)!.push(variant)
+        const list = map.get(eid)!
+        if (!list.some(v => v.id === rec.id)) list.push(variant)
       }
     }
+    console.log('[PTA2WK] variantsByExperiment:', Object.fromEntries(map.entries()))
     return map
-  }, [rawVariants, preview])
+  }, [rawVariants, experimentNames, variantFilter, preview])
 
   // ── State ─────────────────────────────────────────────────────────────────
 

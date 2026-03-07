@@ -17,14 +17,19 @@ function getHeaders(): HeadersInit {
 
 // ─── Fetch with retries + error handling ─────────────────────────────────────
 async function airtableFetch(url: string, options?: RequestInit): Promise<Response> {
+  // Only cache GET (read) requests — mutations must always reach Airtable
+  const method = (options?.method ?? 'GET').toUpperCase()
+  const isMutation = method !== 'GET'
+
   const res = await fetch(url, {
     ...options,
     headers: {
       ...getHeaders(),
       ...options?.headers,
     },
-    // Next.js cache config: revalidate every 60s by default
-    next: { revalidate: 60 },
+    // Reads: revalidate every 60s via Next.js Data Cache
+    // Mutations: bypass cache entirely so the write always reaches Airtable
+    ...(isMutation ? { cache: 'no-store' as RequestCache } : { next: { revalidate: 60 } }),
   })
 
   if (!res.ok) {
@@ -58,43 +63,84 @@ export async function listRecords<T = Record<string, unknown>>(
   tableName: string,
   options: ListOptions = {}
 ): Promise<AirtableListResponse<T>> {
-  const params = new URLSearchParams()
+  const params: Record<string, string | string[]> = {}
 
-  if (options.filterByFormula) params.set('filterByFormula', options.filterByFormula)
-  if (options.maxRecords) params.set('maxRecords', String(options.maxRecords))
-  if (options.pageSize) params.set('pageSize', String(options.pageSize))
-  if (options.offset) params.set('offset', options.offset)
-  if (options.view) params.set('view', options.view)
+  if (options.filterByFormula) params.filterByFormula = options.filterByFormula
+  if (options.maxRecords) params.maxRecords = String(options.maxRecords)
+  if (options.pageSize) params.pageSize = String(options.pageSize)
+  if (options.offset) params.offset = options.offset
+  if (options.view) params.view = options.view
+  
+  // Build URL with manual parameter encoding
+  let url = `${BASE_URL}/${encodeURIComponent(tableName)}`
+  const queryParts: string[] = []
+  
+  // Handle simple params
+  Object.entries(params).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      queryParts.push(`${key}=${encodeURIComponent(value)}`)
+    }
+  })
+  
+  // Handle fields array
   if (options.fields) {
-    options.fields.forEach((f) => params.append('fields[]', f))
-  }
-  if (options.sort) {
-    options.sort.forEach((s, i) => {
-      params.append(`sort[${i}][field]`, s.field)
-      if (s.direction) params.append(`sort[${i}][direction]`, s.direction)
+    options.fields.forEach(f => {
+      queryParts.push(`fields[]=${encodeURIComponent(f)}`)
     })
   }
-
-  const url = `${BASE_URL}/${encodeURIComponent(tableName)}?${params.toString()}`
+  
+  // Handle sort array
+  if (options.sort) {
+    options.sort.forEach((s, i) => {
+      queryParts.push(`sort[${i}][field]=${encodeURIComponent(s.field)}`)
+      if (s.direction) {
+        queryParts.push(`sort[${i}][direction]=${encodeURIComponent(s.direction)}`)
+      }
+    })
+  }
+  
+  if (queryParts.length > 0) {
+    url += '?' + queryParts.join('&')
+  }
+  
   const res = await airtableFetch(url)
   return res.json()
 }
 
 // ─── Get all pages (auto-paginate) ───────────────────────────────────────────
+// Retries from the first page on LIST_RECORDS_ITERATOR_NOT_AVAILABLE (422).
+// This error occurs during cold-cache bursts when Airtable's pagination cursor
+// expires, or when concurrent requests hit the same table simultaneously.
 export async function listAllRecords<T = Record<string, unknown>>(
   tableName: string,
   options: Omit<ListOptions, 'offset'> = {}
 ): Promise<AirtableRecord<T>[]> {
-  const allRecords: AirtableRecord<T>[] = []
-  let offset: string | undefined
+  const MAX_RETRIES = 2
 
-  do {
-    const page = await listRecords<T>(tableName, { ...options, offset })
-    allRecords.push(...page.records)
-    offset = page.offset
-  } while (offset)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const allRecords: AirtableRecord<T>[] = []
+      let offset: string | undefined
 
-  return allRecords
+      do {
+        const page = await listRecords<T>(tableName, { ...options, offset })
+        allRecords.push(...page.records)
+        offset = page.offset
+      } while (offset)
+
+      return allRecords
+    } catch (err) {
+      const is422 = err instanceof AirtableError && err.status === 422
+      if (is422 && attempt < MAX_RETRIES) {
+        // Back off briefly before retrying from page 1
+        await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+        continue
+      }
+      throw err
+    }
+  }
+
+  return [] // unreachable — satisfies TypeScript
 }
 
 // ─── Get single record by ID ──────────────────────────────────────────────────
@@ -132,6 +178,15 @@ export async function updateRecord<T = Record<string, unknown>>(
     body: JSON.stringify({ fields }),
   })
   return res.json()
+}
+
+// ─── Delete record ────────────────────────────────────────────────────────────
+export async function deleteRecord(
+  tableName: string,
+  recordId: string
+): Promise<void> {
+  const url = `${BASE_URL}/${encodeURIComponent(tableName)}/${recordId}`
+  await airtableFetch(url, { method: 'DELETE' })
 }
 
 // ─── Find records by formula ──────────────────────────────────────────────────

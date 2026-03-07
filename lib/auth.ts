@@ -8,10 +8,18 @@
  */
 
 import type { AuthUser, AuthSession, UserRole } from './types'
-import { DEFAULT_ROUTE } from './permissions'
 
 const SESSION_KEY = 'mc_session'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8  // 8 hours
+
+// Default fallback routes per role (used after login if permissions fail to load)
+const DEFAULT_ROUTE: Record<UserRole, string> = {
+  management: '/',
+  strategy: '/experiments/dashboard',
+  sales: '/sales/overview',
+  team: '/team',
+  client: '/clients/client-dashboard',
+}
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 export async function login(

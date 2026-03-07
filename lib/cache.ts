@@ -1,83 +1,163 @@
 /**
- * Cache wrapper — uses Upstash Redis when configured, no-ops otherwise.
- * This means the app works identically with or without Redis.
- * Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to enable caching.
+ * Cache wrapper — tiered Redis strategy:
+ *
+ *   1. Native Redis (ioredis)  — when REDIS_URL is set (self-hosted production)
+ *      Full caching AND Pub/Sub broadcasting on one Redis instance.
+ *
+ *   2. Upstash Redis (REST)    — when UPSTASH_REDIS_REST_URL is set (Vercel demo)
+ *      Caching only (REST API cannot do Pub/Sub).
+ *
+ *   3. No-op                   — neither env var set (local dev / fallback)
+ *      App works identically without caching.
  */
 
-let redis: import('@upstash/redis').Redis | null = null
+import { getRedisClient } from '@/lib/redis'
+import type Redis from 'ioredis'
 
-async function getRedis() {
-  if (redis) return redis
+// ─── Upstash client (lazy-loaded, REST-only) ──────────────────────────────────
+let upstash: import('@upstash/redis').Redis | null = null
 
-  const url = process.env.UPSTASH_REDIS_REST_URL
+async function getUpstash() {
+  if (upstash) return upstash
+
+  const url   = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
-
   if (!url || !token) return null
 
   const { Redis } = await import('@upstash/redis')
-  redis = new Redis({ url, token })
-  return redis
+  upstash = new Redis({ url, token })
+  return upstash
 }
 
 // ─── Default TTLs (seconds) ───────────────────────────────────────────────────
 export const TTL = {
-  short: 30,        // Fast-changing data (e.g. live test status)
-  medium: 120,      // Standard data (experiments, leads)
-  long: 300,        // Slow-changing data (clients, team members)
-  auth: 60 * 30,    // Auth lookups — 30 min
+  short:  30,         // Fast-changing data (e.g. live test status)
+  medium: 120,        // Standard data (experiments, leads)
+  long:   300,        // Slow-changing data (clients, team members)
+  auth:   60 * 30,    // Auth lookups — 30 min
 } as const
 
+// ─── Permission-to-Resource mapping ──────────────────────────────────────────
+const PERMISSION_RESOURCE_MAP: Record<string, string[]> = {
+  finances:    ['revenue', 'expenses', 'pnl'],
+  sales:       ['accounts', 'contacts', 'clients', 'leads'],
+  experiments: ['experiments', 'tests', 'variants'],
+  team:        ['team-members', 'documents', 'projects'],
+  affiliates:  ['affiliates', 'partnerships'],
+}
+
+// ─── Native Redis helpers ─────────────────────────────────────────────────────
+
+async function nativeGet<T>(r: Redis, key: string): Promise<T | null> {
+  const raw = await r.get(key)
+  if (raw === null || raw === undefined) return null
+  try { return JSON.parse(raw as string) as T } catch { return null }
+}
+
+async function nativeSet<T>(r: Redis, key: string, value: T, ttlSeconds: number): Promise<void> {
+  await r.set(key, JSON.stringify(value), 'EX', ttlSeconds)
+}
+
+async function nativeDel(r: Redis, ...keys: string[]): Promise<void> {
+  if (keys.length > 0) await r.del(...keys)
+}
+
+async function nativeScan(r: Redis, pattern: string): Promise<string[]> {
+  const found: string[] = []
+  let cursor = '0'
+  do {
+    const [next, keys] = await r.scan(cursor, 'MATCH', pattern, 'COUNT', '100')
+    cursor = next
+    found.push(...keys)
+  } while (cursor !== '0')
+  return found
+}
+
 // ─── getOrSet ─────────────────────────────────────────────────────────────────
-// The main cache primitive. Checks cache first, falls back to fetcher, stores result.
+
 export async function getOrSet<T>(
   key: string,
   fetcher: () => Promise<T>,
   ttlSeconds: number = TTL.medium
 ): Promise<{ data: T; cached: boolean }> {
-  const r = await getRedis()
 
-  if (r) {
-    const cached = await r.get<T>(key)
-    if (cached !== null && cached !== undefined) {
-      return { data: cached, cached: true }
-    }
+  // 1. Native Redis (self-hosted)
+  const nr = getRedisClient()
+  if (nr) {
+    const cached = await nativeGet<T>(nr, key)
+    if (cached !== null) return { data: cached, cached: true }
+
+    const data = await fetcher()
+    await nativeSet(nr, key, data, ttlSeconds)
+    return { data, cached: false }
   }
 
-  const data = await fetcher()
+  // 2. Upstash (Vercel demo)
+  const ur = await getUpstash()
+  if (ur) {
+    const cached = await ur.get<T>(key)
+    if (cached !== null && cached !== undefined) return { data: cached, cached: true }
 
-  if (r) {
-    await r.set(key, data, { ex: ttlSeconds })
+    const data = await fetcher()
+    await ur.set(key, data, { ex: ttlSeconds })
+    return { data, cached: false }
   }
 
-  return { data, cached: false }
+  // 3. No cache
+  return { data: await fetcher(), cached: false }
 }
 
 // ─── invalidate ───────────────────────────────────────────────────────────────
-// Delete a specific cache key.
+
 export async function invalidate(key: string): Promise<void> {
-  const r = await getRedis()
-  if (r) await r.del(key)
+  const nr = getRedisClient()
+  if (nr) { await nativeDel(nr, key); return }
+
+  const ur = await getUpstash()
+  if (ur) await ur.del(key)
 }
 
 // ─── invalidatePattern ────────────────────────────────────────────────────────
-// Delete all keys matching a pattern (e.g. "experiments:*").
-// Note: Upstash supports SCAN-based deletion.
+
 export async function invalidatePattern(pattern: string): Promise<void> {
-  const r = await getRedis()
-  if (!r) return
+  const nr = getRedisClient()
+  if (nr) {
+    const keys = await nativeScan(nr, pattern)
+    if (keys.length > 0) await nativeDel(nr, ...keys)
+    return
+  }
+
+  const ur = await getUpstash()
+  if (!ur) return
 
   let cursor = 0
   do {
-    const [nextCursor, keys] = await r.scan(cursor, { match: pattern, count: 100 })
+    const [nextCursor, keys] = await ur.scan(cursor, { match: pattern, count: 100 })
     cursor = Number(nextCursor)
-    if (keys.length > 0) {
-      await r.del(...keys)
-    }
+    if (keys.length > 0) await ur.del(...keys)
   } while (cursor !== 0)
 }
 
-// ─── Cache key builders ───────────────────────────────────────────────────────
-// Consistent key format: resource:role:entityId
+// ─── invalidateByPermission ───────────────────────────────────────────────────
+
+export async function invalidateByPermission(permission: string): Promise<void> {
+  const resources = PERMISSION_RESOURCE_MAP[permission]
+  if (!resources) {
+    console.warn(`[cache] Unknown permission: ${permission}`)
+    return
+  }
+  for (const r of resources) await invalidatePattern(`${r}:*`)
+  console.log(`[cache] Invalidated ${resources.length} resource patterns for permission: ${permission}`)
+}
+
+// ─── invalidateByResource ─────────────────────────────────────────────────────
+
+export async function invalidateByResource(resource: string): Promise<void> {
+  await invalidatePattern(`${resource}:*`)
+}
+
+// ─── Cache key builder ────────────────────────────────────────────────────────
+
 export function cacheKey(
   resource: string,
   role: string,
@@ -86,6 +166,6 @@ export function cacheKey(
 ): string {
   const parts = [resource, role]
   if (entityId) parts.push(entityId)
-  if (extras) parts.push(extras)
+  if (extras)   parts.push(extras)
   return parts.join(':')
 }

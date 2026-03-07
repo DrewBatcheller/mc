@@ -26,6 +26,8 @@ export interface UseAirtableOptions {
   enabled?: boolean
   /** SWR refresh interval in ms (0 = no auto-refresh) */
   refreshInterval?: number
+  /** Revalidate on window focus (default: true) */
+  revalidateOnFocus?: boolean
 }
 
 // ─── Return type ──────────────────────────────────────────────────────────────
@@ -38,11 +40,19 @@ export interface UseAirtableResult<T> {
 }
 
 // ─── Fetcher ──────────────────────────────────────────────────────────────────
+class FetchError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function fetcher(url: string, headers: HeadersInit) {
   const res = await fetch(url, { headers })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `Request failed: ${res.status}`)
+    throw new FetchError(body.error ?? `Request failed: ${res.status}`, res.status)
   }
   return res.json()
 }
@@ -53,7 +63,7 @@ export function useAirtable<T = Record<string, unknown>>(
   options: UseAirtableOptions = {}
 ): UseAirtableResult<T> {
   const { user, isAuthenticated } = useUser()
-  const { enabled = true, refreshInterval = 0, ...queryOptions } = options
+  const { enabled = true, refreshInterval = 0, revalidateOnFocus = false, ...queryOptions } = options
 
   // Build URL with query params
   const shouldFetch = isAuthenticated && enabled && !!user
@@ -65,6 +75,7 @@ export function useAirtable<T = Record<string, unknown>>(
     ? {
         'x-user-role': user.role,
         'x-user-id': user.id,
+        'x-user-name': user.name,
         ...(user.clientId ? { 'x-client-id': user.clientId } : {}),
       }
     : {}
@@ -74,9 +85,17 @@ export function useAirtable<T = Record<string, unknown>>(
     ([u, h]) => fetcher(u, h),
     {
       refreshInterval,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000,
+      revalidateOnFocus,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60_000,   // suppress duplicate fetches for 60s
+      onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
+        // Don't retry on 4xx errors (bad filters, auth failures, etc.)
+        const status = (err as FetchError).status
+        if (status && status >= 400 && status < 500) return
+        // Retry transient errors up to 3 times with exponential backoff
+        if (retryCount >= 3) return
+        setTimeout(() => revalidate({ retryCount }), 5000 * 2 ** retryCount)
+      },
     }
   )
 
@@ -90,7 +109,7 @@ export function useAirtable<T = Record<string, unknown>>(
 }
 
 // ─── URL builder ──────────────────────────────────────────────────────────────
-function buildUrl(resource: string, options: Omit<UseAirtableOptions, 'enabled' | 'refreshInterval'>): string {
+function buildUrl(resource: string, options: Omit<UseAirtableOptions, 'enabled' | 'refreshInterval' | 'revalidateOnFocus'>): string {
   const params = new URLSearchParams()
 
   if (options.maxRecords) params.set('maxRecords', String(options.maxRecords))

@@ -1,65 +1,36 @@
 "use client"
 
-import { ArrowUpDown, Pencil, Trash2, AlertCircle } from "lucide-react"
+import { ArrowUpDown, Pencil, Trash2, AlertCircle, X } from "lucide-react"
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { SelectField } from "@/components/shared/select-field"
 
 type SortKey = "month" | "category" | "allocated" | "actual" | "balance" | "transferred" | "variance"
 type SortDirection = "asc" | "desc"
 
 interface LedgerRow {
+  recordId: string
+  monthRecordId: string
+  categoryRecordId: string
   month: string
   monthIndex: number
   yearIndex: number
   category: string
+  transactionType: string
+  percentAllocation: number
   allocated: number
   actual: number
+  accountBalance: number
   balance: number
   transferred: boolean
   variance: number
 }
 
-const allData: LedgerRow[] = [
-  { month: "September 2022", monthIndex: 8, yearIndex: 2022, category: "Emergency Reserve Allocation", allocated: 1170.84, actual: 1165.14, balance: 1165.14, transferred: false, variance: 5.70 },
-  { month: "October 2022", monthIndex: 9, yearIndex: 2022, category: "Emergency Reserve Allocation", allocated: 2198.14, actual: 2298.59, balance: 3463.73, transferred: false, variance: -100.45 },
-  { month: "November 2022", monthIndex: 10, yearIndex: 2022, category: "Emergency Reserve Allocation", allocated: 1327.25, actual: 1319.05, balance: 4782.78, transferred: false, variance: 8.20 },
-  { month: "December 2022", monthIndex: 11, yearIndex: 2022, category: "Emergency Reserve Allocation", allocated: 2187.91, actual: 2187.91, balance: 6970.69, transferred: false, variance: 0.00 },
-  { month: "January 2023", monthIndex: 0, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 2127.91, actual: 2127.91, balance: 9098.60, transferred: false, variance: 0.00 },
-  { month: "February 2023", monthIndex: 1, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 2144.68, actual: 2141.98, balance: 11240.58, transferred: false, variance: 2.70 },
-  { month: "March 2023", monthIndex: 2, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 1910.36, actual: 1909.91, balance: 13150.49, transferred: false, variance: 0.45 },
-  { month: "April 2023", monthIndex: 3, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 728.39, actual: 912.38, balance: 14062.87, transferred: false, variance: -183.99 },
-  { month: "May 2023", monthIndex: 4, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 1373.46, actual: 1359.88, balance: 15422.75, transferred: false, variance: 13.58 },
-  { month: "June 2023", monthIndex: 5, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: -1143.96, actual: -965.40, balance: 14457.35, transferred: false, variance: -178.56 },
-  { month: "July 2023", monthIndex: 6, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 84.55, actual: 1005.51, balance: 15462.86, transferred: false, variance: -920.96 },
-  { month: "August 2023", monthIndex: 7, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 1440.41, actual: 1441.31, balance: 16904.17, transferred: false, variance: -0.90 },
-  { month: "September 2023", monthIndex: 8, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 516.27, actual: 657.50, balance: 17561.67, transferred: false, variance: -141.23 },
-  { month: "October 2023", monthIndex: 9, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 808.93, actual: 1642.03, balance: 19203.70, transferred: false, variance: -833.10 },
-  { month: "November 2023", monthIndex: 10, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 3985.04, actual: 3350.17, balance: 22553.87, transferred: false, variance: 634.87 },
-  { month: "December 2023", monthIndex: 11, yearIndex: 2023, category: "Emergency Reserve Allocation", allocated: 1767.11, actual: 1891.22, balance: 24445.09, transferred: false, variance: -124.11 },
-  { month: "January 2024", monthIndex: 0, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 4001.98, actual: 3820.46, balance: 28265.55, transferred: true, variance: 181.52 },
-  { month: "February 2024", monthIndex: 1, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 4224.51, actual: 4250.10, balance: 32515.65, transferred: true, variance: -25.59 },
-  { month: "March 2024", monthIndex: 2, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 3783.55, actual: 3700.80, balance: 36216.45, transferred: true, variance: 82.75 },
-  { month: "April 2024", monthIndex: 3, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 5880.17, actual: 5950.22, balance: 42166.67, transferred: true, variance: -70.05 },
-  { month: "May 2024", monthIndex: 4, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 6773.36, actual: 6141.33, balance: 48308.00, transferred: true, variance: 632.03 },
-  { month: "June 2024", monthIndex: 5, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 5476.03, actual: 5320.18, balance: 53628.18, transferred: true, variance: 155.85 },
-  { month: "July 2024", monthIndex: 6, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 3770.08, actual: 3890.50, balance: 57518.68, transferred: true, variance: -120.42 },
-  { month: "August 2024", monthIndex: 7, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 4671.06, actual: 4510.90, balance: 62029.58, transferred: true, variance: 160.16 },
-  { month: "September 2024", monthIndex: 8, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 6433.04, actual: 6580.20, balance: 68609.78, transferred: true, variance: -147.16 },
-  { month: "October 2024", monthIndex: 9, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 6868.02, actual: 6750.33, balance: 75360.11, transferred: true, variance: 117.69 },
-  { month: "November 2024", monthIndex: 10, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 5315.09, actual: 5440.80, balance: 80800.91, transferred: true, variance: -125.71 },
-  { month: "December 2024", monthIndex: 11, yearIndex: 2024, category: "Emergency Reserve Allocation", allocated: 3527.04, actual: 3390.15, balance: 84191.06, transferred: true, variance: 136.89 },
-  { month: "January 2025", monthIndex: 0, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 1780.75, actual: 1820.50, balance: 86011.56, transferred: true, variance: -39.75 },
-  { month: "February 2025", monthIndex: 1, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 390.00, actual: 410.25, balance: 86421.81, transferred: true, variance: -20.25 },
-  { month: "March 2025", monthIndex: 2, yearIndex: 2025, category: "Internal Team Salary", allocated: -6500.00, actual: -6500.00, balance: 79921.81, transferred: true, variance: 0.00 },
-  { month: "April 2025", monthIndex: 3, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 1478.50, actual: 1510.22, balance: 81432.03, transferred: true, variance: -31.72 },
-  { month: "May 2025", monthIndex: 4, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 280.93, actual: 295.80, balance: 81727.83, transferred: true, variance: -14.87 },
-  { month: "June 2025", monthIndex: 5, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 2845.27, actual: 2910.40, balance: 84638.23, transferred: true, variance: -65.13 },
-  { month: "July 2025", monthIndex: 6, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 328.73, actual: 340.10, balance: 84978.33, transferred: true, variance: -11.37 },
-  { month: "August 2025", monthIndex: 7, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 185.74, actual: 190.50, balance: 85168.83, transferred: true, variance: -4.76 },
-  { month: "September 2025", monthIndex: 8, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 4558.45, actual: 4620.30, balance: 89789.13, transferred: true, variance: -61.85 },
-  { month: "October 2025", monthIndex: 9, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 6007.10, actual: 6120.44, balance: 95909.57, transferred: true, variance: -113.34 },
-  { month: "November 2025", monthIndex: 10, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 3839.46, actual: 3890.20, balance: 99799.77, transferred: true, variance: -50.74 },
-  { month: "December 2025", monthIndex: 11, yearIndex: 2025, category: "Emergency Reserve Allocation", allocated: 5825.10, actual: 5825.10, balance: 105624.87, transferred: false, variance: 0.00 },
+const MONTH_ORDER = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
 ]
 
 function formatCurrency(value: number) {
@@ -72,30 +43,148 @@ interface ReserveLedgerTableProps {
   showCreateModal?: boolean
   setShowCreateModal?: (show: boolean) => void
   exportTrigger?: number
+  readOnly?: boolean
 }
 
-export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, exportTrigger }: ReserveLedgerTableProps) {
+export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, exportTrigger, readOnly = false }: ReserveLedgerTableProps) {
+  const { data: rawReserve, isLoading, error, mutate } = useAirtable('reserve', {
+    sort: [{ field: 'DateClean', direction: 'asc' }],
+  })
+
+  // Fetch P&L entries for the Month & Year dropdown
+  const { data: rawPnl } = useAirtable('profit-loss', {})
+
+  // Fetch expense categories for the Category dropdown
+  const { data: rawCategories } = useAirtable('expense-categories', {})
+
+  // Build sorted P&L options (newest first)
+  // P&L primary field "Month & Year" stores the full label e.g. "November 2025"
+  const pnlOptions = useMemo(() => {
+    if (!rawPnl) return []
+    return rawPnl
+      .map(r => ({
+        id: r.id,
+        label: String(
+          r.fields['Month & Year'] ??
+          r.fields['Month and Year'] ??
+          ''
+        ).trim(),
+        dateClean: String(r.fields['DateClean'] ?? ''),
+      }))
+      .filter(o => o.label)
+      .sort((a, b) => {
+        // DateClean is "YYYY/MM/D" — descending string sort puts newest first
+        if (a.dateClean && b.dateClean) return b.dateClean.localeCompare(a.dateClean)
+        return a.label.localeCompare(b.label)
+      })
+  }, [rawPnl])
+
+  // Build category options
+  const categoryOptions = useMemo(() => {
+    if (!rawCategories) return []
+    return rawCategories.map(r => ({
+      id: r.id,
+      label: String(
+        r.fields['Name'] ??
+        r.fields['Category'] ??
+        r.fields['Expense Category'] ??
+        r.fields['Category Name'] ??
+        r.id
+      ),
+    })).filter(o => o.label && o.label !== o.id)
+  }, [rawCategories])
+
+  // Default category: Emergency Reserve Allocation
+  const defaultCategoryId = useMemo(
+    () => categoryOptions.find(o => o.label.toLowerCase().includes('emergency reserve'))?.id ?? '',
+    [categoryOptions]
+  )
+
+  const liveData = useMemo((): LedgerRow[] => {
+    if (!rawReserve) return []
+    return rawReserve.map(r => {
+      const dateClean = String(r.fields['DateClean'] ?? '')
+      // Handle both "YYYY/MM/D" (formula) and "YYYY-MM-DD" (ISO date) formats
+      const sep = dateClean.includes('/') ? '/' : '-'
+      const parts = dateClean.split(sep)
+      const yearIndex = parseInt(parts[0] ?? '0')
+      const monthIndex = parseInt(parts[1] ?? '1') - 1 // 0-indexed
+
+      // Category (from Category) is a lookup — fall back to Transaction Type if unavailable
+      const catValue = r.fields['Category (from Category)']
+      let category: string
+      if (Array.isArray(catValue) && catValue.length > 0) {
+        category = String(catValue[0])
+      } else if (catValue) {
+        category = String(catValue)
+      } else {
+        category = String(r.fields['Transaction Type'] ?? '')
+      }
+
+      // Month & Year (from Month & Year) is a lookup — returns array of strings
+      const monthRaw = r.fields['Month & Year (from Month & Year)']
+      const month = String(Array.isArray(monthRaw) ? (monthRaw[0] ?? '') : (monthRaw ?? ''))
+
+      // Linked record IDs for pre-filling dropdowns on edit
+      const monthLinkRaw = r.fields['Month & Year']
+      const monthRecordId = Array.isArray(monthLinkRaw) ? String(monthLinkRaw[0] ?? '') : ''
+      const catLinkRaw = r.fields['Category']
+      const categoryRecordId = Array.isArray(catLinkRaw) ? String(catLinkRaw[0] ?? '') : ''
+
+      return {
+        recordId: r.id,
+        monthRecordId,
+        categoryRecordId,
+        month,
+        monthIndex,
+        yearIndex,
+        category,
+        transactionType: String(r.fields['Transaction Type'] ?? ''),
+        percentAllocation: parseCurrency(r.fields['% Allocation'] as string),
+        allocated: parseCurrency(r.fields['Allocated Amount'] as string),
+        actual: parseCurrency(r.fields['Actual Allocation'] as string),
+        accountBalance: parseCurrency(r.fields['Account Balance'] as string),
+        balance: parseCurrency(r.fields['New Account Balance'] as string),
+        transferred: Boolean(r.fields['Allocation Transferred']),
+        variance: parseCurrency(r.fields['Variance $'] as string),
+      }
+    })
+  }, [rawReserve])
+
   const [sortKey, setSortKey] = useState<SortKey>("month")
   const [sortDir, setSortDir] = useState<SortDirection>("asc")
   const [deleteConfirm, setDeleteConfirm] = useState<{index: number, row: LedgerRow} | null>(null)
   const [editingEntry, setEditingEntry] = useState<{index: number, row: LedgerRow} | null>(null)
-  const [formData, setFormData] = useState<Partial<LedgerRow>>({
-    month: "",
-    monthIndex: 0,
-    yearIndex: new Date().getFullYear(),
-    category: "",
-    allocated: 0,
+  const [selectedPnlId, setSelectedPnlId] = useState<string>('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [formData, setFormData] = useState({
+    transactionType: "",
+    percentAllocation: 0,
+    accountBalance: 0,
     actual: 0,
-    balance: 0,
     transferred: false,
-    variance: 0,
   })
+
+  // Pre-set default category when the Create modal opens
+  useEffect(() => {
+    if (showCreateModal && !editingEntry && defaultCategoryId) {
+      setSelectedCategoryId(prev => prev || defaultCategoryId)
+    }
+  }, [showCreateModal, editingEntry, defaultCategoryId])
+
+  const resetForm = () => {
+    setFormData({ transactionType: "", percentAllocation: 0, accountBalance: 0, actual: 0, transferred: false })
+    setSelectedPnlId('')
+    setSelectedCategoryId('')
+  }
 
   // Handle export when trigger changes
   useEffect(() => {
     if (exportTrigger && exportTrigger > 0) {
       handleExport()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportTrigger])
 
   const handleExport = () => {
@@ -130,61 +219,80 @@ export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, 
 
   const handleEdit = (index: number, row: LedgerRow) => {
     setEditingEntry({index, row})
-    setFormData(row)
+    setSelectedPnlId(row.monthRecordId)
+    setSelectedCategoryId(row.categoryRecordId)
+    setFormData({
+      transactionType: row.transactionType,
+      percentAllocation: row.percentAllocation,
+      accountBalance: row.accountBalance,
+      actual: row.actual,
+      transferred: row.transferred,
+    })
   }
 
   const handleDelete = (index: number, row: LedgerRow) => {
     setDeleteConfirm({index, row})
   }
 
-  const confirmDelete = () => {
-    if (deleteConfirm) {
-      console.log("Delete reserve entry:", deleteConfirm)
-      setDeleteConfirm(null)
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return
+    const { recordId } = deleteConfirm.row
+    try {
+      await fetch(`/api/airtable/reserve/${recordId}`, { method: 'DELETE' })
+      await mutate()
+    } catch (err) {
+      console.error('Delete failed:', err)
     }
+    setDeleteConfirm(null)
   }
 
-  const handleSaveEntry = () => {
-    if (editingEntry) {
-      console.log("Update reserve entry:", editingEntry.index, formData)
-    } else {
-      console.log("Create reserve entry:", formData)
+  const handleSaveEntry = async () => {
+    setIsSaving(true)
+    const fields: Record<string, unknown> = {
+      'Transaction Type': formData.transactionType,
+      '% Allocation': formData.percentAllocation,
+      'Account Balance': formData.accountBalance,
+      'Actual Allocation': formData.actual,
+      'Allocation Transferred': formData.transferred,
     }
-    setEditingEntry(null)
-    if (setShowCreateModal) setShowCreateModal(false)
-    setFormData({
-      month: "",
-      monthIndex: 0,
-      yearIndex: new Date().getFullYear(),
-      category: "",
-      allocated: 0,
-      actual: 0,
-      balance: 0,
-      transferred: false,
-      variance: 0,
-    })
+    if (selectedPnlId) fields['Month & Year'] = [selectedPnlId]
+    if (selectedCategoryId) fields['Category'] = [selectedCategoryId]
+
+    try {
+      if (editingEntry) {
+        await fetch(`/api/airtable/reserve/${editingEntry.row.recordId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      } else {
+        await fetch('/api/airtable/reserve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      }
+      await mutate()
+    } catch (err) {
+      console.error('Save failed:', err)
+    } finally {
+      setIsSaving(false)
+      setEditingEntry(null)
+      if (setShowCreateModal) setShowCreateModal(false)
+      resetForm()
+    }
   }
 
   const handleCloseModal = () => {
     setEditingEntry(null)
     if (setShowCreateModal) setShowCreateModal(false)
-    setFormData({
-      month: "",
-      monthIndex: 0,
-      yearIndex: new Date().getFullYear(),
-      category: "",
-      allocated: 0,
-      actual: 0,
-      balance: 0,
-      transferred: false,
-      variance: 0,
-    })
+    resetForm()
   }
 
   const filteredData = useMemo(() => {
-    if (year === "all") return allData
-    return allData.filter((row) => row.yearIndex === parseInt(year))
-  }, [year])
+    if (year === "all") return liveData
+    return liveData.filter((row) => row.yearIndex === parseInt(year))
+  }, [liveData, year])
 
   const sortedData = useMemo(() => {
     return [...filteredData].sort((a, b) => {
@@ -219,8 +327,11 @@ export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, 
     { key: "balance", label: "New Account Balance", align: "right" },
     { key: "transferred", label: "Transferred", align: "center" },
     { key: "variance", label: "Variance", align: "right" },
-    { label: "Actions", align: "center" },
+    ...(!readOnly ? [{ label: "Actions", align: "center" as const }] : []),
   ]
+
+  const inputCls = "w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+  const labelCls = "block text-[11px] font-medium text-muted-foreground mb-1"
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -262,9 +373,28 @@ export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, 
             </tr>
           </thead>
           <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-[13px] text-muted-foreground">
+                  Loading…
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-[13px] text-red-500">
+                  Failed to load data. Check the browser console for details.
+                </td>
+              </tr>
+            ) : sortedData.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-[13px] text-muted-foreground">
+                  No reserve entries found.
+                </td>
+              </tr>
+            ) : null}
             {sortedData.map((row, i) => (
               <tr
-                key={`${row.month}-${row.category}`}
+                key={`${row.month}-${row.category}-${i}`}
                 className={cn(
                   "border-b border-border last:border-0 transition-colors hover:bg-accent/30",
                   i % 2 === 0 ? "bg-card" : "bg-accent/10"
@@ -302,24 +432,26 @@ export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, 
                 <td className={cn("px-4 py-3.5 text-right whitespace-nowrap", row.variance < 0 ? "text-red-500" : row.variance > 0 ? "text-emerald-600" : "text-muted-foreground")}>
                   {formatCurrency(row.variance)}
                 </td>
-                <td className="px-4 py-3.5 text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <button
-                      onClick={() => handleEdit(i, row)}
-                      className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                      title="Edit"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(i, row)}
-                      className="h-7 w-7 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </td>
+                {!readOnly && (
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => handleEdit(i, row)}
+                        className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(i, row)}
+                        className="h-7 w-7 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -328,112 +460,138 @@ export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, 
 
       {/* Edit/Create Reserve Entry Modal */}
       {(editingEntry || showCreateModal) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-md">
-            <div className="px-6 py-4 border-b border-border">
-              <h3 className="text-base font-semibold text-foreground">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseModal} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
+              <h3 className="text-[15px] font-semibold text-foreground">
                 {editingEntry ? "Edit Reserve Entry" : "Add New Reserve Entry"}
               </h3>
+              <button onClick={handleCloseModal} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent transition-colors">
+                <X className="h-4 w-4 text-foreground/60" />
+              </button>
             </div>
-            <div className="px-6 py-4 space-y-4">
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+              {/* Month & Year — linked P&L entry */}
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                  Month & Year
-                </label>
-                <input
-                  type="text"
-                  value={formData.month || ""}
-                  onChange={(e) => setFormData({...formData, month: e.target.value})}
-                  placeholder="e.g., January 2025"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                <label className={labelCls}>Month &amp; Year (P&amp;L Entry)</label>
+                <SelectField
+                  value={
+                    !rawPnl
+                      ? 'Loading…'
+                      : selectedPnlId
+                        ? (pnlOptions.find(o => o.id === selectedPnlId)?.label ?? 'Select month…')
+                        : 'Select month…'
+                  }
+                  onChange={(v) => {
+                    const opt = pnlOptions.find(o => o.label === v)
+                    setSelectedPnlId(opt?.id ?? '')
+                  }}
+                  options={rawPnl ? ['Select month…', ...pnlOptions.map(o => o.label)] : ['Loading…']}
+                  containerClassName="w-full"
+                  className="w-full"
+                  disabled={!rawPnl}
                 />
               </div>
+
+              {/* Category — linked expense category */}
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                  Category
-                </label>
-                <input
-                  type="text"
-                  value={formData.category || ""}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  placeholder="e.g., Emergency Reserve Allocation"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                <label className={labelCls}>Category</label>
+                <SelectField
+                  value={
+                    !rawCategories
+                      ? 'Loading…'
+                      : selectedCategoryId
+                        ? (categoryOptions.find(o => o.id === selectedCategoryId)?.label ?? 'Select category…')
+                        : 'Select category…'
+                  }
+                  onChange={(v) => {
+                    const opt = categoryOptions.find(o => o.label === v)
+                    setSelectedCategoryId(opt?.id ?? '')
+                  }}
+                  options={rawCategories ? ['Select category…', ...categoryOptions.map(o => o.label)] : ['Loading…']}
+                  containerClassName="w-full"
+                  className="w-full"
+                  disabled={!rawCategories}
                 />
               </div>
+
+              {/* Transaction Type */}
+              <div>
+                <label className={labelCls}>Transaction Type</label>
+                <SelectField
+                  value={formData.transactionType || 'Select type…'}
+                  onChange={(v) => setFormData({...formData, transactionType: v === 'Select type…' ? '' : v})}
+                  options={['Select type…', 'Credit', 'Debit']}
+                  containerClassName="w-full"
+                  className="w-full"
+                />
+              </div>
+
+              {/* % Allocation + Account Balance */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                    Allocated Amount
-                  </label>
+                  <label className={labelCls}>% Allocation</label>
                   <input
                     type="number"
-                    value={formData.allocated || ""}
-                    onChange={(e) => setFormData({...formData, allocated: parseFloat(e.target.value) || 0})}
+                    step="0.01"
+                    value={formData.percentAllocation || ""}
+                    onChange={(e) => setFormData({...formData, percentAllocation: parseFloat(e.target.value) || 0})}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className={inputCls}
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                    Actual Allocation
-                  </label>
+                  <label className={labelCls}>Account Balance</label>
                   <input
                     type="number"
-                    value={formData.actual || ""}
-                    onChange={(e) => setFormData({...formData, actual: parseFloat(e.target.value) || 0})}
+                    step="0.01"
+                    value={formData.accountBalance || ""}
+                    onChange={(e) => setFormData({...formData, accountBalance: parseFloat(e.target.value) || 0})}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className={inputCls}
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                    New Account Balance
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.balance || ""}
-                    onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                    Variance
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.variance || ""}
-                    onChange={(e) => setFormData({...formData, variance: parseFloat(e.target.value) || 0})}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
+
+              {/* Actual Allocation */}
+              <div>
+                <label className={labelCls}>Actual Allocation</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.actual || ""}
+                  onChange={(e) => setFormData({...formData, actual: parseFloat(e.target.value) || 0})}
+                  placeholder="0.00"
+                  className={inputCls}
+                />
               </div>
+
+              {/* Allocation Transferred */}
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={formData.transferred || false}
+                  checked={formData.transferred}
                   onChange={(e) => setFormData({...formData, transferred: e.target.checked})}
-                  className="rounded border border-border"
+                  className="h-4 w-4 rounded border-border accent-foreground cursor-pointer"
                 />
-                <span className="text-[13px] text-foreground">Transferred</span>
+                <span className="text-[13px] text-foreground">Allocation Transferred</span>
               </label>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2 shrink-0">
               <button
                 onClick={handleCloseModal}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEntry}
-                className="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-medium transition-colors"
+                disabled={isSaving}
+                className="px-4 py-1.5 rounded-lg bg-foreground text-background hover:opacity-90 text-[13px] font-medium transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {editingEntry ? "Update" : "Create"}
+                {isSaving ? "Saving…" : editingEntry ? "Update" : "Create"}
               </button>
             </div>
           </div>
@@ -442,9 +600,10 @@ export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, 
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-sm">
-            <div className="px-6 py-4 border-b border-border">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-sm">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border">
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
                 <div>
@@ -455,16 +614,16 @@ export function ReserveLedgerTable({ year, showCreateModal, setShowCreateModal, 
                 </div>
               </div>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
               >
                 Delete
               </button>

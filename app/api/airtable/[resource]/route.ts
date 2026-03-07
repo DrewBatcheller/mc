@@ -24,11 +24,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { listRecords, AirtableError } from '@/lib/airtable'
+import { createHash } from 'crypto'
+import { listRecords, listAllRecords, AirtableError, createRecord } from '@/lib/airtable'
 import { buildRoleFilter, extractQueryContext } from '@/lib/role-filter'
 import { getOrSet, cacheKey, invalidatePattern, TTL } from '@/lib/cache'
 import { TABLE_NAMES } from '@/lib/types'
 import type { ResourceSlug } from '@/lib/types'
+import { broadcastMutation } from '@/lib/websocket-server'
 
 export async function GET(
   request: NextRequest,
@@ -66,6 +68,11 @@ export async function GET(
       filterByFormula = extraFilter
     }
 
+    // Debug logging
+    if (filterByFormula) {
+      console.log(`[/api/airtable] Resource: ${resource}, Filter formula:`, filterByFormula)
+    }
+
     // ── Parse additional options from query params ────────────────────────────
     const options: Parameters<typeof listRecords>[1] = {}
     if (filterByFormula) options.filterByFormula = filterByFormula
@@ -96,23 +103,36 @@ export async function GET(
 
     // ── Cache ────────────────────────────────────────────────────────────────
     const noCache = searchParams.get('noCache') === 'true'
+    const fieldsSuffix = fields.length > 0 ? fields.slice().sort().join(',') : ''
+    // Hash the full filter formula to avoid cache collisions.
+    // Previously we truncated to 50 chars, which caused RECORD_ID() filters
+    // with overlapping prefixes to share cache entries and return stale results.
+    const filterHash = filterByFormula
+      ? createHash('md5').update(filterByFormula).digest('hex').slice(0, 16)
+      : ''
     const key = cacheKey(
       resource,
       ctx.role,
       ctx.clientId ?? ctx.userId,
-      filterByFormula?.slice(0, 50)  // partial formula for key uniqueness
+      [filterHash, fieldsSuffix].filter(Boolean).join('|') || undefined
     )
 
+    // Auto-paginate when no maxRecords cap — returns all matching records
+    const doFetch = async () => {
+      if (options.maxRecords) {
+        const res = await listRecords(tableName, options)
+        return { records: res.records, offset: res.offset }
+      }
+      const records = await listAllRecords(tableName, options)
+      return { records, offset: undefined }
+    }
+
     if (noCache) {
-      const result = await listRecords(tableName, options)
+      const result = await doFetch()
       return NextResponse.json({ records: result.records, offset: result.offset, cached: false })
     }
 
-    const { data, cached } = await getOrSet(
-      key,
-      () => listRecords(tableName, options),
-      TTL.medium
-    )
+    const { data, cached } = await getOrSet(key, doFetch, TTL.medium)
 
     return NextResponse.json({ records: data.records, offset: data.offset, cached })
 
@@ -139,9 +159,49 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only management can create records via API for now
-    if (ctx.role !== 'management' && ctx.role !== 'strategy') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Role-based creation permissions:
+    //   experiment-ideas  → management, strategy, client
+    //   notes             → management, strategy, sales, team  (all internal staff)
+    //   tasks             → management, strategy, sales  (sales can create their own tasks)
+    //   leads             → management, strategy, sales  (sales team manages the pipeline)
+    //   notifications     → management, strategy, sales, team  (for task assignment notifications)
+    //   everything else   → management, strategy only
+    const canCreateIdeas         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'client')
+    const canCreateNotes         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team' || ctx.role === 'client')
+    const canCreateTasks         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales')
+    const canCreateLeads         = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales')
+    const canCreateNotifications = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team')
+    const canCreateDelays        = (ctx.role === 'management' || ctx.role === 'strategy' || ctx.role === 'sales' || ctx.role === 'team')
+    const canCreateOthers        = (ctx.role === 'management' || ctx.role === 'strategy')
+
+    if (resource === 'experiment-ideas') {
+      if (!canCreateIdeas) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'notes') {
+      if (!canCreateNotes) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'tasks') {
+      if (!canCreateTasks) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'leads') {
+      if (!canCreateLeads) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'notifications') {
+      if (!canCreateNotifications) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (resource === 'delays') {
+      if (!canCreateDelays) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else {
+      if (!canCreateOthers) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const tableName = TABLE_NAMES[resource as ResourceSlug]
@@ -150,11 +210,22 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { createRecord } = await import('@/lib/airtable')
-    const record = await createRecord(tableName, body.fields ?? body)
+    let fields = body.fields ?? body
+
+    // For clients creating experiment ideas, enforce client data isolation.
+    // Ideas are records with no Batch — the absence of a Batch makes them ideas.
+    if (resource === 'experiment-ideas' && ctx.role === 'client' && ctx.clientId) {
+      fields['Brand Name'] = [ctx.clientId]
+    }
+
+    const { createRecord: createRecordFn } = await import('@/lib/airtable')
+    const record = await createRecordFn(tableName, fields)
 
     // Invalidate cache for this resource
     await invalidatePattern(`${resource}:*`)
+    
+    // Broadcast mutation to all connected users with permission
+    await broadcastMutation(resource, 'create', record.id, record)
 
     return NextResponse.json({ record }, { status: 201 })
 

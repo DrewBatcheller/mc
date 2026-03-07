@@ -1,23 +1,74 @@
+"use client"
+
 import { DollarSign, Repeat, CreditCard, TrendingUp, BarChart3, Percent, PieChart } from "lucide-react"
 import { MetricCard } from "@/components/shared/metric-card"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { useMemo } from "react"
 
 interface DrilldownStatCardsProps {
   month?: string
 }
 
 export function DrilldownStatCards({ month = "2025-01" }: DrilldownStatCardsProps) {
-  // Sample data for different months
-  const monthlyData: Record<string, { revenue: number; mrr: number; expenses: number; profit: number; ebitda: number; ebitdaMargin: string; grossMargin: string }> = {
-    "2025-01": { revenue: 23000, mrr: 17500, expenses: 7446, profit: 14747, ebitda: 13420, ebitdaMargin: "-55.3%", grossMargin: "64.1%" },
-    "2025-02": { revenue: 25400, mrr: 19200, expenses: 8100, profit: 16200, ebitda: 15100, ebitdaMargin: "-40.5%", grossMargin: "68.2%" },
-    "2025-03": { revenue: 28900, mrr: 21800, expenses: 8800, profit: 19100, ebitda: 18500, ebitdaMargin: "-35.2%", grossMargin: "69.5%" },
-    "2025-04": { revenue: 22100, mrr: 16700, expenses: 7200, profit: 13900, ebitda: 12800, ebitdaMargin: "-42.1%", grossMargin: "67.4%" },
-    "2025-05": { revenue: 31200, mrr: 23600, expenses: 9400, profit: 20800, ebitda: 19800, ebitdaMargin: "-32.1%", grossMargin: "69.9%" },
-    "2025-06": { revenue: 27800, mrr: 21000, expenses: 8600, profit: 18200, ebitda: 17200, ebitdaMargin: "-38.1%", grossMargin: "69.1%" },
-  }
+  const { data: revenue } = useAirtable('revenue', {
+    fields: ['Amount USD', 'Date', 'Monthly Recurring Revenue'],
+  })
+
+  const { data: expenses } = useAirtable('expenses', {
+    fields: ['Expense', 'Date'],
+  })
+
+  const { data: clients } = useAirtable('clients', {
+    fields: ['Monthly Price'],
+  })
+
+  const monthlyStats = useMemo(() => {
+    // Parse month string (e.g., "2025-01")
+    const [year, monthNum] = month.split('-')
+    const monthDate = new Date(`${year}-${monthNum}-01`)
+
+    // Filter revenue for selected month
+    const monthRevenue = (revenue ?? []).filter(r => {
+      const d = r.fields['Date'] as string
+      if (!d) return false
+      const date = new Date(d)
+      return date.getFullYear() === parseInt(year) && date.getMonth() === parseInt(monthNum) - 1
+    })
+
+    // Filter expenses for selected month
+    const monthExpenses = (expenses ?? []).filter(r => {
+      const d = r.fields['Date'] as string
+      if (!d) return false
+      const date = new Date(d)
+      return date.getFullYear() === parseInt(year) && date.getMonth() === parseInt(monthNum) - 1
+    })
+
+    // Calculate totals
+    const totalRevenue = monthRevenue.reduce((sum, r) => sum + parseCurrency(r.fields['Amount USD'] as string), 0)
+    const totalExpenses = monthExpenses.reduce((sum, r) => sum + parseCurrency(r.fields['Expense'] as string), 0)
+    const mrrRevenue = monthRevenue
+      .filter(r => r.fields['Monthly Recurring Revenue'])
+      .reduce((sum, r) => sum + parseCurrency(r.fields['Amount USD'] as string), 0)
+
+    const netProfit = totalRevenue - totalExpenses
+    const ebitda = netProfit // Simplified - actual EBITDA would exclude other items
+    const ebitdaMargin = totalRevenue > 0 ? ((ebitda / totalRevenue) * 100).toFixed(1) : "0"
+    const grossMargin = totalRevenue > 0 ? (((totalRevenue - totalExpenses) / totalRevenue) * 100).toFixed(1) : "0"
+
+    return {
+      revenue: totalRevenue,
+      mrr: mrrRevenue,
+      expenses: totalExpenses,
+      profit: netProfit,
+      ebitda,
+      ebitdaMargin: `${ebitdaMargin}%`,
+      grossMargin: `${grossMargin}%`,
+    }
+  }, [revenue, expenses, month])
 
   const getMonthlyStats = () => {
-    const data = monthlyData[month] || monthlyData["2025-01"]
+    const data = monthlyStats
     
     const row1 = [
       { label: "Total Revenue", value: data.revenue, icon: DollarSign, currency: true },

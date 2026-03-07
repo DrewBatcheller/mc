@@ -3,26 +3,33 @@
 import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAirtable } from '@/hooks/use-airtable'
 import { ContentCard } from '@/components/shared/content-card'
 import { ExperimentDetailsModal } from '@/components/experiments/experiment-details-modal'
 
 type TestStatus = 'Successful' | 'Inconclusive' | 'Unsuccessful'
 
 interface RecentResult {
+  id: string
   name: string
   status: TestStatus
   placement: string
+  placementUrl?: string
   endDate: string
   revenueAdded: number
-  client?: string
   launchDate?: string
   rationale?: string
+  hypothesis?: string
   goals?: string[]
-  device?: string
+  devices?: string
   geos?: string
   deployed?: boolean
-  controlLabel?: string
-  variantLabel?: string
+  whatHappened?: string
+  nextSteps?: string
+  controlImage?: string
+  variantImage?: string
+  resultImage?: string
+  resultVideo?: string
 }
 
 const statusStyles: Record<TestStatus, string> = {
@@ -37,73 +44,6 @@ const cardBorder: Record<TestStatus, string> = {
   Inconclusive: 'border-l-amber-400',
 }
 
-const results: RecentResult[] = [
-  {
-    name: 'OTP Under ATC (L/F)',
-    status: 'Successful',
-    placement: 'Landing Page (Under ATC)',
-    endDate: 'January 10, 2026',
-    revenueAdded: 45000,
-    client: 'Vita Hustle',
-    launchDate: 'December 27, 2025',
-    rationale: 'Testing one-time purchase offers directly under the add-to-cart button to increase conversion rates on landing pages.',
-    goals: ['CVR', 'AOV'],
-    device: 'All Devices',
-    geos: 'US, CA',
-    deployed: true,
-    controlLabel: 'Standard ATC',
-    variantLabel: 'OTP Below ATC',
-  },
-  {
-    name: 'Vertical Stack Buybox & Gamification',
-    status: 'Inconclusive',
-    placement: 'PDP Buybox / Flavor Selection Area',
-    endDate: 'February 7, 2026',
-    revenueAdded: 0,
-    client: 'Vita Hustle',
-    launchDate: 'January 24, 2026',
-    rationale: 'Restructuring the buybox with gamification elements to improve engagement and conversion on product detail pages.',
-    goals: ['CVR', 'ATC'],
-    device: 'All Devices',
-    geos: 'US',
-    deployed: false,
-    controlLabel: 'Horizontal Buybox',
-    variantLabel: 'Vertical Stack + Gamification',
-  },
-  {
-    name: 'Checkout UVP Tests',
-    status: 'Unsuccessful',
-    placement: 'Checkout Page',
-    endDate: 'December 4, 2025',
-    revenueAdded: 0,
-    client: 'Vita Hustle',
-    launchDate: 'November 20, 2025',
-    rationale: 'Adding unique value propositions at checkout to reduce cart abandonment and increase completion rates.',
-    goals: ['CVR'],
-    device: 'All Devices',
-    geos: 'US, CA',
-    deployed: false,
-    controlLabel: 'Standard Checkout',
-    variantLabel: 'UVP-Enhanced Checkout',
-  },
-  {
-    name: 'Free Shipping Banner',
-    status: 'Successful',
-    placement: 'Header',
-    endDate: 'January 25, 2026',
-    revenueAdded: 22000,
-    client: 'Vita Hustle',
-    launchDate: 'January 11, 2026',
-    rationale: 'Promoting free shipping threshold in a prominent header banner to encourage larger cart sizes and increase average order value.',
-    goals: ['AOV', 'CVR'],
-    device: 'All Devices',
-    geos: 'US, CA, UK',
-    deployed: true,
-    controlLabel: 'No Banner',
-    variantLabel: 'Free Shipping Banner',
-  },
-]
-
 const RESULTS_PER_PAGE = 2
 
 function formatRevenue(n: number) {
@@ -112,50 +52,98 @@ function formatRevenue(n: number) {
   return `$${n.toLocaleString()}`
 }
 
-// Convert RecentResult to Experiment interface for modal compatibility
+function formatMrr(value: number | undefined): string {
+  if (value === undefined || value === 0) return "$0"
+  if (value >= 1000000) return "$" + (value / 1000000).toFixed(1) + "M"
+  if (value >= 1000) return "$" + (value / 1000).toFixed(1) + "K"
+  return "$" + value.toLocaleString()
+}
+
+function getImageUrl(field: any): string | undefined {
+  if (Array.isArray(field) && field.length > 0) return field[0].url || field[0]
+  if (typeof field === 'string') return field
+  return undefined
+}
+
 function convertResultToExperiment(result: RecentResult): any {
   return {
     name: result.name,
     description: result.rationale || '',
     status: result.status,
     placement: result.placement,
-    devices: result.device || 'All Devices',
+    placementUrl: result.placementUrl,
+    devices: result.devices || 'All Devices',
     geos: result.geos || 'US',
-    variants: "2",
-    revenue: formatRevenue(result.revenueAdded),
     primaryGoals: result.goals || [],
+    hypothesis: result.hypothesis || '',
     rationale: result.rationale || '',
-    revenueAddedMrr: formatRevenue(result.revenueAdded),
-    deployed: result.deployed || false,
+    revenueAddedMrr: formatMrr(result.revenueAdded),
+    deployed: result.deployed,
     launchDate: result.launchDate || '',
     endDate: result.endDate,
+    whatHappened: result.whatHappened || '',
+    nextSteps: result.nextSteps || '',
+    controlImage: result.controlImage,
+    variantImage: result.variantImage,
+    resultImage: result.resultImage,
+    resultVideo: result.resultVideo,
   }
 }
 
-export function ClientRecentResults() {
+export function ClientRecentResults({ clientId }: { clientId?: string }) {
+  const clientFilter = clientId
+    ? `{Record ID (from Brand Name)} = "${clientId}"`
+    : undefined
+
+  const { data: experiments } = useAirtable('experiments', {
+    fields: ['Test Description', 'Test Status', 'Placement', 'Placement URL', 'End Date', 'Revenue Added (MRR) (Regular Format)', 'Launch Date', 'Hypothesis', 'Rationale', 'Category Primary Goals', 'Devices', 'GEOs', 'Deployed', 'Describe what happened & what we learned', 'Next Steps (Action)', 'Control Image', 'Variant Image', 'PTA Result Image', 'Post-Test Analysis (Loom)'],
+    filterExtra: clientFilter,
+  })
+
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedResult, setSelectedResult] = useState<RecentResult | null>(null)
-  
+
+  const results = useMemo(() => {
+    if (!experiments) return []
+    return experiments
+      .filter(e => e.fields['Test Status'] && ['Successful', 'Unsuccessful', 'Inconclusive'].includes(String(e.fields['Test Status'])))
+      .map(e => ({
+        id: e.id,
+        name: String(e.fields['Test Description'] || ''),
+        status: String(e.fields['Test Status']) as TestStatus,
+        placement: String(e.fields['Placement'] || ''),
+        placementUrl: String(e.fields['Placement URL'] || ''),
+        endDate: String(e.fields['End Date'] || ''),
+        revenueAdded: typeof e.fields['Revenue Added (MRR) (Regular Format)'] === 'number' ? e.fields['Revenue Added (MRR) (Regular Format)'] : 0,
+        launchDate: String(e.fields['Launch Date'] || ''),
+        hypothesis: String(e.fields['Hypothesis'] || ''),
+        rationale: String(e.fields['Rationale'] || ''),
+        goals: e.fields['Category Primary Goals'] ? String(e.fields['Category Primary Goals']).split(',').map((g: string) => g.trim()) : [],
+        devices: String(e.fields['Devices'] || ''),
+        geos: String(e.fields['GEOs'] || ''),
+        deployed: e.fields['Deployed'] === true,
+        whatHappened: String(e.fields['Describe what happened & what we learned'] || ''),
+        nextSteps: String(e.fields['Next Steps (Action)'] || ''),
+        controlImage: getImageUrl(e.fields['Control Image']),
+        variantImage: getImageUrl(e.fields['Variant Image']),
+        resultImage: getImageUrl(e.fields['PTA Result Image']),
+        resultVideo: getImageUrl(e.fields['Post-Test Analysis (Loom)']),
+      }))
+      .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
+  }, [experiments])
+
   const totalPages = Math.ceil(results.length / RESULTS_PER_PAGE)
   const paginatedResults = useMemo(() => {
     const start = currentPage * RESULTS_PER_PAGE
     return results.slice(start, start + RESULTS_PER_PAGE)
-  }, [currentPage])
-
-  const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(0, prev - 1))
-  }
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))
-  }
+  }, [currentPage, results])
 
   return (
     <ContentCard title="Recent Experiment Results">
       <div className="flex-1 px-5 py-4 flex flex-col gap-3">
         {paginatedResults.map((result) => (
           <div
-            key={result.name}
+            key={result.id}
             onClick={() => setSelectedResult(result)}
             className={cn(
               'rounded-lg border border-border p-4 border-l-[3px] flex flex-col gap-2 cursor-pointer hover:shadow-md transition-all',
@@ -164,7 +152,7 @@ export function ClientRecentResults() {
           >
             <div className="flex items-start justify-between gap-2">
               <span className="text-[13px] font-semibold text-foreground">{result.name}</span>
-              {result.revenueAdded > 0 && (
+              {result.status === 'Successful' && result.revenueAdded > 0 && (
                 <span className="text-[12px] font-semibold text-emerald-600 whitespace-nowrap">
                   {formatRevenue(result.revenueAdded)}
                 </span>
@@ -173,12 +161,7 @@ export function ClientRecentResults() {
             <div className="flex flex-col gap-1 text-[12px]">
               <div className="flex items-center gap-1.5">
                 <span className="text-muted-foreground">Status:</span>
-                <span
-                  className={cn(
-                    'inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border',
-                    statusStyles[result.status]
-                  )}
-                >
+                <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border', statusStyles[result.status])}>
                   {result.status}
                 </span>
               </div>
@@ -194,38 +177,26 @@ export function ClientRecentResults() {
           </div>
         ))}
       </div>
-      
-      {/* Pagination */}
+
       <div className="px-5 py-3 border-t border-border flex items-center justify-between">
         <span className="text-[12px] text-muted-foreground">
-          {currentPage + 1} of {totalPages || 1}
+          {results.length > 0 ? currentPage + 1 : 0} of {totalPages || 1}
         </span>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={handlePrevPage}
-            disabled={currentPage === 0}
-            className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="Previous page"
-          >
+          <button onClick={() => setCurrentPage(p => Math.max(0, p - 1))} disabled={currentPage === 0} className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <ChevronLeft className="h-4 w-4 text-muted-foreground" />
           </button>
-          <button
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages - 1}
-            className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="Next page"
-          >
+          <button onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))} disabled={currentPage === totalPages - 1} className="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
       </div>
 
-      {/* Result Detail Modal */}
       {selectedResult && (
-        <ExperimentDetailsModal 
+        <ExperimentDetailsModal
           isOpen={!!selectedResult}
-          experiment={convertResultToExperiment(selectedResult)} 
-          onClose={() => setSelectedResult(null)} 
+          experiment={convertResultToExperiment(selectedResult)}
+          onClose={() => setSelectedResult(null)}
         />
       )}
     </ContentCard>

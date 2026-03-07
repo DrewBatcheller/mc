@@ -1,13 +1,18 @@
 "use client"
 
 import { useState, useMemo, Fragment } from "react"
-import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Send } from "lucide-react"
+import { Search, Plus, ArrowUpDown, ChevronDown, ExternalLink, Send, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 import { NewIdeaModal } from "./new-idea-modal"
 import { SyncIdeaModal } from "./sync-idea-modal"
+import { NotesPanel } from "@/components/shared/notes-panel"
+import { useAirtable } from "@/hooks/use-airtable"
+import { useUser } from "@/contexts/UserContext"
 
-interface Idea {
+export interface Idea {
+  id: string
+  clientId: string
   client: string
   name: string
   hypothesis: string
@@ -18,93 +23,147 @@ interface Idea {
   devices: string
   geos: string
   priority: string
-  createdBy: string
+  weighting: string
+  noteIds: string[]
+  noteCount: number
 }
-
-const ideas: Idea[] = [
-  { client: "The Ayurveda Experience", name: "Dermatologist/Practitioner Authority Block", hypothesis: "Adding an authoritative expert voice will increase the \"Believability\" of product claims and drive higher CVR.", rationale: "Users are skeptical of brand claims alone. A third-party expert endorsement adds credibility and reduces purchase hesitation for skincare products.", placementLabel: "Between \"How it Works\" section and User Reviews", placementUrl: "https://theayurvedaexperience.com/pages/firm-focus-neck-mask-a", goals: ["CVR", "RPV"], devices: "All Devices", geos: "US CA AU", priority: "3", createdBy: "Jayden Gray" },
-  { client: "Vita Hustle", name: "\"Love the Taste or It's Free\" Guarantee", hypothesis: "If we add a specific \"Taste-Match\" badge near the ATC, then CVR will increase by addressing the primary barrier to protein purchases: taste anxiety.", rationale: "Users hesitate to buy large bags of new flavors. A specific taste guarantee removes the psychological risk of being stuck with a chalky protein powder they can't return.", placementLabel: "PDP ATC Area", placementUrl: "https://vitahustle.com/products/one-superfood-protein-shake-strawberry?flavor=chocolate", goals: ["CVR", "ATC", "RPV"], devices: "All Devices", geos: "US", priority: "5", createdBy: "Jayden Gray" },
-  { client: "Fake Brand", name: "Replace sticky \"Add to Cart\" copy", hypothesis: "Replacing the sticky \"Add to Cart\" button with a floating one that follows the user will increase mobile CVR by keeping the primary action always visible.", rationale: "On long PDPs, users scroll past the ATC button and lose the conversion prompt. A persistent floating CTA keeps the purchase action always within reach.", placementLabel: "Bottom Screen Floating Sticky", placementUrl: "www.placementurl.com", goals: ["CVR"], devices: "Desktop", geos: "CA", priority: "2", createdBy: "Jayden Gray" },
-  { client: "Cosara", name: "First-Person vs. Second-Person Button Copy", hypothesis: "If we change CTA copy to first-person (\"I Want Triple Stimulation\"), then ATC rate will increase by creating stronger psychological ownership.", rationale: "Research shows first-person CTA copy creates a sense of personal commitment, making users more likely to follow through on the action.", placementLabel: "CTA", placementUrl: "https://cosara.com/pages/upgrade-uk", goals: ["ATC", "CVR"], devices: "All Devices", geos: "US CA GB AU", priority: "4", createdBy: "Jayden Gray" },
-  { client: "Vita Hustle", name: "Price Per Serving & Total Savings Visualization", hypothesis: "If we emphasize the \"$2.66/serving\" cost and show \"You Save $10.00\" in high contrast green, then SCVR will increase by making the value undeniable.", rationale: "Breaking down large lump sums into a \"Daily Ritual\" cost triggers rational value logic, making the purchase feel like a smaller daily investment.", placementLabel: "Purchase Options / Buybox", placementUrl: "https://vitahustle.com/products/one-superfood-protein-shake-strawberry?flavor=chocolate", goals: ["CVR", "RPV"], devices: "All Devices", geos: "US", priority: "2", createdBy: "Jayden Gray" },
-  { client: "Cosara", name: "Unboxing Privacy Assurance", hypothesis: "If we show a 5-second loop of a plain, unbranded brown box being opened, then CVR will increase by addressing the #1 objection for personal products: privacy.", rationale: "Discreet packaging is a top concern for personal wellness products. Showing the actual unboxing experience removes ambiguity and builds trust.", placementLabel: "Before FAQ", placementUrl: "https://cosara.com/pages/upgrade-uk", goals: ["ATC", "CVR", "RPV"], devices: "All Devices", geos: "US CA GB AU", priority: "4", createdBy: "Jayden Gray" },
-  { client: "Unassigned", name: "Change hero CTA button text", hypothesis: "Changing the hero CTA from \"Shop Now\" to \"Get 20% Off Your First Order\" will increase click-through by adding a concrete value proposition.", rationale: "Generic CTAs like \"Shop Now\" don't communicate any benefit. Stating the discount upfront gives users a clear reason to click.", placementLabel: "LP Hero Section", placementUrl: "www.sdfddsfds.com", goals: ["CVR", "RPV"], devices: "All Devices", geos: "AU", priority: "3", createdBy: "Jayden Gray" },
-  { client: "The Ayurveda Experience", name: "Menu Hierarchy: Concern-Led Navigation", hypothesis: "Swapping the order of \"Shop by Category\" and \"Shop by Concern\" in the mega-menu will increase product discovery and ATC rate.", rationale: "Most users shop by concern (anti-aging, acne) rather than category (serums, masks). Prioritizing concern-led navigation matches user intent.", placementLabel: "Global Navigation Mega-Menu", placementUrl: "https://theayurvedaexperience.com/", goals: ["CVR", "ATC", "PPV", "CTR"], devices: "All Devices", geos: "US CA AU", priority: "5", createdBy: "Jayden Gray" },
-  { client: "Cosara", name: "The \"Momentum\" CTA Injection", hypothesis: "If we insert a CTA block after every primary feature description, then ATC will increase by reducing scroll distance to the next conversion point.", rationale: "Long-form landing pages lose users between sections. Repeated CTAs capture intent at each peak of interest rather than forcing users to scroll back up.", placementLabel: "After Each Primary Section", placementUrl: "https://cosara.com/pages/upgrade-uk", goals: ["ATC", "CVR"], devices: "All Devices", geos: "US CA GB AU", priority: "3", createdBy: "Jayden Gray" },
-  { client: "The Ayurveda Experience", name: "Hero Video Background (String-to-Silk)", hypothesis: "Seeing the unique texture in motion will better explain the \"String-to-Silk\" concept and increase engagement with the hero section.", rationale: "The product's unique texture transformation is difficult to convey with static images. Video demonstrates the experience in a way that text cannot.", placementLabel: "Hero section background or side media element", placementUrl: "https://theayurvedaexperience.com/pages/firm-focus-neck-mask-a", goals: ["ATC", "CVR"], devices: "All Devices", geos: "US CA AU", priority: "2", createdBy: "Jayden Gray" },
-  { client: "The Ayurveda Experience", name: "AOV-Boosting Shipping Progress Bar", hypothesis: "Replacing static text with a visual progress bar that updates live will increase AOV by making the free-shipping threshold feel achievable.", rationale: "Static \"Free shipping over $X\" text doesn't create urgency. A dynamic progress bar gamifies the experience and motivates users to add more items.", placementLabel: "Top of the Cart page, above product list", placementUrl: "https://theayurvedaexperience.com/cart", goals: ["AOV", "CVR", "RPV"], devices: "All Devices", geos: "US AU", priority: "4", createdBy: "Jayden Gray" },
-  { client: "Vita Hustle", name: "Cart Drawer Cross-Sell & Impulse Add-ons", hypothesis: "If we add a \"Frequently Bought Together\" section in the cart drawer with low-friction items, then AOV will increase via impulse purchases.", rationale: "Once a user commits to a $50 bag, adding a $10 shaker or smaller accessory feels like a minor marginal cost that doesn't require heavy consideration.", placementLabel: "Cart Drawer / Slide-out Cart", placementUrl: "https://vitahustle.com/cart", goals: ["AOV", "ATC", "RPV"], devices: "All Devices", geos: "US", priority: "4", createdBy: "Jayden Gray" },
-  { client: "Cosara", name: "\"Silent Tech\" Sound Comparison", hypothesis: "If we add a short video or \"sound bar\" comparing a standard device vs. Cosara, then CVR will increase by making the silence benefit tangible.", rationale: "\"Quiet\" is an abstract claim. An audio or visual comparison makes the benefit concrete and memorable, differentiating from competitors.", placementLabel: "Under Comparison Chart", placementUrl: "https://cosara.com/pages/upgrade-uk", goals: ["ATC", "CVR", "RPV"], devices: "All Devices", geos: "US CA GB AU", priority: "2", createdBy: "Jayden Gray" },
-  { client: "Cosara", name: "Expanded Mobile Search Input", hypothesis: "If we replace the small magnifying glass icon with a full-width search bar on mobile, then product discovery and CVR will increase.", rationale: "A small icon requires an extra tap and reduces search visibility. A full-width input encourages search behavior, which typically converts 2-3x higher.", placementLabel: "Site-Wide (Search)", placementUrl: "https://cosara.com/", goals: ["ATC", "CVR", "AOV", "RPV"], devices: "Mobile", geos: "US CA GB AU", priority: "3", createdBy: "Jayden Gray" },
-  { client: "Vita Hustle", name: "In-Cart Subscription Switcher", hypothesis: "If we add a toggle in the cart drawer to \"Switch to Subscribe & Save,\" then Subscription CVR will increase by capturing users swayed by final price savings.", rationale: "Seeing the total price in the cart is the \"moment of truth.\" A 20% discount here is a powerful final nudge toward subscription.", placementLabel: "Slide-out Cart Drawer", placementUrl: "https://vitahustle.com/", goals: ["CVR", "SCVR", "RPV"], devices: "All Devices", geos: "US", priority: "5", createdBy: "Jayden Gray" },
-  { client: "Vita Hustle", name: "Move OTP Below ATC", hypothesis: "If we move the \"One-Time Purchase\" option to a text link below the main Add to Cart button, then Subscription CVR will increase by making subscription the default path.", rationale: "High growth brands use this to prioritize recurring revenue. It frames the subscription as the \"standard\" way to buy while keeping the one-time option accessible.", placementLabel: "Buybox (Toggles)", placementUrl: "https://vitahustle.com/products/one-superfood-protein-shake-strawberry?flavor=chocolate", goals: ["CVR", "AOV", "SCVR", "RPV"], devices: "All Devices", geos: "US", priority: "5", createdBy: "Jayden Gray" },
-  { client: "Dr Woof Apparel", name: "Quantity Reward Offer Test (Gift vs. Discount)", hypothesis: "Testing a \"Buy 4, Get 1 Free\" or \"Free Shipping\" offer against the current baseline to determine which incentive structure best lifts AOV.", rationale: "Gift-based incentives (free item) may feel more valuable than equivalent percentage discounts, especially for repeat-purchase products.", placementLabel: "PDP, Cart", placementUrl: "", goals: ["AOV", "Units per Order"], devices: "All", geos: "", priority: "3", createdBy: "Drew Batcheller" },
-]
 
 const goalColors: Record<string, string> = {
-  CVR: "bg-sky-50 text-sky-700 border-sky-200",
-  ATC: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  RPV: "bg-violet-50 text-violet-700 border-violet-200",
-  AOV: "bg-amber-50 text-amber-700 border-amber-200",
-  PPV: "bg-rose-50 text-rose-700 border-rose-200",
-  CTR: "bg-teal-50 text-teal-700 border-teal-200",
-  SCVR: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  "Units per Order": "bg-orange-50 text-orange-700 border-orange-200",
+  CVR:              "bg-sky-50 text-sky-700 border-sky-200",
+  ATC:              "bg-emerald-50 text-emerald-700 border-emerald-200",
+  RPV:              "bg-violet-50 text-violet-700 border-violet-200",
+  AOV:              "bg-amber-50 text-amber-700 border-amber-200",
+  PPV:              "bg-rose-50 text-rose-700 border-rose-200",
+  CTR:              "bg-teal-50 text-teal-700 border-teal-200",
+  SCVR:             "bg-indigo-50 text-indigo-700 border-indigo-200",
+  "Units per Order":"bg-orange-50 text-orange-700 border-orange-200",
 }
 
-const clients = ["All Clients", ...Array.from(new Set(ideas.map((i) => i.client))).sort()]
-
-type SortKey = "client" | "name" | "devices" | "geos" | "priority" | "createdBy"
+type SortKey = "client" | "name" | "priority"
 
 const columns: { key: SortKey | null; label: string }[] = [
-  { key: null, label: "" },
-  { key: "client", label: "Client" },
-  { key: "name", label: "Test Description" },
-  { key: null, label: "Placement" },
-  { key: null, label: "Primary Goals" },
+  { key: null,       label: "" },
+  { key: "client",   label: "Client" },
+  { key: "name",     label: "Test Description" },
+  { key: null,       label: "Placement" },
+  { key: null,       label: "Primary Goals" },
   { key: "priority", label: "Priority" },
-  { key: null, label: "Sync" },
+  { key: null,       label: "Notes" },
+  { key: null,       label: "Sync" },
 ]
 
 export function IdeasTable() {
+  const { user } = useUser()
+
+  const { data: rawIdeas, isLoading, mutate } = useAirtable('experiment-ideas', {
+    fields: [
+      'Test Description', 'Hypothesis', 'Rationale',
+      'Placement', 'Placement URL', 'Category Primary Goals',
+      'Brand Name (from Brand Name)', 'Record ID (from Brand Name)',
+      'Devices', 'GEOs', 'Variants Weight', 'Notes',
+    ],
+    sort: [{ field: 'Test Description', direction: 'asc' }],
+  })
+
   const [search, setSearch] = useState("")
   const [clientFilter, setClientFilter] = useState("All Clients")
   const [sortKey, setSortKey] = useState<SortKey>("client")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [syncModalOpen, setSyncModalOpen] = useState(false)
   const [syncIdea, setSyncIdea] = useState<Idea | null>(null)
+  const [notesModalIdea, setNotesModalIdea] = useState<Idea | null>(null)
 
-  const toggleRow = (idx: number) => {
-    setExpandedRows((prev) => {
+  const authHeaders: Record<string, string> = user ? {
+    'Content-Type': 'application/json',
+    'x-user-role': user.role,
+    'x-user-id': user.id,
+    'x-user-name': user.name,
+    ...(user.clientId ? { 'x-client-id': user.clientId } : {}),
+  } : { 'Content-Type': 'application/json' }
+
+  const ideas = useMemo<Idea[]>(() => {
+    if (!rawIdeas) return []
+    return rawIdeas.map(rec => {
+      const f = rec.fields as Record<string, unknown>
+
+      // Brand Name (from Brand Name) is a lookup that returns the client's display name
+      const brandArr = f['Brand Name (from Brand Name)']
+      const client = Array.isArray(brandArr)
+        ? String(brandArr[0] ?? '')
+        : String(brandArr ?? '')
+
+      // Record ID (from Brand Name) is a lookup that gives the client's Airtable record ID
+      // Used by the sync modal to filter batches to this client
+      const clientIdArr = f['Record ID (from Brand Name)']
+      const clientId = Array.isArray(clientIdArr)
+        ? String(clientIdArr[0] ?? '')
+        : String(clientIdArr ?? '')
+
+      const goalsRaw = f['Category Primary Goals']
+      const goals = Array.isArray(goalsRaw)
+        ? (goalsRaw as string[])
+        : goalsRaw ? [String(goalsRaw)] : []
+
+      const devRaw = f['Devices']
+      const devices = Array.isArray(devRaw)
+        ? (devRaw as string[]).join(', ')
+        : String(devRaw ?? '')
+
+      const geosRaw = f['GEOs']
+      const geos = Array.isArray(geosRaw)
+        ? (geosRaw as string[]).join(', ')
+        : String(geosRaw ?? '')
+
+      return {
+        id: rec.id,
+        clientId,
+        client,
+        name:          String(f['Test Description'] ?? ''),
+        hypothesis:    String(f['Hypothesis'] ?? ''),
+        rationale:     String(f['Rationale'] ?? ''),
+        placementLabel:String(f['Placement'] ?? ''),
+        placementUrl:  String(f['Placement URL'] ?? ''),
+        goals,
+        devices,
+        geos,
+        priority:  String(f['Priority'] ?? ''),
+        weighting: String(f['Variants Weight'] ?? ''),
+        noteIds: Array.isArray(f['Notes']) ? (f['Notes'] as string[]) : [],
+        noteCount: Array.isArray(f['Notes']) ? (f['Notes'] as string[]).length : 0,
+      }
+    })
+  }, [rawIdeas])
+
+  const clientOptions = useMemo(
+    () => ["All Clients", ...Array.from(new Set(ideas.map(i => i.client))).filter(Boolean).sort()],
+    [ideas]
+  )
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => {
       const next = new Set(prev)
-      if (next.has(idx)) next.delete(idx)
-      else next.add(idx)
+      next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   }
 
-  const handleCreateIdea = (data: Record<string, unknown>) => {
-    console.log("New idea created:", data)
-  }
-
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc")
     else { setSortKey(key); setSortDir("asc") }
   }
 
   const filtered = useMemo(() => {
-    let list = ideas.map((idea, i) => ({ ...idea, _idx: i }))
-    if (clientFilter !== "All Clients") list = list.filter((i) => i.client === clientFilter)
+    let list = [...ideas]
+    if (clientFilter !== "All Clients") list = list.filter(i => i.client === clientFilter)
     if (search) {
       const q = search.toLowerCase()
-      list = list.filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          i.hypothesis.toLowerCase().includes(q) ||
-          i.client.toLowerCase().includes(q) ||
-          i.placementLabel.toLowerCase().includes(q)
+      list = list.filter(i =>
+        i.name.toLowerCase().includes(q) ||
+        i.hypothesis.toLowerCase().includes(q) ||
+        i.client.toLowerCase().includes(q) ||
+        i.placementLabel.toLowerCase().includes(q)
       )
     }
     list.sort((a, b) => {
@@ -113,19 +172,32 @@ export function IdeasTable() {
       return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av)
     })
     return list
-  }, [search, clientFilter, sortKey, sortDir])
+  }, [ideas, search, clientFilter, sortKey, sortDir])
+
+  // Skeleton rows while loading
+  const skeletonRows = Array.from({ length: 6 }).map((_, i) => (
+    <tr key={i} className="border-b border-border">
+      <td className="px-4 py-3.5"><div className="h-4 w-4 rounded bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-4 w-28 rounded bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-4 w-52 rounded bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-4 w-32 rounded bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-5 w-24 rounded-md bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-4 w-14 rounded bg-muted animate-pulse" /></td>
+      <td className="px-4 py-3.5"><div className="h-7 w-7 rounded-md bg-muted animate-pulse mx-auto" /></td>
+    </tr>
+  ))
 
   return (
     <>
       <div className="flex flex-col gap-4">
-        {/* Table */}
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           {/* Toolbar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 px-4 py-3 border-b border-border">
             <div className="flex items-center gap-3">
               <div>
                 <label className="text-[11px] font-medium text-muted-foreground block mb-1">Client</label>
-                <SelectField value={clientFilter} onChange={setClientFilter} options={clients} />
+                <SelectField value={clientFilter} onChange={setClientFilter} options={clientOptions} />
               </div>
             </div>
 
@@ -158,7 +230,13 @@ export function IdeasTable() {
                       key={i}
                       className={cn(
                         "px-4 py-3 text-[12px] font-medium text-muted-foreground whitespace-nowrap text-left",
-                        i === 0 && "w-10 px-0 pl-4"
+                        i === 0 && "w-10 px-0 pl-4",
+                        i === 1 && "w-[130px]",
+                        i === 3 && "w-[160px]",
+                        i === 4 && "w-[200px]",
+                        i === 5 && "w-[90px]",
+                        i === 6 && "w-[80px]",
+                        i === 7 && "w-[52px]"
                       )}
                     >
                       {col.key ? (
@@ -167,43 +245,43 @@ export function IdeasTable() {
                           className="inline-flex items-center gap-1 hover:text-foreground transition-colors group"
                         >
                           {col.label}
-                          <ArrowUpDown
-                            className={cn(
-                              "h-3 w-3 transition-colors",
-                              sortKey === col.key
-                                ? "text-foreground"
-                                : "text-muted-foreground/30 group-hover:text-muted-foreground"
-                            )}
-                          />
+                          <ArrowUpDown className={cn(
+                            "h-3 w-3 transition-colors",
+                            sortKey === col.key
+                              ? "text-foreground"
+                              : "text-muted-foreground/30 group-hover:text-muted-foreground"
+                          )} />
                         </button>
-                      ) : (
-                        col.label
-                      )}
+                      ) : col.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((idea) => {
-                  const isExpanded = expandedRows.has(idea._idx)
+                {isLoading ? skeletonRows : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length} className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+                      No ideas found
+                    </td>
+                  </tr>
+                ) : filtered.map((idea) => {
+                  const isExpanded = expandedRows.has(idea.id)
                   return (
-                    <Fragment key={idea._idx}>
+                    <Fragment key={idea.id}>
                       <tr
-                        onClick={() => toggleRow(idea._idx)}
+                        onClick={() => toggleRow(idea.id)}
                         className="border-b border-border last:border-b-0 cursor-pointer hover:bg-accent/30 transition-colors"
                       >
                         <td className="w-10 px-0 pl-4 py-3.5 align-middle">
-                          <ChevronDown
-                            className={cn(
-                              "h-4 w-4 text-muted-foreground transition-transform",
-                              isExpanded && "rotate-180"
-                            )}
-                          />
+                          <ChevronDown className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform",
+                            isExpanded && "rotate-180"
+                          )} />
                         </td>
                         <td className="px-4 py-3.5 text-[13px] font-medium text-foreground whitespace-nowrap align-middle">
-                          {idea.client}
+                          {idea.client || <span className="text-muted-foreground italic">Unassigned</span>}
                         </td>
-                        <td className="px-4 py-3.5 text-[13px] font-medium text-foreground align-middle max-w-[260px]">
+                        <td className="px-4 py-3.5 text-[13px] font-medium text-foreground align-middle min-w-0">
                           <span className="block truncate">{idea.name}</span>
                         </td>
                         <td className="px-4 py-3.5 text-[13px] text-foreground whitespace-nowrap align-middle">
@@ -248,6 +326,21 @@ export function IdeasTable() {
                             <span className="text-[12px] text-muted-foreground">-</span>
                           )}
                         </td>
+                        <td className="px-4 py-3.5 align-middle">
+                          {idea.noteCount > 0 ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setNotesModalIdea(idea)
+                              }}
+                              className="text-[12px] text-sky-600 hover:text-sky-700 hover:underline transition-colors"
+                            >
+                              {idea.noteCount} {idea.noteCount === 1 ? "note" : "notes"}
+                            </button>
+                          ) : (
+                            <span className="text-[12px] text-muted-foreground/40">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3.5 text-center align-middle">
                           <button
                             onClick={(e) => {
@@ -256,7 +349,7 @@ export function IdeasTable() {
                               setSyncModalOpen(true)
                             }}
                             className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors inline-flex items-center justify-center"
-                            title="Convert idea to batch test"
+                            title="Sync idea to a batch"
                           >
                             <Send className="h-4 w-4" />
                           </button>
@@ -268,28 +361,18 @@ export function IdeasTable() {
                           <td colSpan={columns.length} className="bg-accent/20 px-5 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pl-6">
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  Hypothesis
-                                </span>
-                                <p className="text-[13px] text-foreground leading-relaxed">
-                                  {idea.hypothesis}
-                                </p>
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Hypothesis</span>
+                                <p className="text-[13px] text-foreground leading-relaxed">{idea.hypothesis || "—"}</p>
                               </div>
                               <div className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  Rationale
-                                </span>
-                                <p className="text-[13px] text-foreground leading-relaxed">
-                                  {idea.rationale}
-                                </p>
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Rationale</span>
+                                <p className="text-[13px] text-foreground leading-relaxed">{idea.rationale || "—"}</p>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-5 pl-6 mt-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 pl-6 mt-4">
                               {idea.placementUrl && (
                                 <div className="flex flex-col gap-1.5 min-w-0">
-                                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                    URL
-                                  </span>
+                                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">URL</span>
                                   <a
                                     href={idea.placementUrl.startsWith("http") ? idea.placementUrl : `https://${idea.placementUrl}`}
                                     target="_blank"
@@ -302,38 +385,24 @@ export function IdeasTable() {
                                   </a>
                                 </div>
                               )}
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  Weighting
-                                </span>
-                                <p className="text-[13px] text-foreground">
-                                  50/50
-                                </p>
-                              </div>
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  Devices
-                                </span>
-                                <p className="text-[13px] text-foreground">
-                                  {idea.devices}
-                                </p>
-                              </div>
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  GEOs
-                                </span>
-                                <p className="text-[13px] text-foreground">
-                                  {idea.geos || "-"}
-                                </p>
-                              </div>
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  Created By
-                                </span>
-                                <p className="text-[13px] text-foreground">
-                                  {idea.createdBy}
-                                </p>
-                              </div>
+                              {idea.weighting && (
+                                <div className="flex flex-col gap-1.5">
+                                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Weighting</span>
+                                  <p className="text-[13px] text-foreground">{idea.weighting}</p>
+                                </div>
+                              )}
+                              {idea.devices && (
+                                <div className="flex flex-col gap-1.5">
+                                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Devices</span>
+                                  <p className="text-[13px] text-foreground">{idea.devices}</p>
+                                </div>
+                              )}
+                              {idea.geos && (
+                                <div className="flex flex-col gap-1.5">
+                                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">GEOs</span>
+                                  <p className="text-[13px] text-foreground">{idea.geos}</p>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -341,13 +410,6 @@ export function IdeasTable() {
                     </Fragment>
                   )
                 })}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={columns.length} className="px-4 py-10 text-center text-[13px] text-muted-foreground">
-                      No ideas found
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
@@ -357,18 +419,46 @@ export function IdeasTable() {
       <NewIdeaModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateIdea}
+        onSuccess={() => mutate()}
       />
 
       {syncIdea && (
         <SyncIdeaModal
           isOpen={syncModalOpen}
-          onClose={() => {
-            setSyncModalOpen(false)
-            setSyncIdea(null)
-          }}
+          onClose={() => { setSyncModalOpen(false); setSyncIdea(null) }}
+          onSuccess={() => { setSyncModalOpen(false); setSyncIdea(null); mutate() }}
           idea={syncIdea}
         />
+      )}
+
+      {notesModalIdea && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setNotesModalIdea(null)}>
+          <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[15px] font-semibold text-foreground">Idea Notes</h3>
+                <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{notesModalIdea.client} — {notesModalIdea.name}</p>
+              </div>
+              <button
+                onClick={() => setNotesModalIdea(null)}
+                className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-accent transition-colors shrink-0 ml-3"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 overflow-y-auto flex-1">
+              <NotesPanel
+                linkedField="Experiments"
+                linkedRecordId={notesModalIdea.id}
+                authHeaders={authHeaders}
+                placeholder="Write a note about this idea…"
+                noteIds={notesModalIdea.noteIds}
+                showVisibilityToggle
+                onNoteCreated={() => mutate()}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

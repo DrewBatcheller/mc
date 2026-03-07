@@ -1,7 +1,7 @@
 'use client'
 
 import { useAirtable } from "@/hooks/use-airtable"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 
 function getLast6Months() {
   const months = []
@@ -17,9 +17,17 @@ function getLast6Months() {
   return months
 }
 
-export function ActivityChart() {
+function buildClientFilter(clientIds: string[]): string | undefined {
+  if (!clientIds.length) return undefined
+  if (clientIds.length === 1) return `{Record ID (from Brand Name)} = "${clientIds[0]}"`
+  const parts = clientIds.map(id => `{Record ID (from Brand Name)} = "${id}"`)
+  return `OR(${parts.join(', ')})`
+}
+
+export function ActivityChart({ clientIds = [] }: { clientIds?: string[] }) {
   const { data, isLoading } = useAirtable('experiments', {
     fields: ['Launch Date', 'Test Status'],
+    filterExtra: buildClientFilter(clientIds),
   })
 
   const months = getLast6Months()
@@ -44,16 +52,30 @@ export function ActivityChart() {
         <div className="h-[200px] w-full bg-muted rounded-lg animate-pulse" />
       ) : (
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: -20 }}>
+            <defs>
+              <linearGradient id="experimentGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.12} />
+                <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
             <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip
               contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-              cursor={{ fill: 'hsl(var(--accent))' }}
+              cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
             />
-            <Bar dataKey="experiments" fill="hsl(var(--primary, 203 89% 53%))" radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <Area
+              type="monotone"
+              dataKey="experiments"
+              stroke="hsl(var(--foreground))"
+              strokeWidth={2}
+              fill="url(#experimentGradient)"
+              dot={{ r: 3, fill: 'hsl(var(--foreground))', strokeWidth: 0 }}
+              activeDot={{ r: 4, fill: 'hsl(var(--foreground))', strokeWidth: 0 }}
+            />
+          </AreaChart>
         </ResponsiveContainer>
       )}
     </div>

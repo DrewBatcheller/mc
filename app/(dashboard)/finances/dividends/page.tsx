@@ -2,11 +2,14 @@
 
 import { useState } from "react"
 import { Plus } from "lucide-react"
+import { useUser } from "@/contexts/UserContext"
 import { DividendStatCards } from "@/components/finance/dividend-stat-cards"
 import { DividendTable } from "@/components/finance/dividend-table"
 import { YearSelector } from "@/components/finance/year-selector"
 
 export default function DividendsPage() {
+  const { user } = useUser()
+  const isViewOnly = !!user?.permissions?.financesViewOnly
   const [year, setYear] = useState("all")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [exportTrigger, setExportTrigger] = useState(0)
@@ -39,24 +42,27 @@ export default function DividendsPage() {
               </svg>
               Export
             </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-4 text-[13px] font-medium transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Entry
-            </button>
+            {!isViewOnly && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-4 text-[13px] font-medium transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Entry
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       <DividendStatCards year={year} />
 
-      <DividendTable 
+      <DividendTable
         year={year}
         showCreateModal={showCreateModal}
         setShowCreateModal={setShowCreateModal}
         exportTrigger={exportTrigger}
+        readOnly={isViewOnly}
       />
     </>
   )

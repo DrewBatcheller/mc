@@ -2,12 +2,15 @@
 
 import { useState } from "react"
 import { Plus } from "lucide-react"
+import { useUser } from "@/contexts/UserContext"
 import { ReserveStatCards } from "@/components/finance/reserve-stat-cards"
 import { ReserveBalanceChart, ReserveTransactionTypePie } from "@/components/finance/reserve-charts"
 import { ReserveLedgerTable } from "@/components/finance/reserve-ledger-table"
 import { YearSelector } from "@/components/finance/year-selector"
 
 export default function ReservesPage() {
+  const { user } = useUser()
+  const isViewOnly = !!user?.permissions?.financesViewOnly
   const [year, setYear] = useState("all")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [exportTrigger, setExportTrigger] = useState(0)
@@ -40,13 +43,15 @@ export default function ReservesPage() {
               </svg>
               Export
             </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-4 text-[13px] font-medium transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Entry
-            </button>
+            {!isViewOnly && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-4 text-[13px] font-medium transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Entry
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -58,11 +63,12 @@ export default function ReservesPage() {
         <ReserveTransactionTypePie year={year} />
       </div>
 
-      <ReserveLedgerTable 
+      <ReserveLedgerTable
         year={year}
         showCreateModal={showCreateModal}
         setShowCreateModal={setShowCreateModal}
         exportTrigger={exportTrigger}
+        readOnly={isViewOnly}
       />
     </>
   )

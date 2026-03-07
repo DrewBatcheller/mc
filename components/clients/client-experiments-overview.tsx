@@ -1,9 +1,20 @@
 "use client"
 
-import { Fragment, useState } from "react"
-import { ChevronDown, ChevronRight, ExternalLink, Layers, FlaskConical, Zap, CheckCircle2 } from "lucide-react"
+import { Fragment, useState, useMemo } from "react"
+import {
+  ChevronDown,
+  ChevronRight,
+  Search,
+  ExternalLink,
+  Layers,
+  FlaskConical,
+  Zap,
+  CheckCircle2,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SelectField } from "@/components/shared/select-field"
 import { ExperimentDetailsModal } from "@/components/experiments/experiment-details-modal"
+import { useAirtable } from "@/hooks/use-airtable"
 
 /* ── Types ── */
 interface Experiment {
@@ -19,9 +30,12 @@ interface Experiment {
   primaryGoals?: string[]
   hypothesis?: string
   rationale?: string
-  weighting?: string
   revenueAddedMrr?: string
   nextSteps?: string
+  launchDate?: string
+  endDate?: string
+  deployed?: boolean
+  whatHappened?: string
   variantData?: {
     name: string
     status?: string
@@ -40,29 +54,25 @@ interface Experiment {
     appv?: number
     appvImprovement?: number
   }[]
-  launchDate?: string
-  endDate?: string
-  deployed?: boolean
-  whatHappened?: string
   [key: string]: unknown
 }
 
 interface Batch {
-  client: string
+  id: string
   launchDate: string
   finishDate: string
   status: string
   tests: number
-  revenueImpact: string
   experiments: Experiment[]
 }
 
-/* ── Data (Vita Hustle only) ── */
+/* ── Status styles ── */
 const statusStyles: Record<string, string> = {
   "In Progress": "bg-sky-50 text-sky-700",
   Live: "bg-emerald-50 text-emerald-700",
   Mixed: "bg-amber-50 text-amber-700",
   Pending: "bg-accent text-muted-foreground",
+  Completed: "bg-accent text-muted-foreground",
   "No Tests": "bg-accent text-muted-foreground",
   Unsuccessful: "bg-rose-50 text-rose-700",
   Blocked: "bg-red-50 text-red-700",
@@ -70,264 +80,395 @@ const statusStyles: Record<string, string> = {
   Inconclusive: "bg-amber-50 text-amber-700",
 }
 
-const mapBatchStatus = (status: string): "Pending" | "In Progress" | "Live" | "Completed" => {
-  const s = status.toLowerCase()
-  if (s === "in progress") return "In Progress"
-  if (s === "live") return "Live"
-  if (s === "completed" || s === "successful" || s === "unsuccessful" || s === "inconclusive" || s === "mixed") return "Completed"
+const computeBatchStatus = (
+  launchDate: string,
+  finishDate: string,
+  testIdeasStartDate: string
+): "Pending" | "In Progress" | "Live" | "Completed" => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const launch = launchDate ? new Date(launchDate) : null
+  const finish = finishDate ? new Date(finishDate) : null
+  const start = testIdeasStartDate ? new Date(testIdeasStartDate) : null
+
+  if (finish && today >= finish) return "Completed"
+  if (launch && today >= launch) return "Live"
+  if (start && today >= start) return "In Progress"
   return "Pending"
 }
 
-const vitaHustleBatches: Batch[] = [
-  {
-    client: "Vita Hustle",
-    launchDate: "Jan 15, 2026",
-    finishDate: "Jan 29, 2026",
-    status: "Mixed",
-    tests: 2,
-    revenueImpact: "$19,027",
-    experiments: [
-      {
-        name: "Subscription Savings Calculator",
-        description: "Interactive savings comparison tool showing cost benefits of subscribing vs one-time purchase.",
-        status: "Successful",
-        placement: "Product Page",
-        devices: "All Devices",
-        geos: "US",
-        variants: "2",
-        revenue: "$19,027",
-        hypothesis: "An interactive savings calculator will increase subscription uptake by clearly demonstrating long-term value.",
-        rationale: "Customers frequently abandoned subscription options without understanding the savings. A dynamic calculator removes cognitive friction.",
-        weighting: "50/50",
-        launchDate: "Jan 15, 2026",
-        endDate: "Jan 22, 2026",
-        deployed: true,
-        whatHappened: "The calculator resonated strongly with returning visitors, lifting subscription conversion rate significantly.",
-        nextSteps: "Expand to bundle pages and email re-engagement campaigns.",
-        revenueAddedMrr: "$19,027",
-        variantData: [
-          { name: "Control", trafficPercent: 50, visitors: 8420, conversions: 421, revenue: 30200, revenueImprovement: 0, crPercent: 5.0, crImprovement: 0, crConfidence: 0, rpv: 3.59, rpvImprovement: 0, appv: 71.73, appvImprovement: 0 },
-          { name: "Savings Calculator", trafficPercent: 50, visitors: 8380, conversions: 537, revenue: 49227, revenueImprovement: 63.0, crPercent: 6.41, crImprovement: 28.2, crConfidence: 96, rpv: 5.87, rpvImprovement: 63.5, rpvConfidence: 95, appv: 91.67, appvImprovement: 27.8 },
-        ],
-      },
-      {
-        name: "Reviews Section Redesign",
-        description: "New reviews layout featuring photo gallery, verified badge prominences, and star distribution chart.",
-        status: "Inconclusive",
-        placement: "Product Page",
-        devices: "All Devices",
-        geos: "US",
-        variants: "2",
-        revenue: "$0",
-        hypothesis: "A richer reviews section with photos will increase purchase confidence and conversion rate.",
-        rationale: "Competitive analysis showed photo-forward reviews performing well in the supplement space.",
-        weighting: "50/50",
-        launchDate: "Jan 15, 2026",
-        endDate: "Jan 29, 2026",
-        deployed: false,
-        whatHappened: "Positive engagement signals but insufficient statistical confidence to declare a winner after the full run.",
-        nextSteps: "Re-test with a focused hypothesis on photo reviews only, isolating the variable.",
-        revenueAddedMrr: "$0",
-        variantData: [
-          { name: "Control", trafficPercent: 50, visitors: 8310, conversions: 499, revenue: 35800, revenueImprovement: 0, crPercent: 6.0, crImprovement: 0, crConfidence: 0, rpv: 4.31, rpvImprovement: 0, appv: 71.74, appvImprovement: 0 },
-          { name: "Redesigned Reviews", trafficPercent: 50, visitors: 8290, conversions: 515, revenue: 37100, revenueImprovement: 3.6, crPercent: 6.21, crImprovement: 3.5, crConfidence: 61, rpv: 4.47, rpvImprovement: 3.7, rpvConfidence: 58, appv: 72.04, appvImprovement: 0.4 },
-        ],
-      },
-    ],
-  },
-  {
-    client: "Vita Hustle",
-    launchDate: "Nov 19, 2025",
-    finishDate: "Dec 3, 2025",
-    status: "Unsuccessful",
-    tests: 1,
-    revenueImpact: "$0",
-    experiments: [
-      {
-        name: "Popup Nutrition Facts",
-        description: "Nutritional info popup on product cards triggered on hover/tap.",
-        status: "Unsuccessful",
-        placement: "Collection Page",
-        devices: "All Devices",
-        geos: "US",
-        variants: "2",
-        revenue: "$0",
-        hypothesis: "Surfacing nutrition facts inline on collection cards will reduce back-and-forth to PDP and improve add-to-cart rate.",
-        rationale: "Customer surveys indicated nutrition transparency as a top purchase driver.",
-        weighting: "50/50",
-        launchDate: "Nov 19, 2025",
-        endDate: "Dec 3, 2025",
-        deployed: false,
-        whatHappened: "Popup introduced visual clutter and reduced scroll depth. Users ignored it on mobile, causing slight drop in ATC rate.",
-        nextSteps: "Consider an inline expandable row rather than a popup overlay.",
-        revenueAddedMrr: "$0",
-        variantData: [
-          { name: "Control", trafficPercent: 50, visitors: 11200, conversions: 896, revenue: 64200, revenueImprovement: 0, crPercent: 8.0, crImprovement: 0, crConfidence: 0, rpv: 5.73, rpvImprovement: 0, appv: 71.65, appvImprovement: 0 },
-          { name: "Nutrition Popup", trafficPercent: 50, visitors: 11150, conversions: 846, revenue: 60700, revenueImprovement: -5.45, crPercent: 7.59, crImprovement: -5.1, crConfidence: 88, rpv: 5.44, rpvImprovement: -5.1, rpvConfidence: 85, appv: 71.75, appvImprovement: 0.1 },
-        ],
-      },
-    ],
-  },
-]
-
-const overviewStats = [
-  { label: "Total Batches", value: String(vitaHustleBatches.length), icon: Layers },
-  { label: "Total Experiments", value: String(vitaHustleBatches.reduce((s, b) => s + b.experiments.length, 0)), icon: FlaskConical },
-  { label: "Live Now", value: String(vitaHustleBatches.filter(b => b.status === "Live").length), icon: Zap },
-  { label: "Successful", value: String(vitaHustleBatches.flatMap(b => b.experiments).filter(e => e.status === "Successful").length), icon: CheckCircle2 },
-]
+const allStatuses = ["All Statuses", "Pending", "In Progress", "Live", "Completed"]
 
 /* ── Component ── */
 export function ClientExperimentsOverview() {
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(0)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("All Statuses")
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  /* ── API fetches (client-filtered automatically by role-filter) ── */
+  const { data: rawBatches, isLoading: batchesLoading } = useAirtable("batches", {
+    fields: ["Launch Date", "PTA (Scheduled Finish)", "Test Ideas Start Date"],
+    sort: [{ field: "Launch Date", direction: "desc" }],
+    revalidateOnFocus: false,
+  })
+
+  const { data: rawExperiments, isLoading: experimentsLoading } = useAirtable("experiments", {
+    revalidateOnFocus: false,
+    fields: [
+      "Test Description",
+      "Test Status",
+      "Launch Date",
+      "End Date",
+      "Placement",
+      "Placement URL",
+      "Devices",
+      "GEOs",
+      "Revenue Added (MRR) (Regular Format)",
+      "Hypothesis",
+      "Rationale",
+      "Category Primary Goals",
+      "Deployed",
+      "Describe what happened & what we learned",
+      "Next Steps (Action)",
+      "Control Image",
+      "Variant Image",
+      "PTA Result Image",
+      "Post-Test Analysis (Loom)",
+      "Batch",
+      "Record ID (from Brand Name)",
+    ],
+  })
+
+  /* ── Build batches with nested experiments ── */
+  const batches = useMemo((): Batch[] => {
+    if (!rawBatches) return []
+
+    const experimentsByBatch: Record<string, Experiment[]> = {}
+
+    if (rawExperiments) {
+      for (const record of rawExperiments) {
+        const f = record.fields
+        const batchIds: string[] = Array.isArray(f["Batch"]) ? (f["Batch"] as string[]) : []
+
+        const exp: Experiment = {
+          name: (f["Test Description"] as string) || "",
+          description: (f["Rationale"] as string) || (f["Test Description"] as string) || "",
+          status: (f["Test Status"] as string) || "Pending",
+          placement: (f["Placement"] as string) || "",
+          placementUrl: f["Placement URL"] as string | undefined,
+          devices: Array.isArray(f["Devices"])
+            ? (f["Devices"] as string[]).join(", ")
+            : (f["Devices"] as string) || "",
+          geos: Array.isArray(f["GEOs"])
+            ? (f["GEOs"] as string[]).join(", ")
+            : (f["GEOs"] as string) || "",
+          variants: "-",
+          revenue:
+            f["Revenue Added (MRR) (Regular Format)"]
+              ? `$${f["Revenue Added (MRR) (Regular Format)"]}`
+              : "$0",
+          primaryGoals: Array.isArray(f["Category Primary Goals"])
+            ? (f["Category Primary Goals"] as string[])
+            : [],
+          hypothesis: f["Hypothesis"] as string | undefined,
+          rationale: f["Rationale"] as string | undefined,
+          revenueAddedMrr: f["Revenue Added (MRR) (Regular Format)"] as string | undefined,
+          nextSteps: f["Next Steps (Action)"] as string | undefined,
+          launchDate: f["Launch Date"] as string | undefined,
+          endDate: f["End Date"] as string | undefined,
+          deployed: Boolean(f["Deployed"]),
+          whatHappened: f["Describe what happened & what we learned"] as string | undefined,
+          controlImage: f["Control Image"] as string | undefined,
+          variantImage: f["Variant Image"] as string | undefined,
+          resultImage: f["PTA Result Image"] as string | undefined,
+          resultVideo: f["Post-Test Analysis (Loom)"] as string | undefined,
+        }
+
+        for (const batchId of batchIds) {
+          if (!experimentsByBatch[batchId]) experimentsByBatch[batchId] = []
+          experimentsByBatch[batchId].push(exp)
+        }
+      }
+    }
+
+    return rawBatches.map((record) => {
+      const f = record.fields
+      const experiments = experimentsByBatch[record.id] || []
+      const launchDate = (f["Launch Date"] as string) || ""
+      const finishDate = (f["PTA (Scheduled Finish)"] as string) || ""
+      const testIdeasStartDate = (f["Test Ideas Start Date"] as string) || ""
+
+      return {
+        id: record.id,
+        launchDate,
+        finishDate,
+        status: computeBatchStatus(launchDate, finishDate, testIdeasStartDate),
+        tests: experiments.length,
+        experiments,
+      }
+    })
+  }, [rawBatches, rawExperiments])
+
+  /* ── Stat cards (computed from live data) ── */
+  const totalBatches = batches.length
+  const totalExperiments = batches.reduce((sum, b) => sum + b.tests, 0)
+  const activeBatches = batches.filter(
+    (b) => b.status === "Live" || b.status === "In Progress"
+  ).length
+  const successful = batches
+    .flatMap((b) => b.experiments)
+    .filter((e) => e.status === "Successful").length
+
+  const statCards = [
+    { label: "Total Batches", value: String(totalBatches), Icon: Layers },
+    { label: "Total Experiments", value: String(totalExperiments), Icon: FlaskConical },
+    { label: "Active Batches", value: String(activeBatches), Icon: Zap },
+    { label: "Successful", value: String(successful), Icon: CheckCircle2 },
+  ]
+
+  /* ── Filtered batches ── */
+  const filtered = useMemo(() => {
+    let result = [...batches]
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (b) =>
+          b.launchDate.toLowerCase().includes(q) ||
+          b.experiments.some((e) => e.name.toLowerCase().includes(q))
+      )
+    }
+    if (statusFilter !== "All Statuses") {
+      result = result.filter((b) => b.status === statusFilter)
+    }
+    return result
+  }, [batches, search, statusFilter])
+
+  const isLoading = batchesLoading || experimentsLoading
 
   return (
     <div className="flex flex-col gap-4">
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {overviewStats.map((stat) => (
-          <div key={stat.label} className="bg-card rounded-xl border border-border p-5 flex flex-col gap-3">
+        {statCards.map(({ label, value, Icon }) => (
+          <div key={label} className="bg-card rounded-xl border border-border p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-[13px] font-medium text-muted-foreground">{stat.label}</span>
+              <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
               <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center">
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
+                <Icon className="h-4 w-4 text-muted-foreground" />
               </div>
             </div>
-            <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">{stat.value}</span>
+            <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">
+              {value}
+            </span>
           </div>
         ))}
       </div>
 
-      {/* Expandable table */}
+      {/* Expandable batch table */}
       <div className="bg-card rounded-xl border border-border">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="w-10 px-3 py-3" />
-                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Launch Date</th>
-                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Finish Date</th>
-                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Status</th>
-                <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">Tests</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vitaHustleBatches.map((batch, i) => {
-                const isExpanded = expandedIdx === i
-                return (
-                  <Fragment key={i}>
-                    <tr
-                      className={cn(
-                        "border-b border-border transition-colors hover:bg-accent/30 cursor-pointer",
-                        isExpanded && "bg-accent/20"
-                      )}
-                      onClick={() => setExpandedIdx(isExpanded ? null : i)}
-                    >
-                      <td className="px-3 py-3.5">
-                        {isExpanded
-                          ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                          : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                      </td>
-                      <td className="px-4 py-3.5 text-[13px] font-medium text-foreground whitespace-nowrap">{batch.launchDate}</td>
-                      <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">{batch.finishDate}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className={cn(
-                          "text-[12px] font-medium px-2.5 py-1 rounded-md",
-                          statusStyles[mapBatchStatus(batch.status)] || "bg-accent text-foreground"
-                        )}>
-                          {mapBatchStatus(batch.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
-                        {batch.tests} {batch.tests === 1 ? "test" : "tests"}
-                      </td>
-                    </tr>
+        {/* Toolbar */}
+        <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 border-b border-border">
+          <SelectField value={statusFilter} onChange={setStatusFilter} options={allStatuses} />
+          <div className="relative flex-1 w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search batches, experiments..."
+              className="w-full text-[13px] bg-card border border-border rounded-lg pl-9 pr-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+        </div>
 
-                    {/* Expanded experiment rows */}
-                    {isExpanded && batch.experiments.length > 0 && (
-                      <tr>
-                        <td colSpan={5} className="p-0">
-                          <div className="bg-accent/10 border-b border-border">
-                            <table className="w-full">
-                              <thead>
-                                <tr className="border-b border-border/60">
-                                  <th className="px-6 py-2.5 text-[12px] font-medium text-muted-foreground text-left pl-14">Experiment</th>
-                                  <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Status</th>
-                                  <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Placement</th>
-                                  <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Devices</th>
-                                  <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">GEOs</th>
-                                  <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">Variants</th>
-                                  <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-right">Revenue</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {batch.experiments.map((exp, ei) => (
-                                  <tr
-                                    key={ei}
-                                    className="border-b border-border/40 last:border-0 hover:bg-accent/20 transition-colors cursor-pointer"
-                                    onClick={() => {
-                                      setSelectedExperiment(exp)
-                                      setSelectedBatch(batch)
-                                      setIsModalOpen(true)
-                                    }}
-                                  >
-                                    <td className="px-6 py-3 pl-14">
-                                      <div className="flex flex-col gap-0.5">
-                                        <span className="text-[13px] font-medium text-foreground">{exp.name}</span>
-                                        <span className="text-[11px] text-muted-foreground">{exp.description}</span>
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                      <span className={cn(
-                                        "text-[11px] font-medium px-2 py-0.5 rounded-md",
-                                        statusStyles[exp.status] || "bg-accent text-foreground"
-                                      )}>
-                                        {exp.status}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <div className="flex flex-col gap-0.5">
-                                        <span className="text-[12px] text-foreground">{exp.placement}</span>
-                                        {exp.placementUrl && (
-                                          <span className="text-[11px] text-sky-600 flex items-center gap-0.5">
-                                            <ExternalLink className="h-2.5 w-2.5" />
-                                            {exp.placementUrl}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">{exp.devices}</td>
-                                    <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">{exp.geos}</td>
-                                    <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">{exp.variants}</td>
-                                    <td className={cn(
-                                      "px-4 py-3 text-[12px] text-right whitespace-nowrap tabular-nums font-medium",
-                                      exp.revenue !== "$0" && exp.revenue !== "-" ? "text-emerald-600" : "text-muted-foreground"
-                                    )}>
-                                      {exp.revenue}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+        {isLoading ? (
+          <div className="py-16 text-center text-[13px] text-muted-foreground">Loading...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="w-10 px-3 py-3" />
+                  <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">
+                    Launch Date
+                  </th>
+                  <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">
+                    Finish Date
+                  </th>
+                  <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-[13px] font-medium text-muted-foreground text-left">
+                    Tests
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-[13px] text-muted-foreground">
+                      No batches found
+                    </td>
+                  </tr>
+                )}
+                {filtered.map((batch, i) => {
+                  const isExpanded = expandedIdx === i
+                  return (
+                    <Fragment key={batch.id || i}>
+                      {/* Batch row */}
+                      <tr
+                        className={cn(
+                          "border-b border-border transition-colors hover:bg-accent/30 cursor-pointer",
+                          isExpanded && "bg-accent/20"
+                        )}
+                        onClick={() => setExpandedIdx(isExpanded ? null : i)}
+                      >
+                        <td className="px-3 py-3.5">
+                          {isExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-[13px] font-medium text-foreground whitespace-nowrap">
+                          {batch.launchDate}
+                        </td>
+                        <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
+                          {batch.finishDate}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span
+                            className={cn(
+                              "text-[12px] font-medium px-2.5 py-1 rounded-md",
+                              statusStyles[batch.status] || "bg-accent text-foreground"
+                            )}
+                          >
+                            {batch.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
+                          {batch.tests} {batch.tests === 1 ? "test" : "tests"}
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+
+                      {/* Expanded experiment rows */}
+                      {isExpanded && batch.experiments.length > 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-0">
+                            <div className="bg-accent/10 border-b border-border">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="border-b border-border/60">
+                                    <th className="px-6 py-2.5 text-[12px] font-medium text-muted-foreground text-left pl-10">
+                                      Experiment
+                                    </th>
+                                    <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">
+                                      Status
+                                    </th>
+                                    <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">
+                                      Placement
+                                    </th>
+                                    <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">
+                                      Devices
+                                    </th>
+                                    <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">
+                                      GEOs
+                                    </th>
+                                    <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-left">
+                                      Variants
+                                    </th>
+                                    <th className="px-4 py-2.5 text-[12px] font-medium text-muted-foreground text-right">
+                                      Revenue
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {batch.experiments.map((exp, ei) => (
+                                    <tr
+                                      key={ei}
+                                      className="border-b border-border/40 last:border-0 hover:bg-accent/20 transition-colors cursor-pointer"
+                                      onClick={() => {
+                                        setSelectedExperiment(exp)
+                                        setSelectedBatch(batch)
+                                        setIsModalOpen(true)
+                                      }}
+                                    >
+                                      <td className="px-6 py-3 pl-10">
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-[13px] font-medium text-foreground">
+                                            {exp.name}
+                                          </span>
+                                          <span className="text-[11px] text-muted-foreground">
+                                            {exp.description}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 whitespace-nowrap">
+                                        <span
+                                          className={cn(
+                                            "text-[11px] font-medium px-2 py-0.5 rounded-md",
+                                            statusStyles[exp.status] || "bg-accent text-foreground"
+                                          )}
+                                        >
+                                          {exp.status}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-[12px] text-foreground">
+                                            {exp.placement}
+                                          </span>
+                                          {exp.placementUrl && (
+                                            <span className="text-[11px] text-sky-600 flex items-center gap-0.5">
+                                              <ExternalLink className="h-2.5 w-2.5" />
+                                              {exp.placementUrl}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">
+                                        {exp.devices}
+                                      </td>
+                                      <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">
+                                        {exp.geos}
+                                      </td>
+                                      <td className="px-4 py-3 text-[12px] text-muted-foreground whitespace-nowrap">
+                                        {exp.variants}
+                                      </td>
+                                      <td
+                                        className={cn(
+                                          "px-4 py-3 text-[12px] text-right whitespace-nowrap tabular-nums font-medium",
+                                          exp.revenue !== "$0" && exp.revenue !== "-"
+                                            ? "text-emerald-600"
+                                            : "text-muted-foreground"
+                                        )}
+                                      >
+                                        {exp.revenue}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
+      {/* View Experiment Details modal (read-only) */}
       <ExperimentDetailsModal
         isOpen={isModalOpen}
         experiment={selectedExperiment}
-        batchKey={selectedBatch ? `${selectedBatch.client} | ${selectedBatch.launchDate}` : undefined}
+        batchKey={selectedBatch ? selectedBatch.launchDate : undefined}
         onClose={() => setIsModalOpen(false)}
       />
     </div>

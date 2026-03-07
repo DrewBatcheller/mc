@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { SelectField } from "@/components/shared/select-field"
+import { useAirtable } from "@/hooks/use-airtable"
 
 interface Phase {
   label: string
@@ -22,39 +22,53 @@ const phaseStyles: Record<string, { bg: string; text: string }> = {
   "Post-Test Analyses":{ bg: "bg-gray-200", text: "text-gray-700" },
 }
 
-const phases: Phase[] = [
-  { label: "Strategy Submitted", startDate: "2026-01-28", endDate: "2026-01-31", color: "bg-sky-100", textColor: "text-sky-800" },
-  { label: "Design", startDate: "2026-02-02", endDate: "2026-02-07", color: "bg-purple-100", textColor: "text-purple-800" },
-  { label: "Development", startDate: "2026-02-09", endDate: "2026-02-14", color: "bg-blue-100", textColor: "text-blue-800" },
-  { label: "QA Started", startDate: "2026-02-14", endDate: "2026-02-15", color: "bg-amber-100", textColor: "text-amber-800" },
-  { label: "Test(s) Live", startDate: "2026-02-16", endDate: "2026-02-28", color: "bg-cyan-200", textColor: "text-cyan-900" },
-  { label: "Post-Test Analyses", startDate: "2026-02-28", endDate: "2026-03-04", color: "bg-gray-200", textColor: "text-gray-700" },
-]
-
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ]
-const clients = ["All Clients", "Sereneherbs", "Purusha People", "Fake Brand", "Cosara", "Test Client"]
 
 function getDaysInMonth(y: number, m: number) {
   return new Date(y, m + 1, 0).getDate()
 }
+
 function getFirstDayOfMonth(y: number, m: number) {
   return new Date(y, m, 1).getDay()
 }
 
 function parseDate(s: string) {
-  const [y, m, d] = s.split("-").map(Number)
+  const parts = s.split("-")
+  if (parts.length !== 3) return new Date()
+  const [y, m, d] = parts.map(Number)
   return new Date(y, m - 1, d)
 }
 
-export function ClientTimeline() {
+export function ClientTimeline({ clientId }: { clientId?: string }) {
+  const clientFilter = clientId
+    ? `{Record ID (from Client)} = "${clientId}"`
+    : undefined
+
+  const { data: tasks } = useAirtable('tasks', {
+    fields: ['Client Facing Name', 'Start Date', 'Due Date', 'Status'],
+    filterExtra: clientFilter,
+  })
+
   const [year, setYear] = useState(2026)
   const [month, setMonth] = useState(1)
   const [today, setToday] = useState<{ d: number; m: number; y: number } | null>(null)
-  const [selectedClient, setSelectedClient] = useState(clients[0])
+
+  const phases = useMemo(() => {
+    if (!tasks) return []
+    return tasks
+      .filter(t => t.fields['Start Date'] && t.fields['Due Date'])
+      .map(t => ({
+        label: String(t.fields['Client Facing Name'] || 'Task'),
+        startDate: String(t.fields['Start Date']),
+        endDate: String(t.fields['Due Date']),
+        color: phaseStyles[String(t.fields['Client Facing Name'] || 'Strategy Submitted')]?.bg || 'bg-gray-100',
+        textColor: phaseStyles[String(t.fields['Client Facing Name'] || 'Strategy Submitted')]?.text || 'text-gray-700',
+      }))
+  }, [tasks])
 
   useEffect(() => {
     const now = new Date()
@@ -65,11 +79,17 @@ export function ClientTimeline() {
     if (month === 0) { setMonth(11); setYear(year - 1) }
     else setMonth(month - 1)
   }
+
   const next = () => {
     if (month === 11) { setMonth(0); setYear(year + 1) }
     else setMonth(month + 1)
   }
-  const goToday = () => { const n = new Date(); setYear(n.getFullYear()); setMonth(n.getMonth()) }
+
+  const goToday = () => {
+    const n = new Date()
+    setYear(n.getFullYear())
+    setMonth(n.getMonth())
+  }
 
   const daysInMonth = getDaysInMonth(year, month)
   const firstDay = getFirstDayOfMonth(year, month)
@@ -127,29 +147,20 @@ export function ClientTimeline() {
     })
 
     return bars
-  }, [weeks, year, month])
+  }, [weeks, year, month, phases])
 
   const taskCount = phases.length
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
-      {/* Controls */}
-      <div className="px-5 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        {/* Legend */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {Object.entries(phaseStyles).map(([label, s]) => (
-            <div key={label} className="flex items-center gap-1.5">
-              <span className={cn("h-2.5 w-2.5 rounded-sm", s.bg)} />
-              <span className="text-[11px] text-muted-foreground">{label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Client Filter */}
-        <div className="flex items-center gap-2 shrink-0">
-          <label className="text-[13px] text-muted-foreground font-medium">Client:</label>
-          <SelectField value={selectedClient} onChange={setSelectedClient} options={clients} />
-        </div>
+      {/* Legend */}
+      <div className="px-5 py-4 border-b border-border flex items-center gap-3 flex-wrap">
+        {Object.entries(phaseStyles).map(([label, s]) => (
+          <div key={label} className="flex items-center gap-1.5">
+            <span className={cn("h-2.5 w-2.5 rounded-sm", s.bg)} />
+            <span className="text-[11px] text-muted-foreground">{label}</span>
+          </div>
+        ))}
       </div>
 
       <div className="p-5">

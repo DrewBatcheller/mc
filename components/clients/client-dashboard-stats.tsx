@@ -1,56 +1,93 @@
+'use client'
+
+import { useAirtable } from '@/hooks/use-airtable'
 import { MetricCard } from '@/components/shared/metric-card'
+import { useMemo } from 'react'
 
-const row1 = [
-  {
-    label: 'Total Experiments',
-    value: '5',
-    sub: 'The cumulative count of all CRO tests launched to date.',
-    className: 'border-l-[3px] border-l-sky-400',
-  },
-  {
-    label: 'Scheduled Experiments',
-    value: '0',
-    sub: 'Validated test ideas currently in the queue for production.',
-    className: 'border-l-[3px] border-l-emerald-400',
-  },
-  {
-    label: 'Live Experiments',
-    value: '0',
-    sub: 'Tests currently active and collecting data on the site.',
-    className: 'border-l-[3px] border-l-emerald-400',
-  },
-]
+export function ClientDashboardStats({ clientId }: { clientId?: string }) {
+  const clientFilter = clientId
+    ? `{Record ID (from Brand Name)} = "${clientId}"`
+    : undefined
 
-const row2 = [
-  {
-    label: 'Unsuccessful Experiments',
-    value: '3',
-    sub: 'Total number of tests that resulted in a loss or were inconclusive.',
-    className: 'border-l-[3px] border-l-rose-400',
-  },
-  {
-    label: 'Successful Experiments',
-    value: '2',
-    sub: 'Winning variations that outperformed the control and were pushed to production.',
-    className: 'border-l-[3px] border-l-emerald-400',
-  },
-  {
-    label: 'Total Revenue Added',
-    value: 27791.90,
-    currency: true,
-    sub: 'Estimated incremental Monthly Recurring Revenue ($MRR) generated from winning experiments.',
-    className: 'border-l-[3px] border-l-emerald-400',
-  },
-]
+  const { data: experiments } = useAirtable('experiments', { filterExtra: clientFilter })
 
-export function ClientDashboardStats() {
+  const stats = useMemo(() => {
+    if (!experiments) {
+      return {
+        totalExperiments: 0,
+        scheduledExperiments: 0,
+        liveExperiments: 0,
+        liveStatus: 'No Active Tests',
+        unsuccessfulExperiments: 0,
+        successfulExperiments: 0,
+        totalRevenueAdded: 0,
+      }
+    }
+
+    const totalExperiments = experiments.length
+
+    let liveExperiments = 0
+    let liveStatus = 'No Active Tests'
+    const activeStatuses = experiments.filter(e => {
+      const status = String(e.fields['Test Status'] || '')
+      return status.includes('In Progress') || status.includes('Live')
+    })
+
+    if (activeStatuses.length > 0) {
+      liveExperiments = activeStatuses.length
+      const statusCounts: Record<string, number> = {}
+      activeStatuses.forEach(e => {
+        const status = String(e.fields['Test Status'] || '')
+        statusCounts[status] = (statusCounts[status] || 0) + 1
+      })
+      const mostCommonStatus = Object.entries(statusCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
+      if (mostCommonStatus) liveStatus = mostCommonStatus
+    }
+
+    const scheduledExperiments = experiments.filter(e => {
+      const status = String(e.fields['Test Status'] || '')
+      return status === 'Pending' || status === 'Scheduled'
+    }).length
+
+    const successfulExperiments = experiments.filter(e => {
+      const testStatus = String(e.fields['Test Status'] || '')
+      const outcome = String(e.fields['Outcome'] || '')
+      return testStatus === 'Successful' || outcome === 'Successful' || outcome === 'Win'
+    }).length
+
+    const unsuccessfulExperiments = experiments.filter(e => {
+      const testStatus = String(e.fields['Test Status'] || '')
+      const outcome = String(e.fields['Outcome'] || '')
+      return testStatus === 'Unsuccessful' || testStatus === 'Inconclusive' || outcome === 'Unsuccessful' || outcome === 'Loss' || outcome === 'Inconclusive'
+    }).length
+
+    const totalRevenueAdded = experiments.reduce((sum, exp) => {
+      const revenue = exp.fields['Revenue Added (MRR) (Regular Format)']
+      return sum + (typeof revenue === 'number' ? revenue : 0)
+    }, 0)
+
+    return { totalExperiments, scheduledExperiments, liveExperiments, liveStatus, unsuccessfulExperiments, successfulExperiments, totalRevenueAdded }
+  }, [experiments])
+
+  const row1 = [
+    { id: 'total-experiments', label: 'Total Experiments', value: String(stats.totalExperiments), sub: 'The cumulative count of all CRO tests launched to date.', className: 'border-l-[3px] border-l-sky-400' },
+    { id: 'scheduled-experiments', label: 'Scheduled Experiments', value: String(stats.scheduledExperiments), sub: 'Validated test ideas currently in the queue for production.', className: 'border-l-[3px] border-l-emerald-400' },
+    { id: 'active-tests', label: stats.liveStatus, value: String(stats.liveExperiments), sub: stats.liveStatus === 'No Active Tests' ? 'No tests currently active.' : 'Tests actively collecting data or in development pipeline.', className: 'border-l-[3px] border-l-emerald-400' },
+  ]
+
+  const row2 = [
+    { id: 'unsuccessful-experiments', label: 'Unsuccessful Experiments', value: String(stats.unsuccessfulExperiments), sub: 'Total number of tests that resulted in a loss or were inconclusive.', className: 'border-l-[3px] border-l-rose-400' },
+    { id: 'successful-experiments', label: 'Successful Experiments', value: String(stats.successfulExperiments), sub: 'Winning variations that outperformed the control and were pushed to production.', className: 'border-l-[3px] border-l-emerald-400' },
+    { id: 'total-revenue', label: 'Total Revenue Added', value: stats.totalRevenueAdded, currency: true, sub: 'Estimated incremental Monthly Recurring Revenue ($MRR) generated from winning experiments.', className: 'border-l-[3px] border-l-emerald-400' },
+  ]
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {row1.map((s) => <MetricCard key={s.label} {...s} />)}
+        {row1.map((s) => <MetricCard key={s.id} {...s} />)}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {row2.map((s) => <MetricCard key={s.label} {...s} />)}
+        {row2.map((s) => <MetricCard key={s.id} {...s} />)}
       </div>
     </div>
   )

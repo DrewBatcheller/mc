@@ -4,12 +4,22 @@ import { Users, FlaskConical, FolderKanban, TrendingUp } from "lucide-react"
 import { MetricCard } from "@/components/shared/metric-card"
 import { useAirtable } from "@/hooks/use-airtable"
 
-export function StatCards() {
+function buildClientFilter(clientIds: string[]): string | undefined {
+  if (!clientIds.length) return undefined
+  if (clientIds.length === 1) return `{Record ID (from Brand Name)} = "${clientIds[0]}"`
+  const parts = clientIds.map(id => `{Record ID (from Brand Name)} = "${id}"`)
+  return `OR(${parts.join(', ')})`
+}
+
+export function StatCards({ clientIds = [] }: { clientIds?: string[] }) {
+  const clientFilter = buildClientFilter(clientIds)
+
   const { data: clientRecords, isLoading: cL } = useAirtable('clients', {
     fields: ['Client Status', 'Total Tests Run', 'Successful Tests'],
   })
   const { data: experimentRecords, isLoading: eL } = useAirtable('experiments', {
     fields: ['Test Status'],
+    filterExtra: clientFilter,
   })
   const { data: batchRecords, isLoading: bL } = useAirtable('batches', {
     fields: ['All Tests Status'],
@@ -17,8 +27,10 @@ export function StatCards() {
 
   const isLoading = cL || eL || bL
 
-  const totalClients = clientRecords?.length ?? 0
-  const activeClients = clientRecords?.filter(r => r.fields['Client Status'] === 'Active').length ?? 0
+  const totalClients = clientIds.length > 0 ? clientIds.length : (clientRecords?.length ?? 0)
+  const activeClients = clientIds.length > 0
+    ? clientIds.length
+    : (clientRecords?.filter(r => r.fields['Client Status'] === 'Active').length ?? 0)
 
   const totalExperiments = experimentRecords?.length ?? 0
   const liveExperiments = experimentRecords?.filter(r => String(r.fields['Test Status'] ?? '') === 'Live - Collecting Data').length ?? 0

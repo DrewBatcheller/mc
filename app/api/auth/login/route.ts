@@ -2,13 +2,14 @@
  * POST /api/auth/login
  *
  * Validates email + password against Airtable Team and Clients tables.
- * Returns an AuthUser object on success — no server-side session created yet.
- * The client stores the user in localStorage (Phase 1 temporary approach).
+ * Returns an AuthUser object on success WITHOUT waiting for permissions.
+ * Permissions are fetched separately by the client after login succeeds.
  *
  * Role logic:
  *   Team table match:
  *     Department = "Management"  → role: "management"
  *     Department = "Strategy"    → role: "strategy"
+ *     Department = "Sales"       → role: "sales"
  *     else                       → role: "team"
  *   Clients table match          → role: "client"
  */
@@ -57,6 +58,8 @@ export async function POST(request: Request) {
         role = 'management'
       } else if (dept === 'strategy') {
         role = 'strategy'
+      } else if (dept === 'sales') {
+        role = 'sales'
       } else {
         role = 'team'
       }
@@ -69,6 +72,7 @@ export async function POST(request: Request) {
         .join('')
         .toUpperCase()
 
+      // Return immediately - permissions will be fetched by client after auth
       const user: AuthUser = {
         id: teamRecord.id,
         email: normalizedEmail,
@@ -90,6 +94,7 @@ export async function POST(request: Request) {
     if (clientRecord) {
       const brandName = clientRecord.fields['Brand Name'] ?? email
 
+      // Return immediately - permissions will be fetched by client after auth
       const user: AuthUser = {
         id: clientRecord.id,
         email: normalizedEmail,

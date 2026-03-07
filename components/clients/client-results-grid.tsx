@@ -13,16 +13,17 @@ import {
 import { cn } from "@/lib/utils"
 import { SelectField } from "@/components/shared/select-field"
 import { ExperimentDetailsModal } from "../experiments/experiment-details-modal"
-
-const RESULT_IMG = "https://i.imgur.com/u50b3Yy.png"
+import { useAirtable } from "@/hooks/use-airtable"
 
 type Status = "Successful" | "Unsuccessful" | "Inconclusive"
 
 interface Result {
+  id: string
   name: string
   status: Status
   revenueAdded: number
   placement: string
+  placementUrl?: string
   device: string
   geos: string
   launchDate: string
@@ -30,33 +31,20 @@ interface Result {
   rationale: string
   goals: string[]
   deployed: boolean
-  controlLabel: string
-  variantLabel: string
+  hypothesis?: string
+  whatHappened?: string
+  nextSteps?: string
+  controlImage?: string
+  variantImage?: string
+  resultImage?: string
+  resultVideo?: string
+  thumbnailUrl?: string
 }
-
-const results: Result[] = [
-  { name: "Free Shipping Topbar", status: "Successful", revenueAdded: 22000, placement: "Site-wide Header", device: "All Devices", geos: "US, CA", launchDate: "Feb 2, 2024", endDate: "Feb 16, 2024", rationale: "A topbar promoting free shipping thresholds incentivizes larger purchases, aiming to boost average order value.", goals: ["CVR"], deployed: true, controlLabel: "Original Page", variantLabel: "Variant Page" },
-  { name: "Update Mobile Menu Navigation", status: "Successful", revenueAdded: 0, placement: "Mobile Menu", device: "Mobile", geos: "US", launchDate: "Jan 20, 2024", endDate: "Feb 5, 2024", rationale: "Restructuring the mobile menu to aid navigation with grouped categories and visual icons.", goals: ["CVR", "RPV"], deployed: false, controlLabel: "Original Menu", variantLabel: "Redesigned Menu" },
-  { name: "Slim Down PDP", status: "Unsuccessful", revenueAdded: 0, placement: "Product Page", device: "All Devices", geos: "US, CA, AU", launchDate: "Jan 15, 2024", endDate: "Feb 1, 2024", rationale: "Reducing clutter on the PDP to create a cleaner, more focused purchase experience.", goals: ["CVR", "ATC"], deployed: false, controlLabel: "Current PDP", variantLabel: "Minimal PDP" },
-  { name: "Increase PDP Legibility Shorts", status: "Successful", revenueAdded: 5900, placement: "Product Page", device: "All Devices", geos: "US, CA", launchDate: "Jan 8, 2024", endDate: "Jan 25, 2024", rationale: "Improving typography and spacing on the PDP to increase readability and conversion.", goals: ["CVR", "ATC", "RPV"], deployed: true, controlLabel: "Current Layout", variantLabel: "Improved Layout" },
-  { name: "Cart Redesign: UVPs", status: "Successful", revenueAdded: 11400, placement: "Cart Page", device: "All Devices", geos: "US", launchDate: "Dec 28, 2023", endDate: "Jan 15, 2024", rationale: "Adding unique value propositions to the cart page to reinforce purchase confidence.", goals: ["CVR", "AOV"], deployed: true, controlLabel: "Original Cart", variantLabel: "UVP Cart" },
-  { name: "Separate CTA on Homepage", status: "Successful", revenueAdded: 29200, placement: "Homepage", device: "All Devices", geos: "US, CA, GB, AU", launchDate: "Dec 15, 2023", endDate: "Jan 10, 2024", rationale: "Separating primary and secondary CTAs on the homepage to improve click-through clarity.", goals: ["CVR", "RPV"], deployed: true, controlLabel: "Combined CTAs", variantLabel: "Separated CTAs" },
-  { name: "Instagram Story-Style Highlights", status: "Unsuccessful", revenueAdded: 0, placement: "Homepage", device: "All Devices", geos: "US", launchDate: "Dec 5, 2023", endDate: "Jan 2, 2024", rationale: "Adding Instagram-style story highlights on the homepage to drive product discovery.", goals: ["CVR"], deployed: false, controlLabel: "Standard Banner", variantLabel: "Story Highlights" },
-  { name: "Anchor ATC Button with Badges", status: "Inconclusive", revenueAdded: 0, placement: "Product Page", device: "Mobile", geos: "US", launchDate: "Nov 28, 2023", endDate: "Dec 26, 2023", rationale: "Making the ATC button sticky with trust badges to increase mobile conversion.", goals: ["ATC", "CVR", "RPV"], deployed: false, controlLabel: "Static ATC", variantLabel: "Sticky ATC + Badges" },
-  { name: "Redesign Reposition UVPs Max 3", status: "Successful", revenueAdded: 67900, placement: "Product Page", device: "All Devices", geos: "US, CA, GB, AU", launchDate: "Sep 5, 2023", endDate: "Oct 3, 2023", rationale: "Redesigning and limiting UVPs to max 3 for clearer messaging and stronger conversion.", goals: ["CVR", "ATC", "RPV", "AOV"], deployed: true, controlLabel: "5+ UVPs", variantLabel: "Top 3 UVPs" },
-  { name: "Savings Presentation (You Saved $X)", status: "Successful", revenueAdded: 6800, placement: "Cart Page", device: "All Devices", geos: "US, CA", launchDate: "Aug 28, 2023", endDate: "Sep 25, 2023", rationale: "Showing dynamic savings amount in the cart to reinforce the value of the purchase.", goals: ["CVR", "AOV"], deployed: true, controlLabel: "No Savings", variantLabel: "Savings Display" },
-]
 
 const statusConfig: Record<Status, { icon: typeof CheckCircle2; color: string; bg: string; border: string; dot: string }> = {
   Successful: { icon: CheckCircle2, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", dot: "bg-emerald-500" },
   Unsuccessful: { icon: XCircle, color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200", dot: "bg-rose-500" },
   Inconclusive: { icon: HelpCircle, color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200", dot: "bg-amber-500" },
-}
-
-const accentStrip: Record<Status, string> = {
-  Successful: "bg-emerald-500",
-  Unsuccessful: "bg-rose-400",
-  Inconclusive: "bg-amber-400",
 }
 
 const goalColors: Record<string, string> = {
@@ -74,23 +62,38 @@ function formatRevenue(n: number) {
   return `$${n.toLocaleString()}`
 }
 
-// Convert Result to Experiment interface for modal compatibility
-function convertResultToExperiment(result: Result): any {
+// Airtable attachment fields return an array of objects; extract the first URL
+function getAttachmentUrl(field: unknown): string | undefined {
+  if (!field || !Array.isArray(field) || field.length === 0) return undefined
+  const att = field[0] as Record<string, unknown>
+  const thumbs = att.thumbnails as Record<string, { url: string }> | undefined
+  return (thumbs?.large?.url ?? att.url) as string | undefined
+}
+
+function convertResultToExperiment(result: Result) {
   return {
     name: result.name,
     description: result.rationale,
     status: result.status,
     placement: result.placement,
+    placementUrl: result.placementUrl,
     devices: result.device,
     geos: result.geos,
     variants: "2",
     revenue: formatRevenue(result.revenueAdded),
     primaryGoals: result.goals,
+    hypothesis: result.hypothesis,
     rationale: result.rationale,
     revenueAddedMrr: formatRevenue(result.revenueAdded),
     deployed: result.deployed,
     launchDate: result.launchDate,
     endDate: result.endDate,
+    whatHappened: result.whatHappened,
+    nextSteps: result.nextSteps,
+    controlImage: result.controlImage,
+    variantImage: result.variantImage,
+    resultImage: result.resultImage,
+    resultVideo: result.resultVideo,
   }
 }
 
@@ -105,21 +108,111 @@ export function ClientResultsGrid() {
 
   const handleClose = useCallback(() => setSelectedResult(null), [])
 
+  // Fetch completed experiments — role-filter auto-scopes to this client
+  const { data: rawExperiments, isLoading } = useAirtable("experiments", {
+    filterExtra:
+      'OR({Test Status} = "Successful", {Test Status} = "Unsuccessful", {Test Status} = "Inconclusive")',
+    fields: [
+      "Test Description",
+      "Test Status",
+      "Revenue Added (MRR) (Regular Format)",
+      "Placement",
+      "Placement URL",
+      "Devices",
+      "GEOs",
+      "Launch Date",
+      "End Date",
+      "Rationale",
+      "Category Primary Goals",
+      "Deployed",
+      "Hypothesis",
+      "Describe what happened & what we learned",
+      "Next Steps (Action)",
+      "Control Image",
+      "Variant Image",
+      "PTA Result Image",
+      "Post-Test Analysis (Loom)",
+    ],
+    sort: [{ field: "End Date", direction: "desc" }],
+    revalidateOnFocus: false,
+  })
+
+  const results = useMemo((): Result[] => {
+    if (!rawExperiments) return []
+    return rawExperiments
+      .map((record) => {
+        const f = record.fields
+        const rawStatus = f["Test Status"] as string
+        if (!["Successful", "Unsuccessful", "Inconclusive"].includes(rawStatus)) return null
+
+        const rev = f["Revenue Added (MRR) (Regular Format)"]
+        const revenueAdded =
+          typeof rev === "number"
+            ? rev
+            : parseFloat(String(rev ?? "0").replace(/[$,]/g, "")) || 0
+
+        return {
+          id: record.id,
+          name: (f["Test Description"] as string) || "Unnamed",
+          status: rawStatus as Status,
+          revenueAdded,
+          placement: (f["Placement"] as string) || "",
+          placementUrl: (f["Placement URL"] as string) || undefined,
+          device: Array.isArray(f["Devices"])
+            ? (f["Devices"] as string[]).join(", ")
+            : (f["Devices"] as string) || "",
+          geos: Array.isArray(f["GEOs"])
+            ? (f["GEOs"] as string[]).join(", ")
+            : (f["GEOs"] as string) || "",
+          launchDate: (f["Launch Date"] as string) || "",
+          endDate: (f["End Date"] as string) || "",
+          rationale: (f["Rationale"] as string) || "",
+          goals: Array.isArray(f["Category Primary Goals"])
+            ? (f["Category Primary Goals"] as string[])
+            : [],
+          deployed: Boolean(f["Deployed"]),
+          hypothesis: (f["Hypothesis"] as string) || undefined,
+          whatHappened:
+            (f["Describe what happened & what we learned"] as string) || undefined,
+          nextSteps: (f["Next Steps (Action)"] as string) || undefined,
+          controlImage: getAttachmentUrl(f["Control Image"]),
+          variantImage: getAttachmentUrl(f["Variant Image"]),
+          resultImage: getAttachmentUrl(f["PTA Result Image"]),
+          resultVideo: (f["Post-Test Analysis (Loom)"] as string) || undefined,
+          thumbnailUrl:
+            getAttachmentUrl(f["PTA Result Image"]) ??
+            getAttachmentUrl(f["Control Image"]),
+        } satisfies Result
+      })
+      .filter((r) => r !== null) as Result[]
+  }, [rawExperiments])
+
   const filtered = useMemo(() => {
     return results.filter((r) => {
       if (status !== "All Results" && r.status !== status) return false
       if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
-  }, [status, search])
+  }, [results, status, search])
 
-  const counts = useMemo(() => ({
-    total: filtered.length,
-    successful: filtered.filter((r) => r.status === "Successful").length,
-    unsuccessful: filtered.filter((r) => r.status === "Unsuccessful").length,
-    inconclusive: filtered.filter((r) => r.status === "Inconclusive").length,
-    totalRevenue: filtered.reduce((sum, r) => sum + r.revenueAdded, 0),
-  }), [filtered])
+  const counts = useMemo(
+    () => ({
+      total: filtered.length,
+      successful: filtered.filter((r) => r.status === "Successful").length,
+      unsuccessful: filtered.filter((r) => r.status === "Unsuccessful").length,
+      inconclusive: filtered.filter((r) => r.status === "Inconclusive").length,
+      totalRevenue: filtered.reduce((sum, r) => sum + r.revenueAdded, 0),
+    }),
+    [filtered]
+  )
+
+  if (isLoading) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-12 text-center">
+        <p className="text-[13px] text-muted-foreground">Loading results...</p>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -142,13 +235,20 @@ export function ClientResultsGrid() {
             <span className="font-medium text-foreground">{counts.inconclusive}</span> inconclusive
           </span>
           <span className="text-muted-foreground sm:ml-auto">
-            Revenue added: <span className="font-semibold text-emerald-600">{formatRevenue(counts.totalRevenue)}</span>
+            Revenue added:{" "}
+            <span className="font-semibold text-emerald-600">
+              {formatRevenue(counts.totalRevenue)}
+            </span>
           </span>
         </div>
 
-        {/* Toolbar -- no client filter */}
+        {/* Toolbar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <SelectField value={status} onChange={(v) => setStatus(v as typeof status)} options={allStatuses} />
+          <SelectField
+            value={status}
+            onChange={(v) => setStatus(v as typeof status)}
+            options={allStatuses}
+          />
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
@@ -184,34 +284,53 @@ export function ClientResultsGrid() {
         {/* Grid view */}
         {view === "grid" && (
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-            {filtered.map((r, i) => {
+            {filtered.map((r) => {
               const cfg = statusConfig[r.status]
               return (
                 <button
-                  key={i}
+                  key={r.id}
                   onClick={() => setSelectedResult(r)}
                   className="bg-card rounded-xl border border-border overflow-hidden hover:shadow-md transition-all group text-left"
                 >
                   <div className="h-36 bg-accent/20 overflow-hidden">
-                    <img
-                      src={RESULT_IMG}
-                      alt={r.name}
-                      className="h-full w-full object-cover object-top group-hover:scale-[1.03] transition-transform duration-300"
-                    />
+                    {r.thumbnailUrl ? (
+                      <img
+                        src={r.thumbnailUrl}
+                        alt={r.name}
+                        className="h-full w-full object-cover object-top group-hover:scale-[1.03] transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="h-full w-full" />
+                    )}
                   </div>
                   <div className="p-4 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-md border", cfg.bg, cfg.color, cfg.border)}>
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium px-2 py-0.5 rounded-md border",
+                          cfg.bg,
+                          cfg.color,
+                          cfg.border
+                        )}
+                      >
                         {r.status}
                       </span>
                       <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-[13px] font-semibold text-foreground leading-snug line-clamp-2">{r.name}</h3>
+                      <h3 className="text-[13px] font-semibold text-foreground leading-snug line-clamp-2">
+                        {r.name}
+                      </h3>
                     </div>
                     <div className="flex gap-1 flex-wrap">
                       {r.goals.map((g) => (
-                        <span key={g} className={cn("text-[10px] font-semibold px-1.5 py-px rounded border", goalColors[g] || "bg-accent text-foreground border-border")}>
+                        <span
+                          key={g}
+                          className={cn(
+                            "text-[10px] font-semibold px-1.5 py-px rounded border",
+                            goalColors[g] || "bg-accent text-foreground border-border"
+                          )}
+                        >
                           {g}
                         </span>
                       ))}
@@ -219,7 +338,12 @@ export function ClientResultsGrid() {
                     <div className="flex items-center justify-between pt-2 border-t border-border">
                       <div className="flex flex-col">
                         <span className="text-[10px] text-muted-foreground">Revenue Added</span>
-                        <span className={cn("text-[14px] font-semibold tabular-nums", r.revenueAdded > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+                        <span
+                          className={cn(
+                            "text-[14px] font-semibold tabular-nums",
+                            r.revenueAdded > 0 ? "text-emerald-600" : "text-muted-foreground"
+                          )}
+                        >
                           {formatRevenue(r.revenueAdded)}
                         </span>
                       </div>
@@ -243,50 +367,84 @@ export function ClientResultsGrid() {
                 <thead>
                   <tr className="border-b border-border">
                     {["Experiment", "Status", "Goals", "Placement", "Device", "Revenue Added", "Duration"].map((h) => (
-                      <th key={h} className={cn("px-4 py-3 text-[13px] font-medium text-muted-foreground whitespace-nowrap text-left", h === "Revenue Added" && "text-right")}>
+                      <th
+                        key={h}
+                        className={cn(
+                          "px-4 py-3 text-[13px] font-medium text-muted-foreground whitespace-nowrap text-left",
+                          h === "Revenue Added" && "text-right"
+                        )}
+                      >
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r, i) => {
+                  {filtered.map((r) => {
                     const cfg = statusConfig[r.status]
                     return (
                       <tr
-                        key={i}
+                        key={r.id}
                         onClick={() => setSelectedResult(r)}
                         className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors cursor-pointer"
                       >
                         <td className="px-4 py-3.5 text-[13px] font-medium text-foreground max-w-[300px]">
                           <div className="flex items-center gap-3">
                             <div className="h-9 w-14 rounded-md border border-border overflow-hidden bg-accent/30 shrink-0">
-                              <img src={RESULT_IMG} alt={r.name} className="h-full w-full object-cover object-top" />
+                              {r.thumbnailUrl && (
+                                <img
+                                  src={r.thumbnailUrl}
+                                  alt={r.name}
+                                  className="h-full w-full object-cover object-top"
+                                />
+                              )}
                             </div>
                             <span className="line-clamp-1">{r.name}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-md border inline-block", cfg.bg, cfg.color, cfg.border)}>
+                          <span
+                            className={cn(
+                              "text-[11px] font-medium px-2 py-0.5 rounded-md border inline-block",
+                              cfg.bg,
+                              cfg.color,
+                              cfg.border
+                            )}
+                          >
                             {r.status}
                           </span>
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex gap-1">
                             {r.goals.map((g) => (
-                              <span key={g} className={cn("text-[10px] font-semibold px-1.5 py-px rounded border", goalColors[g] || "bg-accent text-foreground border-border")}>
+                              <span
+                                key={g}
+                                className={cn(
+                                  "text-[10px] font-semibold px-1.5 py-px rounded border",
+                                  goalColors[g] || "bg-accent text-foreground border-border"
+                                )}
+                              >
                                 {g}
                               </span>
                             ))}
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">{r.placement}</td>
-                        <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">{r.device}</td>
-                        <td className={cn("px-4 py-3.5 text-[13px] font-medium tabular-nums text-right whitespace-nowrap", r.revenueAdded > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+                        <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
+                          {r.placement}
+                        </td>
+                        <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap">
+                          {r.device}
+                        </td>
+                        <td
+                          className={cn(
+                            "px-4 py-3.5 text-[13px] font-medium tabular-nums text-right whitespace-nowrap",
+                            r.revenueAdded > 0 ? "text-emerald-600" : "text-muted-foreground"
+                          )}
+                        >
                           {formatRevenue(r.revenueAdded)}
                         </td>
                         <td className="px-4 py-3.5 text-[13px] text-muted-foreground whitespace-nowrap tabular-nums">
-                          {r.launchDate.split(",")[0]} - {r.endDate.split(",")[0]}
+                          {r.launchDate} – {r.endDate}
                         </td>
                       </tr>
                     )
@@ -297,7 +455,7 @@ export function ClientResultsGrid() {
           </div>
         )}
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !isLoading && (
           <div className="bg-card rounded-xl border border-border p-12 text-center">
             <p className="text-[13px] text-muted-foreground">No results match your filters.</p>
           </div>
@@ -305,10 +463,10 @@ export function ClientResultsGrid() {
       </div>
 
       {selectedResult && (
-        <ExperimentDetailsModal 
+        <ExperimentDetailsModal
           isOpen={!!selectedResult}
-          experiment={convertResultToExperiment(selectedResult)} 
-          onClose={handleClose} 
+          experiment={convertResultToExperiment(selectedResult)}
+          onClose={handleClose}
         />
       )}
     </>

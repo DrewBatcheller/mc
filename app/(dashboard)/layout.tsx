@@ -4,6 +4,7 @@ import { RoleSidebar } from "@/components/dashboard/RoleSidebar"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { DashboardContentWrapper } from "@/components/dashboard/dashboard-content-wrapper"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
+import { RealtimeSyncMount } from "@/components/realtime/RealtimeSyncMount"
 
 export default function DashboardLayout({
   children,
@@ -12,6 +13,8 @@ export default function DashboardLayout({
 }) {
   return (
     <ProtectedRoute>
+      {/* SSE real-time cache invalidation — mounted once for all dashboard pages */}
+      <RealtimeSyncMount />
       <div className="flex h-screen">
         <RoleSidebar />
         <div className="flex-1 flex flex-col min-w-0">

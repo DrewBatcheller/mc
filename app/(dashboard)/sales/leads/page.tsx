@@ -1,5 +1,6 @@
 import { LeadsStatCards } from "@/components/sales/leads-stat-cards"
 import { LeadsTable } from "@/components/sales/leads-table"
+import { AddLeadButton } from "@/components/sales/add-lead-button"
 
 export default function SalesLeadsPage() {
   return (
@@ -13,6 +14,7 @@ export default function SalesLeadsPage() {
             Manage and track all leads in the pipeline
           </p>
         </div>
+        <AddLeadButton />
       </div>
 
       <LeadsStatCards />

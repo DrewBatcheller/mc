@@ -1,6 +1,8 @@
+import type { UserPermissions } from './permission-types'
+
 // ─── User Roles ──────────────────────────────────────────────────────────────
-// Derived from Permissions table: Management, Strategy, Team, Client
-export type UserRole = 'management' | 'strategy' | 'team' | 'client'
+// Derived from Permissions table: Management, Strategy, Sales, Team, Client
+export type UserRole = 'management' | 'strategy' | 'sales' | 'team' | 'client'
 
 // ─── Authenticated User ───────────────────────────────────────────────────────
 export interface AuthUser {
@@ -11,6 +13,8 @@ export interface AuthUser {
   department?: string  // Team members: "Management", "Strategy", etc.
   clientId?: string    // Set when role === 'client'
   avatarInitials?: string
+  avatarUrl?: string           // URL from Profile Photo (team) or Avatar (client) attachment field
+  permissions?: UserPermissions  // Fetched from Airtable Permissions table
 }
 
 // ─── Stored Session ───────────────────────────────────────────────────────────
@@ -56,7 +60,7 @@ export const TABLE_NAMES = {
   clients: 'Clients',
   contacts: 'Contacts',
   experiments: 'Experiments',
-  'experiment-ideas': 'Experiment Ideas',
+  'experiment-ideas': 'Experiments',
   batches: 'Batches',
   variants: 'Variants',
   tasks: 'Tasks',
@@ -69,6 +73,13 @@ export const TABLE_NAMES = {
   partners: 'Partners',
   permissions: 'Permissions',
   'onboard-qa': 'Onboard QA',
+  'revenue-categories': 'Revenue Categories',
+  'expense-categories': 'Expense Categories',
+  vendors: 'Vendors',
+  notifications: 'Notifications',
+  dividends: 'Dividends Paid',
+  notes: 'Notes',
+  delays: 'Delays',
 } as const
 
 export type ResourceSlug = keyof typeof TABLE_NAMES

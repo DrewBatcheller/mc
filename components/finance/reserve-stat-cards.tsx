@@ -2,36 +2,40 @@
 
 import { Wallet, TrendingUp, TrendingDown } from "lucide-react"
 import { MetricCard } from "@/components/shared/metric-card"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { useMemo } from "react"
 
-interface ReserveStatCardsProps {
-  year?: string
-}
+export function ReserveStatCards({ year = "all" }: { year?: string }) {
+  const { data: rawReserve } = useAirtable('reserve', {
+    sort: [{ field: 'DateClean', direction: 'desc' }],
+  })
 
-const allData = [
-  { yearIndex: 2022, balance: 6970.69, allocations: 6970.69, deallocations: 0 },
-  { yearIndex: 2023, balance: 24445.09, allocations: 13747.66, deallocations: -178.56 },
-  { yearIndex: 2024, balance: 84191.06, allocations: 62410.47, deallocations: -970.45 },
-  { yearIndex: 2025, balance: 105625.00, allocations: 21433.94, deallocations: 0 },
-]
+  const { currentBalance, allocations, deallocations } = useMemo(() => {
+    if (!rawReserve?.length) return { currentBalance: 0, allocations: 0, deallocations: 0 }
 
-export function ReserveStatCards({ year = "all" }: ReserveStatCardsProps) {
-  // Filter data based on year selection
-  const getFilteredTotals = () => {
-    let filteredData = allData
+    // Current balance = the most recent record's New Account Balance (always all-time)
+    const currentBalance = parseCurrency(rawReserve[0].fields['New Account Balance'] as string)
 
-    if (year !== "all") {
-      const yearNum = parseInt(year)
-      filteredData = allData.filter(d => d.yearIndex === yearNum)
+    // Allocations/deallocations filtered by selected year
+    const yearNum = year !== 'all' ? parseInt(year) : null
+    const filtered = yearNum
+      ? rawReserve.filter(r => {
+          const d = String(r.fields['DateClean'] ?? '')
+          return d.startsWith(String(yearNum))
+        })
+      : rawReserve
+
+    let allocations = 0
+    let deallocations = 0
+    for (const r of filtered) {
+      const amt = parseCurrency(r.fields['Allocated Amount'] as string)
+      if (amt >= 0) allocations += amt
+      else deallocations += amt
     }
 
-    const currentBalance = filteredData.length > 0 ? filteredData[filteredData.length - 1].balance : 0
-    const allocations = filteredData.reduce((sum, d) => sum + d.allocations, 0)
-    const deallocations = filteredData.reduce((sum, d) => sum + d.deallocations, 0)
-
     return { currentBalance, allocations, deallocations }
-  }
-
-  const { currentBalance, allocations, deallocations } = getFilteredTotals()
+  }, [rawReserve, year])
 
   const cards = [
     { label: "Current Reserve Balance", value: currentBalance, icon: Wallet, currency: true },

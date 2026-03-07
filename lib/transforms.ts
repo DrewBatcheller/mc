@@ -144,8 +144,8 @@ export function transformExperiment(id: string, f: Record<string, unknown>): App
   return {
     id,
     name: String(f['Test Description'] ?? ''),
-    client: joinArr(f['Brand Name (from Brand Name)'] as string[] ?? f['Brand Name'] as string[]),
-    clientId: joinArr((f['Record ID (from Brand Name)'] as string[]) ?? []),
+    client: joinArr(f['Brand Name'] as string[] ?? f['Brand Name'] as string[]),
+    clientId: joinArr((f['Client'] as string[]) ?? []),
     batchId: joinArr((f['Batch Record ID'] as string[]) ?? (f['Batch'] as string[]) ?? []),
     status: String(f['Test Status'] ?? ''),
     launchDate: (f['Launch Date Override'] || f['Launch Date']) ? String(f['Launch Date Override'] || f['Launch Date']) : null,
@@ -163,7 +163,7 @@ export function transformExperiment(id: string, f: Record<string, unknown>): App
     devices: String(f['Devices'] ?? 'All Devices'),
     geos: joinArr(f['GEOs'] as string[] | string),
     revenueAdded: parseCurrency(f['Revenue Added (MRR) (Regular Format)'] as string),
-    revenueAddedFormatted: String(f['Revenue Added (MRR) (K Format)'] ?? '$0'),
+    revenueAddedFormatted: String(f['Revenue Added (MRR)'] ?? '$0'),
     goalMetric1: String(f['Goal Metric 1'] ?? ''),
     metric1Increase: String(f['Metric #1 Increase'] ?? ''),
     goalMetric2: String(f['Goal Metric 2'] ?? ''),
@@ -202,8 +202,8 @@ export function transformBatch(id: string, f: Record<string, unknown>): AppBatch
   return {
     id,
     key: String(f['Batch Key'] ?? ''),
-    client: joinArr(f['Brand Name (from Client)'] as string[] ?? f['Brand Name'] as string[]),
-    clientId: joinArr((f['Record ID (from Client)'] as string[]) ?? []),
+    client: joinArr(f['Client'] as string[] ?? f['Brand Name'] as string[]),
+    clientId: joinArr((f['Client'] as string[]) ?? []),
     launchDate: f['Launch Date'] ? String(f['Launch Date']) : null,
     status: String(f['All Tests Status'] ?? f['Last Test Status'] ?? ''),
     revenueAdded: parseCurrency(f['Revenue Added (MRR)'] as string),
@@ -286,7 +286,7 @@ export function transformIdea(id: string, f: Record<string, unknown>): AppIdea {
     id,
     name: String(f['Test Description'] ?? ''),
     client: joinArr(f['Client'] as string[]),
-    clientId: joinArr((f['Record ID (from Client)'] as string[]) ?? (f['Client'] as string[]) ?? []),
+    clientId: joinArr((f['Client'] as string[]) ?? []),
     hypothesis: String(f['Hypothesis'] ?? ''),
     rationale: String(f['Rationale'] ?? ''),
     placement: String(f['Placement'] ?? ''),
@@ -321,16 +321,16 @@ export function transformTask(id: string, f: Record<string, unknown>): AppTask {
     id,
     name: String(f['Team Facing Name'] ?? ''),
     clientFacingName: String(f['Client Facing Name'] ?? ''),
-    client: joinArr(f['Brand Name (from Client)'] as string[]),
-    clientId: joinArr((f['Record ID (from Client)'] as string[]) ?? []),
+    client: joinArr(f['Brand Name'] as string[] ?? f['Client'] as string[]),
+    clientId: joinArr((f['Client'] as string[]) ?? []),
     department: String(f['Department'] ?? ''),
     startDate: f['Start Date'] ? String(f['Start Date']) : null,
     dueDate: f['Due Date'] ? String(f['Due Date']) : null,
     status: String(f['Status'] ?? ''),
     assignedTo: joinArr(f['Assigned to'] as string[]),
-    batchId: joinArr((f['Record ID (from Batch)'] as string[]) ?? (f['Batch'] as string[]) ?? []),
-    linkedTests: Array.isArray(f['Linked Test Names (from Batch)'])
-      ? f['Linked Test Names (from Batch)'] as string[]
+    batchId: joinArr((f['Batch'] as string[]) ?? []),
+    linkedTests: Array.isArray(f['Linked Test Names'])
+      ? f['Linked Test Names'] as string[]
       : [],
   }
 }
@@ -428,7 +428,7 @@ export interface AppRevenue {
 export function transformRevenue(id: string, f: Record<string, unknown>): AppRevenue {
   return {
     id,
-    client: joinArr(f['Brand Name (from Client)'] as string[] ?? f['Client'] as string[]),
+    client: joinArr(f['Brand Name'] as string[] ?? f['Client'] as string[]),
     clientId: joinArr((f['Client'] as string[]) ?? []),
     date: f['Date'] ? String(f['Date']) : null,
     amountUsd: parseCurrency(f['Amount USD'] as string),
@@ -531,7 +531,7 @@ export function transformReserve(id: string, f: Record<string, unknown>): AppRes
   return {
     id,
     allocation: String(f['Allocation'] ?? ''),
-    amount: parseCurrency(f['Amount'] as string),
+    amount: parseCurrency(f['Allocated Amount'] as string),
     category: String(f['Category'] ?? ''),
     description: String(f['Description'] ?? ''),
     date: f['Date'] ? String(f['Date']) : null,

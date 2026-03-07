@@ -12,6 +12,7 @@ interface SectionPermissions {
   management: boolean
   team: boolean
   affiliates: boolean
+  forms: boolean
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
@@ -24,6 +25,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: true,
     team: false,
     affiliates: true,
+    forms: true,
   },
   strategy: {
     finances: false,
@@ -34,6 +36,18 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: true,
     team: false,
     affiliates: true,
+    forms: false,
+  },
+  sales: {
+    finances: false,
+    sales: true,
+    experiments: false,
+    clients: false,
+    clientDashboard: false,
+    management: false,
+    team: true,
+    affiliates: false,
+    forms: false,
   },
   team: {
     finances: false,
@@ -44,6 +58,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: false,
     team: true,
     affiliates: false,
+    forms: false,
   },
   client: {
     finances: false,
@@ -54,6 +69,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, SectionPermissions> = {
     management: false,
     team: false,
     affiliates: false,
+    forms: false,
   },
 }
 
@@ -135,6 +151,7 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
         { label: 'Team Directory', href: '/management/team-directory' },
         { label: 'Team Dashboard', href: '/management/team-dashboard' },
         { label: 'Schedule', href: '/management/schedule' },
+        { label: 'Forms Directory', href: '/management/forms' },
       ],
     },
     { icon: 'Handshake', label: 'Affiliates', href: '/affiliates' },
@@ -194,6 +211,27 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
     { icon: 'Handshake', label: 'Affiliates', href: '/affiliates' },
   ],
 
+  sales: [
+    {
+      icon: 'Target',
+      label: 'Sales',
+      subItems: [
+        { label: 'Overview', href: '/sales/overview' },
+        { label: 'Leads', href: '/sales/leads' },
+        { label: 'Kanban', href: '/sales/kanban' },
+        { label: 'Tasks', href: '/sales/tasks' },
+      ],
+    },
+    {
+      icon: 'UserCircle',
+      label: 'Team',
+      subItems: [
+        { label: 'My Dashboard', href: '/team' },
+        { label: 'Directory', href: '/team/directory' },
+      ],
+    },
+  ],
+
   team: [
     {
       icon: 'FlaskConical',
@@ -209,7 +247,7 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
       icon: 'UserCircle',
       label: 'Team',
       subItems: [
-        { label: 'My Dashboard', href: '/team/dashboard' },
+        { label: 'My Dashboard', href: '/team' },
         { label: 'Schedule', href: '/team/schedule' },
         { label: 'Directory', href: '/team/directory' },
       ],
@@ -235,7 +273,8 @@ export const NAV_CONFIG: Record<UserRole, NavSection[]> = {
 export const DEFAULT_ROUTE: Record<UserRole, string> = {
   management: '/',
   strategy: '/experiments/dashboard',
-  team: '/team/dashboard',
+  sales: '/sales/overview',
+  team: '/team',
   client: '/clients/client-dashboard',
 }
 
@@ -249,9 +288,11 @@ export const ACCESSIBLE_PREFIXES: Record<UserRole, string[]> = {
     '/clients',
     '/affiliates',
     '/management',
+    '/forms',
   ],
-  team: ['/experiments', '/team'],
-  client: ['/clients/client-dashboard', '/clients/client-ideas', '/clients/experiments-overview', '/clients/client-live-tests', '/clients/client-results'],
+  sales: ['/sales', '/team', '/forms'],
+  team: ['/experiments', '/team', '/forms'],
+  client: ['/clients/client-dashboard', '/clients/client-ideas', '/clients/experiments-overview', '/clients/client-live-tests', '/clients/client-results', '/forms'],
 }
 
 export function canAccessRoute(role: UserRole, pathname: string): boolean {

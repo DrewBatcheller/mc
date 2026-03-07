@@ -1,13 +1,18 @@
 "use client"
 
-import { ArrowUpDown, Pencil, Trash2, AlertCircle, Check, X } from "lucide-react"
+import { ArrowUpDown, Pencil, Trash2, AlertCircle, X } from "lucide-react"
 import { useState, useMemo, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { SelectField } from "@/components/shared/select-field"
 
 type SortKey = "month" | "totalDividend" | "connorDividend" | "connorPaid" | "jaydenDividend" | "jaydenPaid"
 type SortDirection = "asc" | "desc"
 
 interface DividendRow {
+  recordId: string
+  monthRecordId: string   // ID of the linked P&L record
   month: string
   monthIndex: number
   yearIndex: number
@@ -18,48 +23,7 @@ interface DividendRow {
   jaydenPaid: boolean
 }
 
-const allData: DividendRow[] = [
-  { month: "September 2022", monthIndex: 8, yearIndex: 2022, totalDividend: 11838.52, connorDividend: 4735.41, connorPaid: true, jaydenDividend: 7103.11, jaydenPaid: true },
-  { month: "October 2022", monthIndex: 9, yearIndex: 2022, totalDividend: 22225.67, connorDividend: 8890.27, connorPaid: true, jaydenDividend: 13335.40, jaydenPaid: true },
-  { month: "November 2022", monthIndex: 10, yearIndex: 2022, totalDividend: 13419.97, connorDividend: 5367.99, connorPaid: true, jaydenDividend: 8051.98, jaydenPaid: true },
-  { month: "December 2022", monthIndex: 11, yearIndex: 2022, totalDividend: 22122.18, connorDividend: 8848.87, connorPaid: true, jaydenDividend: 13273.31, jaydenPaid: true },
-  { month: "January 2023", monthIndex: 0, yearIndex: 2023, totalDividend: 21515.52, connorDividend: 8606.21, connorPaid: true, jaydenDividend: 12909.31, jaydenPaid: true },
-  { month: "February 2023", monthIndex: 1, yearIndex: 2023, totalDividend: 21685.14, connorDividend: 8674.06, connorPaid: true, jaydenDividend: 13011.08, jaydenPaid: true },
-  { month: "March 2023", monthIndex: 2, yearIndex: 2023, totalDividend: 19315.82, connorDividend: 7726.33, connorPaid: true, jaydenDividend: 11589.49, jaydenPaid: true },
-  { month: "April 2023", monthIndex: 3, yearIndex: 2023, totalDividend: 7364.85, connorDividend: 2945.94, connorPaid: true, jaydenDividend: 4418.91, jaydenPaid: true },
-  { month: "May 2023", monthIndex: 4, yearIndex: 2023, totalDividend: 13887.20, connorDividend: 5554.88, connorPaid: true, jaydenDividend: 8332.32, jaydenPaid: true },
-  { month: "June 2023", monthIndex: 5, yearIndex: 2023, totalDividend: -11566.75, connorDividend: -4626.70, connorPaid: true, jaydenDividend: -6940.05, jaydenPaid: true },
-  { month: "July 2023", monthIndex: 6, yearIndex: 2023, totalDividend: 854.93, connorDividend: 341.97, connorPaid: true, jaydenDividend: 512.96, jaydenPaid: true },
-  { month: "August 2023", monthIndex: 7, yearIndex: 2023, totalDividend: 14564.14, connorDividend: 5825.66, connorPaid: true, jaydenDividend: 8738.49, jaydenPaid: true },
-  { month: "September 2023", monthIndex: 8, yearIndex: 2023, totalDividend: 5220.05, connorDividend: 2088.02, connorPaid: true, jaydenDividend: 3132.03, jaydenPaid: true },
-  { month: "October 2023", monthIndex: 9, yearIndex: 2023, totalDividend: 8179.20, connorDividend: 3271.68, connorPaid: true, jaydenDividend: 4907.52, jaydenPaid: true },
-  { month: "November 2023", monthIndex: 10, yearIndex: 2023, totalDividend: 40300.38, connorDividend: 16120.15, connorPaid: true, jaydenDividend: 24180.23, jaydenPaid: true },
-  { month: "December 2023", monthIndex: 11, yearIndex: 2023, totalDividend: 17871.14, connorDividend: 7148.46, connorPaid: true, jaydenDividend: 10722.69, jaydenPaid: true },
-  { month: "January 2024", monthIndex: 0, yearIndex: 2024, totalDividend: 40519.77, connorDividend: 16207.91, connorPaid: true, jaydenDividend: 24311.86, jaydenPaid: true },
-  { month: "February 2024", monthIndex: 1, yearIndex: 2024, totalDividend: 42745.11, connorDividend: 17098.04, connorPaid: true, jaydenDividend: 25647.07, jaydenPaid: true },
-  { month: "March 2024", monthIndex: 2, yearIndex: 2024, totalDividend: 38335.50, connorDividend: 15334.20, connorPaid: true, jaydenDividend: 23001.30, jaydenPaid: true },
-  { month: "April 2024", monthIndex: 3, yearIndex: 2024, totalDividend: 59501.71, connorDividend: 23800.68, connorPaid: true, jaydenDividend: 35701.03, jaydenPaid: true },
-  { month: "May 2024", monthIndex: 4, yearIndex: 2024, totalDividend: 68533.61, connorDividend: 27413.44, connorPaid: true, jaydenDividend: 41120.16, jaydenPaid: true },
-  { month: "June 2024", monthIndex: 5, yearIndex: 2024, totalDividend: 55460.30, connorDividend: 22184.12, connorPaid: true, jaydenDividend: 33276.18, jaydenPaid: true },
-  { month: "July 2024", monthIndex: 6, yearIndex: 2024, totalDividend: 38200.80, connorDividend: 15280.32, connorPaid: true, jaydenDividend: 22920.48, jaydenPaid: true },
-  { month: "August 2024", monthIndex: 7, yearIndex: 2024, totalDividend: 47300.60, connorDividend: 18920.24, connorPaid: true, jaydenDividend: 28380.36, jaydenPaid: true },
-  { month: "September 2024", monthIndex: 8, yearIndex: 2024, totalDividend: 65100.40, connorDividend: 26040.16, connorPaid: true, jaydenDividend: 39060.24, jaydenPaid: true },
-  { month: "October 2024", monthIndex: 9, yearIndex: 2024, totalDividend: 69500.20, connorDividend: 27800.08, connorPaid: true, jaydenDividend: 41700.12, jaydenPaid: true },
-  { month: "November 2024", monthIndex: 10, yearIndex: 2024, totalDividend: 53800.90, connorDividend: 21520.36, connorPaid: true, jaydenDividend: 32280.54, jaydenPaid: true },
-  { month: "December 2024", monthIndex: 11, yearIndex: 2024, totalDividend: 35700.40, connorDividend: 14280.16, connorPaid: true, jaydenDividend: 21420.24, jaydenPaid: false },
-  { month: "January 2025", monthIndex: 0, yearIndex: 2025, totalDividend: 18017.47, connorDividend: 7206.99, connorPaid: true, jaydenDividend: 10810.48, jaydenPaid: true },
-  { month: "February 2025", monthIndex: 1, yearIndex: 2025, totalDividend: 3950.03, connorDividend: 1580.01, connorPaid: true, jaydenDividend: 2370.02, jaydenPaid: true },
-  { month: "March 2025", monthIndex: 2, yearIndex: 2025, totalDividend: -715.46, connorDividend: -286.19, connorPaid: true, jaydenDividend: -429.28, jaydenPaid: true },
-  { month: "April 2025", monthIndex: 3, yearIndex: 2025, totalDividend: 14954.96, connorDividend: 5981.98, connorPaid: true, jaydenDividend: 8972.98, jaydenPaid: true },
-  { month: "May 2025", monthIndex: 4, yearIndex: 2025, totalDividend: 2843.25, connorDividend: 1137.30, connorPaid: true, jaydenDividend: 1705.95, jaydenPaid: true },
-  { month: "June 2025", monthIndex: 5, yearIndex: 2025, totalDividend: 28802.67, connorDividend: 11521.07, connorPaid: true, jaydenDividend: 17281.60, jaydenPaid: true },
-  { month: "July 2025", monthIndex: 6, yearIndex: 2025, totalDividend: 3327.30, connorDividend: 1330.92, connorPaid: true, jaydenDividend: 1996.38, jaydenPaid: true },
-  { month: "August 2025", monthIndex: 7, yearIndex: 2025, totalDividend: 1879.44, connorDividend: 751.77, connorPaid: true, jaydenDividend: 1127.66, jaydenPaid: true },
-  { month: "September 2025", monthIndex: 8, yearIndex: 2025, totalDividend: 46124.50, connorDividend: 18449.80, connorPaid: true, jaydenDividend: 27674.70, jaydenPaid: true },
-  { month: "October 2025", monthIndex: 9, yearIndex: 2025, totalDividend: 60781.02, connorDividend: 24312.41, connorPaid: true, jaydenDividend: 36468.61, jaydenPaid: true },
-  { month: "November 2025", monthIndex: 10, yearIndex: 2025, totalDividend: 38844.64, connorDividend: 15537.86, connorPaid: true, jaydenDividend: 23306.78, jaydenPaid: true },
-  { month: "December 2025", monthIndex: 11, yearIndex: 2025, totalDividend: -3852.17, connorDividend: -1540.87, connorPaid: false, jaydenDividend: -2311.30, jaydenPaid: false },
-]
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 function formatCurrency(value: number) {
   const prefix = value < 0 ? "-$" : "$"
@@ -71,17 +35,75 @@ interface DividendTableProps {
   showCreateModal?: boolean
   setShowCreateModal?: (show: boolean) => void
   exportTrigger?: number
+  readOnly?: boolean
 }
 
-export function DividendTable({ year, showCreateModal, setShowCreateModal, exportTrigger }: DividendTableProps) {
+export function DividendTable({ year, showCreateModal, setShowCreateModal, exportTrigger, readOnly = false }: DividendTableProps) {
+  const { data: rawDividends, mutate } = useAirtable('dividends', {})
+
+  // Fetch P&L entries for the Month & Year dropdown
+  const { data: rawPnl } = useAirtable('profit-loss', {})
+
+  // Build sorted P&L options (newest first) — primary field "Month & Year" is the full label
+  const pnlOptions = useMemo(() => {
+    if (!rawPnl) return []
+    return rawPnl
+      .map(r => ({
+        id: r.id,
+        label: String(
+          r.fields['Month & Year'] ??
+          r.fields['Month and Year'] ??
+          ''
+        ).trim(),
+        dateClean: String(r.fields['DateClean'] ?? ''),
+      }))
+      .filter(o => o.label)
+      .sort((a, b) => {
+        if (a.dateClean && b.dateClean) return b.dateClean.localeCompare(a.dateClean)
+        return a.label.localeCompare(b.label)
+      })
+  }, [rawPnl])
+
+  const liveData = useMemo((): DividendRow[] => {
+    if (!rawDividends) return []
+    return rawDividends.map(r => {
+      // Lookup field returns the readable month string
+      const monthYearValue = r.fields['Month & Year (from Profit & Loss (Link))']
+      const monthYear = String(
+        Array.isArray(monthYearValue) ? (monthYearValue[0] ?? '') : (monthYearValue ?? '')
+      )
+      // Parse "September 2022" into indices
+      const parts = monthYear.split(' ')
+      const monthName = parts[0] ?? ''
+      const yearIndex = parseInt(parts[1] ?? '0')
+      const monthIndex = MONTHS.indexOf(monthName)
+
+      // Linked record field — store the P&L record ID for pre-filling the dropdown
+      const pnlLinkRaw = r.fields['Profit & Loss (Link)']
+      const monthRecordId = Array.isArray(pnlLinkRaw) ? String(pnlLinkRaw[0] ?? '') : ''
+
+      return {
+        recordId: r.id,
+        monthRecordId,
+        month: monthYear,
+        monthIndex: monthIndex >= 0 ? monthIndex : 0,
+        yearIndex,
+        totalDividend: parseCurrency(r.fields['Dividends Total'] as string),
+        connorDividend: parseCurrency(r.fields['Connor'] as string),
+        connorPaid: Boolean(r.fields['Connor Paid']),
+        jaydenDividend: parseCurrency(r.fields['Jayden'] as string),
+        jaydenPaid: Boolean(r.fields['Jayden Paid']),
+      }
+    })
+  }, [rawDividends])
+
   const [sortKey, setSortKey] = useState<SortKey>("month")
   const [sortDir, setSortDir] = useState<SortDirection>("asc")
   const [deleteConfirm, setDeleteConfirm] = useState<{index: number, row: DividendRow} | null>(null)
   const [editingDividend, setEditingDividend] = useState<{index: number, row: DividendRow} | null>(null)
-  const [formData, setFormData] = useState<Partial<DividendRow>>({
-    month: "",
-    monthIndex: 0,
-    yearIndex: new Date().getFullYear(),
+  const [selectedPnlId, setSelectedPnlId] = useState<string>('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [formData, setFormData] = useState({
     totalDividend: 0,
     connorDividend: 0,
     connorPaid: false,
@@ -89,11 +111,17 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
     jaydenPaid: false,
   })
 
+  const resetForm = () => {
+    setSelectedPnlId('')
+    setFormData({ totalDividend: 0, connorDividend: 0, connorPaid: false, jaydenDividend: 0, jaydenPaid: false })
+  }
+
   // Handle export when trigger changes
   useEffect(() => {
     if (exportTrigger && exportTrigger > 0) {
       handleExport()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportTrigger])
 
   const handleExport = () => {
@@ -127,59 +155,78 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
 
   const handleEdit = (index: number, row: DividendRow) => {
     setEditingDividend({index, row})
-    setFormData(row)
+    setSelectedPnlId(row.monthRecordId)
+    setFormData({
+      totalDividend: row.totalDividend,
+      connorDividend: row.connorDividend,
+      connorPaid: row.connorPaid,
+      jaydenDividend: row.jaydenDividend,
+      jaydenPaid: row.jaydenPaid,
+    })
   }
 
   const handleDelete = (index: number, row: DividendRow) => {
     setDeleteConfirm({index, row})
   }
 
-  const confirmDelete = () => {
-    if (deleteConfirm) {
-      console.log("Delete dividend:", deleteConfirm)
-      setDeleteConfirm(null)
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return
+    const { recordId } = deleteConfirm.row
+    try {
+      await fetch(`/api/airtable/dividends/${recordId}`, { method: 'DELETE' })
+      await mutate()
+    } catch (err) {
+      console.error('Delete failed:', err)
     }
+    setDeleteConfirm(null)
   }
 
-  const handleSaveDividend = () => {
-    if (editingDividend) {
-      console.log("Update dividend:", editingDividend.index, formData)
-    } else {
-      console.log("Create dividend:", formData)
+  const handleSaveDividend = async () => {
+    setIsSaving(true)
+    const fields: Record<string, unknown> = {
+      'Dividends Total': formData.totalDividend,
+      'Connor': formData.connorDividend,
+      'Connor Paid': formData.connorPaid,
+      'Jayden': formData.jaydenDividend,
+      'Jayden Paid': formData.jaydenPaid,
     }
-    setEditingDividend(null)
-    if (setShowCreateModal) setShowCreateModal(false)
-    setFormData({
-      month: "",
-      monthIndex: 0,
-      yearIndex: new Date().getFullYear(),
-      totalDividend: 0,
-      connorDividend: 0,
-      connorPaid: false,
-      jaydenDividend: 0,
-      jaydenPaid: false,
-    })
+    if (selectedPnlId) fields['Profit & Loss (Link)'] = [selectedPnlId]
+
+    try {
+      if (editingDividend) {
+        await fetch(`/api/airtable/dividends/${editingDividend.row.recordId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      } else {
+        await fetch('/api/airtable/dividends', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      }
+      await mutate()
+    } catch (err) {
+      console.error('Save failed:', err)
+    } finally {
+      setIsSaving(false)
+      setEditingDividend(null)
+      if (setShowCreateModal) setShowCreateModal(false)
+      resetForm()
+    }
   }
 
   const handleCloseModal = () => {
     setEditingDividend(null)
     if (setShowCreateModal) setShowCreateModal(false)
-    setFormData({
-      month: "",
-      monthIndex: 0,
-      yearIndex: new Date().getFullYear(),
-      totalDividend: 0,
-      connorDividend: 0,
-      connorPaid: false,
-      jaydenDividend: 0,
-      jaydenPaid: false,
-    })
+    resetForm()
   }
 
   const filteredData = useMemo(() => {
-    if (year === "all") return allData
-    return allData.filter((row) => row.yearIndex === parseInt(year))
-  }, [year])
+    if (year === "all") return liveData
+    return liveData.filter((row) => row.yearIndex === parseInt(year))
+  }, [liveData, year])
 
   const sortedData = useMemo(() => {
     return [...filteredData].sort((a, b) => {
@@ -213,15 +260,18 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
     }
   }
 
-  const columns: { key?: SortKey; label: string; align: "left" | "right" | "center" }[] = [
-    { key: "month", label: "Month & Year", align: "left" },
-    { key: "totalDividend", label: "Total Dividend", align: "right" },
-    { key: "connorDividend", label: "Connor Dividend", align: "right" },
-    { key: "connorPaid", label: "Connor Paid", align: "center" },
-    { key: "jaydenDividend", label: "Jayden Dividend", align: "right" },
-    { key: "jaydenPaid", label: "Jayden Paid", align: "center" },
-    { label: "Actions", align: "center" },
+  const columns: { key?: SortKey; label: string; align: "left" | "right" | "center"; width: string }[] = [
+    { key: "month",          label: "Month & Year",    align: "left",   width: "w-[20%]" },
+    { key: "totalDividend",  label: "Total Dividend",  align: "right",  width: "w-[14%]" },
+    { key: "connorDividend", label: "Connor Dividend", align: "right",  width: "w-[14%]" },
+    { key: "connorPaid",     label: "Connor Paid",     align: "center", width: "w-[12%]" },
+    { key: "jaydenDividend", label: "Jayden Dividend", align: "right",  width: "w-[14%]" },
+    { key: "jaydenPaid",     label: "Jayden Paid",     align: "center", width: "w-[12%]" },
+    ...(!readOnly ? [{ label: "Actions", align: "center" as const, width: "w-[14%]" }] : []),
   ]
+
+  const inputCls = "w-full px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+  const labelCls = "block text-[11px] font-medium text-muted-foreground mb-1"
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -229,7 +279,7 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
         <h3 className="text-sm font-semibold text-foreground">Dividend Payouts</h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
+        <table className="w-full table-fixed text-[13px]">
           <thead>
             <tr className="border-b border-border">
               {columns.map((col) => (
@@ -238,13 +288,7 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                   className={cn(
                     "px-4 py-2.5 text-[13px] font-medium text-muted-foreground",
                     col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left",
-                    col.label === "Month & Year" && "w-32",
-                    col.label === "Total Dividend" && "w-28",
-                    col.label === "Connor Dividend" && "w-28",
-                    col.label === "Connor Paid" && "w-20",
-                    col.label === "Jayden Dividend" && "w-28",
-                    col.label === "Jayden Paid" && "w-20",
-                    col.label === "Actions" && "w-20"
+                    col.width
                   )}
                 >
                   {!col.key ? (
@@ -272,22 +316,22 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
           <tbody>
             {sortedData.map((row, i) => (
               <tr
-                key={row.month}
+                key={`${row.month}-${i}`}
                 className={cn(
                   "border-b border-border last:border-0 transition-colors hover:bg-accent/30",
                   i % 2 === 0 ? "bg-card" : "bg-accent/10"
                 )}
               >
-                <td className="px-4 py-3.5 w-32 font-medium text-foreground whitespace-nowrap">
+                <td className="px-4 py-3.5 font-medium text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
                   {row.month}
                 </td>
-                <td className={cn("px-4 py-3.5 w-28 text-right whitespace-nowrap", row.totalDividend < 0 ? "text-red-500" : "text-foreground")}>
+                <td className={cn("px-4 py-3.5 text-right whitespace-nowrap", row.totalDividend < 0 ? "text-red-500" : "text-foreground")}>
                   {formatCurrency(row.totalDividend)}
                 </td>
-                <td className={cn("px-4 py-3.5 w-28 text-right whitespace-nowrap", row.connorDividend < 0 ? "text-red-500" : "text-foreground")}>
+                <td className={cn("px-4 py-3.5 text-right whitespace-nowrap", row.connorDividend < 0 ? "text-red-500" : "text-foreground")}>
                   {formatCurrency(row.connorDividend)}
                 </td>
-                <td className="px-4 py-3.5 w-20 text-center">
+                <td className="px-4 py-3.5 text-center">
                   <span
                     className={cn(
                       "inline-flex h-5 w-5 items-center justify-center rounded-full",
@@ -301,10 +345,10 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                     </svg>
                   </span>
                 </td>
-                <td className={cn("px-4 py-3.5 w-28 text-right whitespace-nowrap", row.jaydenDividend < 0 ? "text-red-500" : "text-foreground")}>
+                <td className={cn("px-4 py-3.5 text-right whitespace-nowrap", row.jaydenDividend < 0 ? "text-red-500" : "text-foreground")}>
                   {formatCurrency(row.jaydenDividend)}
                 </td>
-                <td className="px-4 py-3.5 w-20 text-center">
+                <td className="px-4 py-3.5 text-center">
                   <span
                     className={cn(
                       "inline-flex h-5 w-5 items-center justify-center rounded-full",
@@ -318,24 +362,26 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                     </svg>
                   </span>
                 </td>
-                <td className="px-4 py-3.5 w-20 text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <button
-                      onClick={() => handleEdit(i, row)}
-                      className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                      title="Edit"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(i, row)}
-                      className="h-7 w-7 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </td>
+                {!readOnly && (
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => handleEdit(i, row)}
+                        className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(i, row)}
+                        className="h-7 w-7 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -353,6 +399,7 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                 {formatCurrency(totals.jaydenDividend)}
               </td>
               <td className="px-4 py-3.5" />
+              {!readOnly && <td className="px-4 py-3.5" />}
             </tr>
           </tfoot>
         </table>
@@ -360,99 +407,113 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
 
       {/* Edit/Create Dividend Modal */}
       {(editingDividend || showCreateModal) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-md">
-            <div className="px-6 py-4 border-b border-border">
-              <h3 className="text-base font-semibold text-foreground">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseModal} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
+              <h3 className="text-[15px] font-semibold text-foreground">
                 {editingDividend ? "Edit Dividend Entry" : "Add New Dividend Entry"}
               </h3>
+              <button onClick={handleCloseModal} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-accent transition-colors">
+                <X className="h-4 w-4 text-foreground/60" />
+              </button>
             </div>
-            <div className="px-6 py-4 space-y-4">
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+              {/* Month & Year — linked P&L entry */}
               <div>
-                <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                  Month & Year
-                </label>
-                <input
-                  type="text"
-                  value={formData.month || ""}
-                  onChange={(e) => setFormData({...formData, month: e.target.value})}
-                  placeholder="e.g., January 2025"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                <label className={labelCls}>Month &amp; Year (P&amp;L Entry)</label>
+                <SelectField
+                  value={
+                    !rawPnl
+                      ? 'Loading…'
+                      : selectedPnlId
+                        ? (pnlOptions.find(o => o.id === selectedPnlId)?.label ?? 'Select month…')
+                        : 'Select month…'
+                  }
+                  onChange={(v) => {
+                    const opt = pnlOptions.find(o => o.label === v)
+                    setSelectedPnlId(opt?.id ?? '')
+                  }}
+                  options={rawPnl ? ['Select month…', ...pnlOptions.map(o => o.label)] : ['Loading…']}
+                  containerClassName="w-full"
+                  className="w-full"
+                  disabled={!rawPnl}
                 />
               </div>
+
+              {/* Dividend amounts */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                    Total Dividend
-                  </label>
+                  <label className={labelCls}>Total Dividend</label>
                   <input
                     type="number"
+                    step="0.01"
                     value={formData.totalDividend || ""}
                     onChange={(e) => setFormData({...formData, totalDividend: parseFloat(e.target.value) || 0})}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className={inputCls}
                   />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                    Connor Dividend
-                  </label>
+                  <label className={labelCls}>Connor Dividend</label>
                   <input
                     type="number"
+                    step="0.01"
                     value={formData.connorDividend || ""}
                     onChange={(e) => setFormData({...formData, connorDividend: parseFloat(e.target.value) || 0})}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className={inputCls}
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-foreground mb-1.5">
-                    Jayden Dividend
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.jaydenDividend || ""}
-                    onChange={(e) => setFormData({...formData, jaydenDividend: parseFloat(e.target.value) || 0})}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-[13px] placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
+              <div>
+                <label className={labelCls}>Jayden Dividend</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.jaydenDividend || ""}
+                  onChange={(e) => setFormData({...formData, jaydenDividend: parseFloat(e.target.value) || 0})}
+                  placeholder="0.00"
+                  className={inputCls}
+                />
               </div>
+
+              {/* Paid checkboxes */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={formData.connorPaid || false}
+                    checked={formData.connorPaid}
                     onChange={(e) => setFormData({...formData, connorPaid: e.target.checked})}
-                    className="rounded border border-border"
+                    className="h-4 w-4 rounded border-border accent-foreground cursor-pointer"
                   />
                   <span className="text-[13px] text-foreground">Connor Paid</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={formData.jaydenPaid || false}
+                    checked={formData.jaydenPaid}
                     onChange={(e) => setFormData({...formData, jaydenPaid: e.target.checked})}
-                    className="rounded border border-border"
+                    className="h-4 w-4 rounded border-border accent-foreground cursor-pointer"
                   />
                   <span className="text-[13px] text-foreground">Jayden Paid</span>
                 </label>
               </div>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2 shrink-0">
               <button
                 onClick={handleCloseModal}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveDividend}
-                className="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-medium transition-colors"
+                disabled={isSaving}
+                className="px-4 py-1.5 rounded-lg bg-foreground text-background hover:opacity-90 text-[13px] font-medium transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {editingDividend ? "Update" : "Create"}
+                {isSaving ? "Saving…" : editingDividend ? "Update" : "Create"}
               </button>
             </div>
           </div>
@@ -461,9 +522,10 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl border border-border w-full max-w-sm">
-            <div className="px-6 py-4 border-b border-border">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
+          <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-sm">
+            <div className="rounded-t-xl px-5 py-4 border-b border-border">
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
                 <div>
@@ -474,16 +536,16 @@ export function DividendTable({ year, showCreateModal, setShowCreateModal, expor
                 </div>
               </div>
             </div>
-            <div className="px-6 py-3 border-t border-border flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="h-8 px-3 rounded-lg border border-border hover:bg-accent text-foreground text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg border border-border hover:bg-accent text-muted-foreground text-[13px] font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-medium transition-colors"
               >
                 Delete
               </button>

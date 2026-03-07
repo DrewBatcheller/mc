@@ -10,288 +10,22 @@ import { SelectField } from "@/components/shared/select-field"
 import { MetricCard } from "@/components/shared/metric-card"
 import { ContentCard } from "@/components/shared/content-card"
 import { AddMemberModal, type MemberFormData } from "./add-member-modal"
+import { useAirtable } from "@/hooks/use-airtable"
+import { useUser } from "@/contexts/UserContext"
 
-/* ── Data ── */
+/* ── Types ── */
 type Dept = "Strategy" | "QA" | "Development" | "Management" | "Design"
 type Status = "Active" | "Inactive"
 interface AssignedClient { name: string; status: string; experiments: number; lastActive: string }
 interface ScheduleTask { day: number; month: number; year: number; title: string; client: string; time: string; type: "strategy" | "design" | "dev" | "qa" | "review" }
 interface Member {
-  id: number; name: string; initials: string; department: Dept;
+  id: string; name: string; initials: string; department: Dept;
   email: string; employment: Status; status: Status;
   clients: number; role: string; startDate: string;
   slackId: string; timezone: string;
   assignedClients: AssignedClient[]; bio: string;
   schedule: ScheduleTask[];
 }
-
-const members: Member[] = [
-  {
-    id: 1, name: "Andrew Vo", initials: "AV", department: "Strategy",
-    email: "andrew@moreconversions.com", employment: "Inactive", status: "Inactive",
-    clients: 0, role: "CRO Strategist", startDate: "2024-03-15",
-    slackId: "U07AV01", timezone: "EST", assignedClients: [],
-    bio: "CRO strategist with a focus on data-driven experimentation and user behavior analysis.",
-    schedule: [],
-  },
-  {
-    id: 2, name: "Anna Anikeieva", initials: "AA", department: "QA",
-    email: "a.anikeieva23@gmail.com", employment: "Active", status: "Active",
-    clients: 14, role: "QA Lead", startDate: "2023-06-01",
-    slackId: "U07AA01", timezone: "EST",
-    assignedClients: [
-      { name: "Sereneherbs", status: "Active", experiments: 3, lastActive: "Feb 12, 2026" },
-      { name: "Live Love Locks LLC", status: "Active", experiments: 1, lastActive: "Feb 10, 2026" },
-      { name: "Goose Creek Candles", status: "Active", experiments: 4, lastActive: "Feb 8, 2026" },
-      { name: "Perfect White Tee", status: "Active", experiments: 3, lastActive: "Feb 7, 2026" },
-      { name: "Cosara", status: "Active", experiments: 2, lastActive: "Feb 14, 2026" },
-      { name: "Vita Hustle", status: "Active", experiments: 2, lastActive: "Feb 13, 2026" },
-      { name: "The Ayurveda Experience", status: "Active", experiments: 3, lastActive: "Feb 6, 2026" },
-      { name: "Fake Brand", status: "Active", experiments: 4, lastActive: "Feb 11, 2026" },
-      { name: "Dr Woof Apparel", status: "Active", experiments: 3, lastActive: "Feb 15, 2026" },
-      { name: "Shop Noble", status: "Active", experiments: 1, lastActive: "Feb 3, 2026" },
-      { name: "Infinite Age", status: "Inactive", experiments: 1, lastActive: "Jan 20, 2026" },
-      { name: "TryAyuri", status: "Inactive", experiments: 0, lastActive: "Jan 18, 2026" },
-      { name: "Arrowhead", status: "Inactive", experiments: 2, lastActive: "Jan 25, 2026" },
-      { name: "Gatsby", status: "Inactive", experiments: 1, lastActive: "Jan 22, 2026" },
-    ],
-    bio: "Quality assurance specialist ensuring all experiments meet production standards before launch.",
-    schedule: [
-      { day: 3, month: 1, year: 2026, title: "QA Review: Cart Redesign", client: "Perfect White Tee", time: "10:00 AM", type: "qa" },
-      { day: 5, month: 1, year: 2026, title: "QA Review: PDP Restructure", client: "Cosara", time: "2:00 PM", type: "qa" },
-      { day: 10, month: 1, year: 2026, title: "QA Review: Free Shipping Topbar", client: "Sereneherbs", time: "11:00 AM", type: "qa" },
-      { day: 12, month: 1, year: 2026, title: "QA Review: Mobile Nav Tabs", client: "Dr Woof Apparel", time: "9:30 AM", type: "qa" },
-      { day: 14, month: 1, year: 2026, title: "Bug Verification: Checkout Flow", client: "Vita Hustle", time: "3:00 PM", type: "review" },
-      { day: 18, month: 1, year: 2026, title: "QA Review: Search Header", client: "Goose Creek Candles", time: "10:30 AM", type: "qa" },
-      { day: 20, month: 1, year: 2026, title: "Final QA Pass: Nav Bubbles", client: "Live Love Locks LLC", time: "1:00 PM", type: "qa" },
-      { day: 24, month: 1, year: 2026, title: "Regression Testing: Homepage", client: "Fake Brand", time: "11:00 AM", type: "review" },
-    ],
-  },
-  {
-    id: 3, name: "Arafat Islam", initials: "AI", department: "Development",
-    email: "alarafatislam@gmail.com", employment: "Active", status: "Active",
-    clients: 8, role: "Lead Developer", startDate: "2023-04-10",
-    slackId: "U07AF01", timezone: "EST",
-    assignedClients: [
-      { name: "Sereneherbs", status: "Active", experiments: 3, lastActive: "Feb 12, 2026" },
-      { name: "Live Love Locks LLC", status: "Active", experiments: 1, lastActive: "Feb 10, 2026" },
-      { name: "Cosara", status: "Active", experiments: 2, lastActive: "Feb 14, 2026" },
-      { name: "Vita Hustle", status: "Active", experiments: 2, lastActive: "Feb 13, 2026" },
-      { name: "The Ayurveda Experience", status: "Active", experiments: 3, lastActive: "Feb 6, 2026" },
-      { name: "Perfect White Tee", status: "Active", experiments: 3, lastActive: "Feb 7, 2026" },
-      { name: "Fake Brand", status: "Active", experiments: 4, lastActive: "Feb 11, 2026" },
-      { name: "Dr Woof Apparel", status: "Active", experiments: 3, lastActive: "Feb 15, 2026" },
-    ],
-    bio: "Full-stack developer specializing in A/B test implementation and front-end optimization.",
-    schedule: [
-      { day: 2, month: 1, year: 2026, title: "Dev: Cart Redesign", client: "Perfect White Tee", time: "9:00 AM", type: "dev" },
-      { day: 4, month: 1, year: 2026, title: "Dev: Free Shipping Topbar", client: "Sereneherbs", time: "10:00 AM", type: "dev" },
-      { day: 6, month: 1, year: 2026, title: "Dev: PDP Restructure", client: "Cosara", time: "9:00 AM", type: "dev" },
-      { day: 9, month: 1, year: 2026, title: "Dev: Mobile Nav Tabs", client: "Dr Woof Apparel", time: "11:00 AM", type: "dev" },
-      { day: 11, month: 1, year: 2026, title: "Code Review: Checkout Fix", client: "Vita Hustle", time: "2:00 PM", type: "review" },
-      { day: 16, month: 1, year: 2026, title: "Dev: Search Header", client: "Goose Creek Candles", time: "9:30 AM", type: "dev" },
-      { day: 19, month: 1, year: 2026, title: "Dev: Nav Bubbles", client: "Live Love Locks LLC", time: "10:00 AM", type: "dev" },
-      { day: 23, month: 1, year: 2026, title: "Dev: Hero Video", client: "The Ayurveda Experience", time: "9:00 AM", type: "dev" },
-      { day: 25, month: 1, year: 2026, title: "Hotfix: Cart Drawer", client: "Vita Hustle", time: "3:00 PM", type: "dev" },
-    ],
-  },
-  {
-    id: 4, name: "Connor Shelefontiuk", initials: "CS", department: "Management",
-    email: "connor@moreconversions.com", employment: "Active", status: "Active",
-    clients: 13, role: "Account Manager", startDate: "2022-11-01",
-    slackId: "U07CS01", timezone: "EST",
-    assignedClients: [
-      { name: "Sereneherbs", status: "Active", experiments: 3, lastActive: "Feb 12, 2026" },
-      { name: "Perfect White Tee", status: "Active", experiments: 3, lastActive: "Feb 7, 2026" },
-      { name: "Cosara", status: "Active", experiments: 2, lastActive: "Feb 14, 2026" },
-      { name: "Goose Creek Candles", status: "Active", experiments: 4, lastActive: "Feb 8, 2026" },
-      { name: "Vita Hustle", status: "Active", experiments: 2, lastActive: "Feb 13, 2026" },
-    ],
-    bio: "Account manager overseeing client relationships and ensuring project delivery timelines are met.",
-    schedule: [
-      { day: 3, month: 1, year: 2026, title: "Strategy Review: Q1 Roadmap", client: "Sereneherbs", time: "10:00 AM", type: "strategy" },
-      { day: 7, month: 1, year: 2026, title: "Client Sync: Monthly Review", client: "Perfect White Tee", time: "2:00 PM", type: "review" },
-      { day: 13, month: 1, year: 2026, title: "Strategy Review: Test Pipeline", client: "Cosara", time: "11:00 AM", type: "strategy" },
-      { day: 17, month: 1, year: 2026, title: "Client Sync: Results Review", client: "Goose Creek Candles", time: "3:00 PM", type: "review" },
-      { day: 21, month: 1, year: 2026, title: "Strategy Session: Growth Plan", client: "Vita Hustle", time: "10:00 AM", type: "strategy" },
-    ],
-  },
-  {
-    id: 5, name: "Connor Shelefontiuk Strat", initials: "CS", department: "Strategy",
-    email: "connor.strat@moreconversions.com", employment: "Active", status: "Active",
-    clients: 13, role: "CRO Strategist", startDate: "2022-11-01",
-    slackId: "U07CS02", timezone: "EST",
-    assignedClients: [
-      { name: "Sereneherbs", status: "Active", experiments: 3, lastActive: "Feb 12, 2026" },
-      { name: "Cosara", status: "Active", experiments: 2, lastActive: "Feb 14, 2026" },
-      { name: "Vita Hustle", status: "Active", experiments: 2, lastActive: "Feb 13, 2026" },
-    ],
-    bio: "Strategist responsible for building test hypotheses and experiment roadmaps across client accounts.",
-    schedule: [
-      { day: 4, month: 1, year: 2026, title: "Hypothesis Workshop", client: "Sereneherbs", time: "10:00 AM", type: "strategy" },
-      { day: 8, month: 1, year: 2026, title: "Test Prioritization", client: "Cosara", time: "1:00 PM", type: "strategy" },
-      { day: 15, month: 1, year: 2026, title: "Roadmap Planning: Q2", client: "Vita Hustle", time: "11:00 AM", type: "strategy" },
-    ],
-  },
-  {
-    id: 6, name: "David Sondervan", initials: "DS", department: "Strategy",
-    email: "david@moreconversions.com", employment: "Inactive", status: "Inactive",
-    clients: 0, role: "CRO Strategist", startDate: "2024-01-10",
-    slackId: "U07DS01", timezone: "CST", assignedClients: [],
-    bio: "Former strategist who supported multiple DTC brands with conversion optimization.",
-    schedule: [],
-  },
-  {
-    id: 7, name: "Drew Batcheller", initials: "DB", department: "Management",
-    email: "dbatchell@gmail.com", employment: "Active", status: "Active",
-    clients: 0, role: "CEO", startDate: "2021-01-01",
-    slackId: "U07DB01", timezone: "EST", assignedClients: [],
-    bio: "Founder and CEO. Oversees company strategy, partnerships, and growth initiatives.",
-    schedule: [
-      { day: 6, month: 1, year: 2026, title: "All-Hands Meeting", client: "Internal", time: "9:00 AM", type: "review" },
-      { day: 14, month: 1, year: 2026, title: "Board Strategy Session", client: "Internal", time: "10:00 AM", type: "strategy" },
-    ],
-  },
-  {
-    id: 8, name: "Ivan Guzman", initials: "IG", department: "Development",
-    email: "ivan@moreconversions.com", employment: "Active", status: "Active",
-    clients: 6, role: "Developer", startDate: "2024-02-20",
-    slackId: "U07IG01", timezone: "CST",
-    assignedClients: [
-      { name: "Goose Creek Candles", status: "Active", experiments: 4, lastActive: "Feb 8, 2026" },
-      { name: "Fake Brand", status: "Active", experiments: 4, lastActive: "Feb 11, 2026" },
-      { name: "Shop Noble", status: "Active", experiments: 1, lastActive: "Feb 3, 2026" },
-    ],
-    bio: "Front-end developer focused on building and deploying A/B test variants.",
-    schedule: [
-      { day: 5, month: 1, year: 2026, title: "Dev: ATC Button Variants", client: "Goose Creek Candles", time: "10:00 AM", type: "dev" },
-      { day: 10, month: 1, year: 2026, title: "Dev: Hero Banner Test", client: "Fake Brand", time: "9:00 AM", type: "dev" },
-      { day: 17, month: 1, year: 2026, title: "Dev: Collection Redesign", client: "Shop Noble", time: "11:00 AM", type: "dev" },
-      { day: 22, month: 1, year: 2026, title: "Code Review: Banner Fix", client: "Fake Brand", time: "2:00 PM", type: "review" },
-    ],
-  },
-  {
-    id: 9, name: "Jayden Grayston", initials: "JG", department: "Management",
-    email: "jayden@moreconversions.com", employment: "Active", status: "Active",
-    clients: 0, role: "COO", startDate: "2021-06-01",
-    slackId: "U07JG01", timezone: "EST", assignedClients: [],
-    bio: "Chief Operations Officer managing team operations, client delivery, and process optimization.",
-    schedule: [
-      { day: 2, month: 1, year: 2026, title: "Ops Review: Weekly", client: "Internal", time: "9:00 AM", type: "review" },
-      { day: 9, month: 1, year: 2026, title: "Ops Review: Weekly", client: "Internal", time: "9:00 AM", type: "review" },
-      { day: 16, month: 1, year: 2026, title: "Ops Review: Weekly", client: "Internal", time: "9:00 AM", type: "review" },
-      { day: 23, month: 1, year: 2026, title: "Ops Review: Weekly", client: "Internal", time: "9:00 AM", type: "review" },
-    ],
-  },
-  {
-    id: 10, name: "Jayden Grayston Design", initials: "JG", department: "Design",
-    email: "jayden.Design@moreconversions.com", employment: "Active", status: "Active",
-    clients: 1, role: "Designer", startDate: "2023-09-01",
-    slackId: "U07JGD1", timezone: "EST",
-    assignedClients: [
-      { name: "Dr Woof Apparel", status: "Active", experiments: 3, lastActive: "Feb 15, 2026" },
-    ],
-    bio: "UI/UX designer creating high-converting test variants and visual assets.",
-    schedule: [
-      { day: 3, month: 1, year: 2026, title: "Design: Mobile Nav Tabs", client: "Dr Woof Apparel", time: "10:00 AM", type: "design" },
-      { day: 11, month: 1, year: 2026, title: "Design: Search Header", client: "Dr Woof Apparel", time: "11:00 AM", type: "design" },
-      { day: 19, month: 1, year: 2026, title: "Design Review: Final Mocks", client: "Dr Woof Apparel", time: "2:00 PM", type: "review" },
-    ],
-  },
-  {
-    id: 11, name: "Jayden Grayston Dev", initials: "JG", department: "Development",
-    email: "jayden.Dev@moreconversions.com", employment: "Active", status: "Active",
-    clients: 1, role: "Developer", startDate: "2023-09-01",
-    slackId: "U07JGV1", timezone: "EST",
-    assignedClients: [
-      { name: "The Ayurveda Experience", status: "Active", experiments: 3, lastActive: "Feb 6, 2026" },
-    ],
-    bio: "Developer handling A/B test variant implementation and Shopify theme development.",
-    schedule: [
-      { day: 7, month: 1, year: 2026, title: "Dev: Menu Hierarchy", client: "The Ayurveda Experience", time: "9:00 AM", type: "dev" },
-      { day: 15, month: 1, year: 2026, title: "Dev: Shipping Progress Bar", client: "The Ayurveda Experience", time: "10:00 AM", type: "dev" },
-    ],
-  },
-  {
-    id: 12, name: "Jayden Grayston QA", initials: "JG", department: "QA",
-    email: "jayden.QA@moreconversions.com", employment: "Active", status: "Active",
-    clients: 1, role: "QA Specialist", startDate: "2023-09-01",
-    slackId: "U07JGQ1", timezone: "EST",
-    assignedClients: [
-      { name: "Cosara", status: "Active", experiments: 2, lastActive: "Feb 14, 2026" },
-    ],
-    bio: "QA specialist responsible for cross-browser testing and variant validation.",
-    schedule: [
-      { day: 8, month: 1, year: 2026, title: "QA: Mobile Search Input", client: "Cosara", time: "10:00 AM", type: "qa" },
-      { day: 18, month: 1, year: 2026, title: "QA: CTA Injection Test", client: "Cosara", time: "11:00 AM", type: "qa" },
-    ],
-  },
-  {
-    id: 13, name: "Jayden Grayston Strategist", initials: "JG", department: "Strategy",
-    email: "jayden.Strat@moreconversions.com", employment: "Active", status: "Active",
-    clients: 2, role: "CRO Strategist", startDate: "2023-09-01",
-    slackId: "U07JGS1", timezone: "EST",
-    assignedClients: [
-      { name: "Sereneherbs", status: "Active", experiments: 3, lastActive: "Feb 12, 2026" },
-      { name: "Vita Hustle", status: "Active", experiments: 2, lastActive: "Feb 13, 2026" },
-    ],
-    bio: "CRO strategist building test roadmaps and analyzing experiment results for optimization wins.",
-    schedule: [
-      { day: 5, month: 1, year: 2026, title: "Strategy: Q1 Test Pipeline", client: "Sereneherbs", time: "10:00 AM", type: "strategy" },
-      { day: 12, month: 1, year: 2026, title: "Strategy: Pricing Test", client: "Vita Hustle", time: "2:00 PM", type: "strategy" },
-      { day: 20, month: 1, year: 2026, title: "Results Analysis: Topbar", client: "Sereneherbs", time: "11:00 AM", type: "review" },
-    ],
-  },
-  {
-    id: 14, name: "Marcus Phellipe", initials: "MP", department: "Design",
-    email: "marcus.phellipe@toptal.com", employment: "Active", status: "Active",
-    clients: 3, role: "Senior Designer", startDate: "2024-06-01",
-    slackId: "U07MP01", timezone: "BRT",
-    assignedClients: [
-      { name: "Cosara", status: "Active", experiments: 2, lastActive: "Feb 14, 2026" },
-      { name: "Live Love Locks LLC", status: "Active", experiments: 1, lastActive: "Feb 10, 2026" },
-      { name: "Goose Creek Candles", status: "Active", experiments: 4, lastActive: "Feb 8, 2026" },
-    ],
-    bio: "Senior UI designer crafting engaging experiment designs across multiple DTC brands.",
-    schedule: [
-      { day: 4, month: 1, year: 2026, title: "Design: CTA Button Variants", client: "Cosara", time: "9:00 AM", type: "design" },
-      { day: 9, month: 1, year: 2026, title: "Design: Collection Page", client: "Live Love Locks LLC", time: "10:00 AM", type: "design" },
-      { day: 14, month: 1, year: 2026, title: "Design: ATC Badges", client: "Goose Creek Candles", time: "11:00 AM", type: "design" },
-      { day: 20, month: 1, year: 2026, title: "Design Review: All Mocks", client: "Cosara", time: "3:00 PM", type: "review" },
-    ],
-  },
-  {
-    id: 15, name: "Rajesh Bhuva", initials: "RB", department: "Design",
-    email: "bhuvaraj8090@gmail.com", employment: "Inactive", status: "Inactive",
-    clients: 0, role: "Designer", startDate: "2024-08-01",
-    slackId: "U07RB01", timezone: "IST", assignedClients: [],
-    bio: "Former designer who supported visual asset creation for experiments.",
-    schedule: [],
-  },
-  {
-    id: 16, name: "Tobi Akinloye", initials: "TA", department: "Design",
-    email: "tobhyak@gmail.com", employment: "Active", status: "Active",
-    clients: 11, role: "Lead Designer", startDate: "2022-08-15",
-    slackId: "U07TA01", timezone: "WAT",
-    assignedClients: [
-      { name: "Sereneherbs", status: "Active", experiments: 3, lastActive: "Feb 12, 2026" },
-      { name: "Perfect White Tee", status: "Active", experiments: 3, lastActive: "Feb 7, 2026" },
-      { name: "Vita Hustle", status: "Active", experiments: 2, lastActive: "Feb 13, 2026" },
-      { name: "The Ayurveda Experience", status: "Active", experiments: 3, lastActive: "Feb 6, 2026" },
-      { name: "Fake Brand", status: "Active", experiments: 4, lastActive: "Feb 11, 2026" },
-    ],
-    bio: "Lead designer overseeing all visual design output and maintaining brand consistency across tests.",
-    schedule: [
-      { day: 2, month: 1, year: 2026, title: "Design: Free Shipping Bar", client: "Sereneherbs", time: "9:00 AM", type: "design" },
-      { day: 5, month: 1, year: 2026, title: "Design: Cart Redesign", client: "Perfect White Tee", time: "10:00 AM", type: "design" },
-      { day: 9, month: 1, year: 2026, title: "Design: Price Visualization", client: "Vita Hustle", time: "11:00 AM", type: "design" },
-      { day: 12, month: 1, year: 2026, title: "Design: Hero Video BG", client: "The Ayurveda Experience", time: "9:30 AM", type: "design" },
-      { day: 16, month: 1, year: 2026, title: "Design: FAQ Section", client: "Fake Brand", time: "10:00 AM", type: "design" },
-      { day: 20, month: 1, year: 2026, title: "Design Review: All Clients", client: "Internal", time: "2:00 PM", type: "review" },
-      { day: 24, month: 1, year: 2026, title: "Design: Subscription Toggle", client: "Vita Hustle", time: "9:00 AM", type: "design" },
-    ],
-  },
-]
 
 /* ── Schedule task type styles ── */
 const typeStyles: Record<string, { bg: string; border: string; dot: string; label: string }> = {
@@ -316,17 +50,75 @@ const tabs = ["Overview", "Assigned Clients", "Schedule", "Settings"]
 
 /* ── Main ── */
 export function TeamDirectory() {
-  const [memberList, setMemberList] = useState(members)
-  const [selectedId, setSelectedId] = useState(members.find(m => m.assignedClients.length > 0)?.id ?? members[0].id)
+  const { user } = useUser()
+  const { data: rawTeam, mutate, isLoading } = useAirtable<Record<string, unknown>>('team', {
+    sort: [{ field: 'Full Name', direction: 'asc' }],
+  })
+
+  const authHeaders: HeadersInit = useMemo(() => user ? {
+    'x-user-role': user.role,
+    'x-user-id': user.id,
+    'x-user-name': user.name,
+    ...(user.clientId ? { 'x-client-id': user.clientId } : {}),
+    'Content-Type': 'application/json',
+  } : { 'Content-Type': 'application/json' }, [user])
+
+  /* ── Optimistic state ── */
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
+  const [editOverrides, setEditOverrides] = useState<Record<string, Partial<Member>>>({})
+
+  const memberList = useMemo<Member[]>(() => {
+    return (rawTeam ?? [])
+      .filter(r => !deletedIds.has(r.id))
+      .map(r => {
+        const f = r.fields as Record<string, unknown>
+        const rawName = (f['Full Name'] as string) ?? ''
+        const override = editOverrides[r.id] ?? {}
+        const name = override.name ?? rawName
+        const employment = (override.employment ?? (f['Employment Status'] as string) ?? 'Active') as Status
+        const clientIds = new Set([
+          ...((f['Dev Client Link'] as string[]) ?? []),
+          ...((f['Design Client Link'] as string[]) ?? []),
+          ...((f['Strategist Client Link'] as string[]) ?? []),
+          ...((f['QA Client Link'] as string[]) ?? []),
+        ])
+        return {
+          id: r.id,
+          name,
+          initials: name.split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+          department: (override.department ?? (f['Department'] as string) ?? 'Management') as Dept,
+          email: override.email ?? (f['Email'] as string) ?? '',
+          employment,
+          status: employment,
+          clients: override.clients ?? clientIds.size,
+          role: override.role ?? (f['Role'] as string) ?? '',
+          startDate: override.startDate ?? '',
+          slackId: override.slackId ?? (f['Slack Member ID'] as string) ?? '',
+          timezone: override.timezone ?? '',
+          assignedClients: [],
+          bio: override.bio ?? '',
+          schedule: [],
+        }
+      })
+  }, [rawTeam, deletedIds, editOverrides])
+
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("Overview")
   const [deptFilter, setDeptFilter] = useState("All Departments")
-  const [statusFilter, setStatusFilter] = useState("All Statuses")
+  const [showInactive, setShowInactive] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  /* Auto-select first member once data loads */
+  useEffect(() => {
+    if (!selectedId && memberList.length > 0) {
+      setSelectedId(memberList[0].id)
+    }
+  }, [memberList, selectedId])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -340,37 +132,41 @@ export function TeamDirectory() {
     () => memberList.filter((m) => {
       const matchSearch = m.name.toLowerCase().includes(search.toLowerCase())
       const matchDept = deptFilter === "All Departments" || m.department === deptFilter
-      const matchStatus = statusFilter === "All Statuses" || m.status === statusFilter
+      const matchStatus = showInactive ? true : m.status === 'Active'
       return matchSearch && matchDept && matchStatus
     }),
-    [search, deptFilter, statusFilter, memberList]
+    [search, deptFilter, showInactive, memberList]
   )
 
-  const member = memberList.find((m) => m.id === selectedId) ?? memberList[0]
+  const member = memberList.find((m) => m.id === selectedId) ?? memberList[0] ?? null
 
-  const handleAddMember = (data: MemberFormData) => {
-    const initials = data.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    const dept = data.department as Member["department"]
-    const newMember: Member = {
-      id: Date.now(),
-      name: data.name,
-      initials,
-      department: dept,
-      email: data.email,
-      employment: data.employment as Member["employment"],
-      status: data.employment as Member["status"],
-      clients: 0,
-      role: data.role || dept,
-      startDate: data.startDate || new Date().toISOString().split("T")[0],
-      slackId: data.slackId,
-      timezone: data.timezone,
-      assignedClients: [],
-      bio: data.bio,
-      schedule: [],
+  /* ── CRUD handlers ── */
+  const handleAddMember = async (data: MemberFormData) => {
+    try {
+      const res = await fetch('/api/airtable/team', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          fields: {
+            'Full Name': data.name,
+            'Email': data.email,
+            'Role': data.role || undefined,
+            'Department': data.department,
+            'Employment Status': data.employment,
+            ...(data.slackId ? { 'Slack Member ID': data.slackId } : {}),
+          },
+        }),
+      })
+      if (res.ok) {
+        const { record } = await res.json()
+        mutate()
+        setSelectedId(record.id)
+        setActiveTab("Overview")
+      }
+    } catch {
+      // mutate will reconcile on next revalidation
+      mutate()
     }
-    setMemberList(prev => [...prev, newMember])
-    setSelectedId(newMember.id)
-    setActiveTab("Overview")
   }
 
   const memberToFormData = (m: Member): MemberFormData => ({
@@ -379,21 +175,80 @@ export function TeamDirectory() {
     timezone: m.timezone, bio: m.bio,
   })
 
-  const handleEditSave = (data: MemberFormData) => {
-    const initials = data.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    setMemberList(prev => prev.map(m =>
-      m.id === selectedId
-        ? { ...m, ...data, initials, department: data.department as Member["department"], employment: data.employment as Member["employment"], status: data.employment as Member["status"] }
-        : m
-    ))
+  const handleEditSave = async (data: MemberFormData) => {
+    if (!selectedId) return
+    const initials = data.name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    const override: Partial<Member> = {
+      name: data.name, initials, email: data.email, role: data.role,
+      department: data.department as Dept,
+      employment: data.employment as Status,
+      status: data.employment as Status,
+      startDate: data.startDate, slackId: data.slackId,
+      timezone: data.timezone, bio: data.bio,
+    }
+    // Optimistic update
+    setEditOverrides(prev => ({ ...prev, [selectedId]: override }))
+    try {
+      await fetch(`/api/airtable/team/${selectedId}`, {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({
+          fields: {
+            'Full Name': data.name,
+            'Email': data.email,
+            'Role': data.role || undefined,
+            'Department': data.department,
+            'Employment Status': data.employment,
+            ...(data.slackId ? { 'Slack Member ID': data.slackId } : {}),
+          },
+        }),
+      })
+      mutate()
+      setEditOverrides(prev => { const next = { ...prev }; delete next[selectedId]; return next })
+    } catch {
+      // Revert optimistic override on error
+      setEditOverrides(prev => { const next = { ...prev }; delete next[selectedId]; return next })
+    }
   }
 
-  const handleDelete = () => {
-    const idx = memberList.findIndex(m => m.id === selectedId)
+  const handleDelete = async () => {
+    if (!selectedId) return
+    const idToDelete = selectedId
+    const idx = memberList.findIndex(m => m.id === idToDelete)
     const next = memberList[idx + 1] ?? memberList[idx - 1]
-    setMemberList(prev => prev.filter(m => m.id !== selectedId))
+    // Optimistic removal
+    setDeletedIds(prev => new Set([...prev, idToDelete]))
     if (next) setSelectedId(next.id)
     setDeleteConfirmOpen(false)
+    setMenuOpen(false)
+    try {
+      await fetch(`/api/airtable/team/${idToDelete}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      mutate()
+    } catch {
+      // Revert on error
+      setDeletedIds(prev => { const s = new Set(prev); s.delete(idToDelete); return s })
+      setSelectedId(idToDelete)
+    }
+  }
+
+  /* ── Loading / empty states ── */
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-[13px] text-muted-foreground">
+        Loading team directory…
+      </div>
+    )
+  }
+
+  if (!member) {
+    return (
+      <div className="flex items-center justify-center h-64 text-[13px] text-muted-foreground">
+        No team members found.
+      </div>
+    )
   }
 
   return (
@@ -443,9 +298,17 @@ export function TeamDirectory() {
               className="w-full h-9 pl-8 pr-3 text-[13px] rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
-          <div className="flex gap-2">
-            <SelectField value={deptFilter} onChange={setDeptFilter} options={["All Departments", "Strategy", "QA", "Development", "Management", "Design"]} containerClassName="flex-1 min-w-0" />
-            <SelectField value={statusFilter} onChange={setStatusFilter} options={["All Statuses", "Active", "Inactive"]} containerClassName="flex-1 min-w-0" />
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectField value={deptFilter} onChange={setDeptFilter} options={["All Departments", "Strategy", "QA", "Development", "Management", "Design"]} containerClassName="flex-1 min-w-[130px]" className="w-full" />
+            <label className="flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+              />
+              <span className="text-[12px] text-muted-foreground">Show Inactive</span>
+            </label>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -552,36 +415,41 @@ function OverviewTab({ member }: { member: Member }) {
 
       <div className="bg-background rounded-xl border border-border p-6">
         <h3 className="text-sm font-semibold text-foreground mb-3">About</h3>
-        <p className="text-[13px] text-muted-foreground leading-relaxed">{member.bio}</p>
+        <p className="text-[13px] text-muted-foreground leading-relaxed">{member.bio || "No bio available."}</p>
       </div>
 
       <CollapsibleSection title="Contact Information" defaultOpen>
         <div className="grid grid-cols-2 gap-x-8 gap-y-5">
           <DetailField label="Email" icon={<Mail className="h-3.5 w-3.5" />}>
-            <a href={`mailto:${member.email}`} className="text-sky-600 hover:underline">{member.email}</a>
+            {member.email ? <a href={`mailto:${member.email}`} className="text-sky-600 hover:underline">{member.email}</a> : <span className="text-muted-foreground">—</span>}
           </DetailField>
-          <DetailField label="Timezone" icon={<Globe className="h-3.5 w-3.5" />}>{member.timezone}</DetailField>
-          <DetailField label="Start Date" icon={<Clock className="h-3.5 w-3.5" />}>{member.startDate}</DetailField>
-          <DetailField label="Slack ID" icon={<FileText className="h-3.5 w-3.5" />}>{member.slackId}</DetailField>
+          <DetailField label="Timezone" icon={<Globe className="h-3.5 w-3.5" />}>{member.timezone || "—"}</DetailField>
+          <DetailField label="Start Date" icon={<Clock className="h-3.5 w-3.5" />}>{member.startDate || "—"}</DetailField>
+          <DetailField label="Slack ID" icon={<FileText className="h-3.5 w-3.5" />}>{member.slackId || "—"}</DetailField>
         </div>
       </CollapsibleSection>
-
-      {member.assignedClients.length > 0 && (
-        <CollapsibleSection title={`Assigned Clients (${member.assignedClients.length})`} defaultOpen>
-          <div className="flex flex-wrap gap-2">
-            {member.assignedClients.map((c) => (
-              <span key={c.name} className="text-[12px] font-medium px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground">{c.name}</span>
-            ))}
-          </div>
-        </CollapsibleSection>
-      )}
     </div>
   )
 }
 
 /* ── Assigned Clients Tab ── */
 function AssignedClientsTab({ member }: { member: Member }) {
-  if (member.assignedClients.length === 0) {
+  const safeName = member.name.replace(/"/g, '\\"')
+  const filterExtra = `OR(FIND("${safeName}", {Full Name (from Developer)}) > 0, FIND("${safeName}", {Full Name (from Designer)}) > 0, FIND("${safeName}", {Full Name (from Strategist)}) > 0, FIND("${safeName}", {Full Name (from QA)}) > 0)`
+  const { data: rawClients, isLoading } = useAirtable<Record<string, unknown>>('clients', {
+    filterExtra,
+    sort: [{ field: 'Brand Name', direction: 'asc' }],
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-[13px] text-muted-foreground">
+        Loading clients…
+      </div>
+    )
+  }
+
+  if (!rawClients || rawClients.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="h-20 w-20 rounded-2xl bg-accent/40 flex items-center justify-center mb-4">
@@ -599,38 +467,81 @@ function AssignedClientsTab({ member }: { member: Member }) {
           <tr className="border-b border-border bg-accent/30">
             <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
             <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Experiments</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Last Active</th>
+            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tests Run</th>
+            <th className="text-left px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Role</th>
           </tr>
         </thead>
         <tbody>
-          {member.assignedClients.map((c, i) => (
-            <tr key={c.name} className={cn("border-b border-border/50 transition-colors hover:bg-accent/20", i % 2 === 0 && "bg-accent/10")}>
-              <td className="px-5 py-3.5 text-[13px] font-medium text-foreground">
-                <div className="flex items-center gap-2.5">
-                  <Briefcase className="h-3.5 w-3.5 text-muted-foreground/50" />
-                  {c.name}
-                </div>
-              </td>
-              <td className="px-5 py-3.5">
-                <span className={cn(
-                  "text-[11px] font-medium px-2 py-0.5 rounded-md border",
-                  c.status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-orange-50 text-orange-700 border-orange-200"
-                )}>{c.status}</span>
-              </td>
-              <td className="px-5 py-3.5 text-[13px] text-foreground">{c.experiments}</td>
-              <td className="px-5 py-3.5 text-[13px] text-muted-foreground">{c.lastActive}</td>
-            </tr>
-          ))}
+          {rawClients.map((r, i) => {
+            const f = r.fields as Record<string, unknown>
+            const name = (f['Brand Name'] as string) ?? '—'
+            const status = (f['Client Status'] as string) === 'Active' ? 'Active' : 'Inactive'
+            const tests = (f['Total Tests Run'] as number) ?? 0
+            // determine this member's role for this client
+            const devName = (f['Full Name (from Developer)'] as string) ?? ''
+            const desName = (f['Full Name (from Designer)'] as string) ?? ''
+            const stratName = (f['Full Name (from Strategist)'] as string) ?? ''
+            const qaName = (f['Full Name (from QA)'] as string) ?? ''
+            const role = devName.includes(member.name) ? 'Developer'
+              : desName.includes(member.name) ? 'Designer'
+              : stratName.includes(member.name) ? 'Strategist'
+              : qaName.includes(member.name) ? 'QA'
+              : '—'
+            return (
+              <tr key={r.id} className={cn("border-b border-border/50 transition-colors hover:bg-accent/20", i % 2 === 0 && "bg-accent/10")}>
+                <td className="px-5 py-3.5 text-[13px] font-medium text-foreground">
+                  <div className="flex items-center gap-2.5">
+                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground/50" />
+                    {name}
+                  </div>
+                </td>
+                <td className="px-5 py-3.5">
+                  <span className={cn(
+                    "text-[11px] font-medium px-2 py-0.5 rounded-md border",
+                    status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-orange-50 text-orange-700 border-orange-200"
+                  )}>{status}</span>
+                </td>
+                <td className="px-5 py-3.5 text-[13px] text-foreground">{tests}</td>
+                <td className="px-5 py-3.5 text-[13px] text-muted-foreground">{role}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
   )
 }
 
+const deptToType: Record<string, ScheduleTask['type']> = {
+  Strategy: 'strategy', Design: 'design', Development: 'dev', QA: 'qa', Management: 'review',
+}
+
 /* ── Schedule Tab ── */
 function ScheduleTab({ member }: { member: Member }) {
-  const schedule = member.schedule
+  const safeName = member.name.replace(/"/g, '\\"')
+  const { data: rawTasks } = useAirtable<Record<string, unknown>>('tasks', {
+    filterExtra: `FIND("${safeName}", {Assigned to}) > 0`,
+  })
+
+  const schedule = useMemo<ScheduleTask[]>(() => {
+    return (rawTasks ?? []).flatMap(r => {
+      const f = r.fields as Record<string, unknown>
+      const dateStr = (f['Start Date'] as string) ?? ''
+      if (!dateStr) return []
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return []
+      return [{
+        day: d.getDate(),
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        title: (f['Client Facing Name'] as string) ?? (f['Team Facing Name'] as string) ?? 'Task',
+        client: (f['Brand Name (from Client)'] as string) ?? '',
+        time: '',
+        type: deptToType[(f['Department'] as string) ?? ''] ?? 'review',
+      }]
+    })
+  }, [rawTasks])
+
   const [calYear, setCalYear] = useState(2026)
   const [calMonth, setCalMonth] = useState(1)
   const [todayInfo, setTodayInfo] = useState<{ d: number; m: number; y: number } | null>(null)
@@ -752,10 +663,10 @@ function SettingsTab({ member }: { member: Member }) {
     <div className="flex flex-col gap-8">
       <CollapsibleSection title="Account Settings" defaultOpen>
         <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-          <DetailField label="Slack Member ID" icon={<FileText className="h-3.5 w-3.5" />}>{member.slackId}</DetailField>
-          <DetailField label="Timezone" icon={<Globe className="h-3.5 w-3.5" />}>{member.timezone}</DetailField>
-          <DetailField label="Start Date" icon={<Clock className="h-3.5 w-3.5" />}>{member.startDate}</DetailField>
-          <DetailField label="Email" icon={<Mail className="h-3.5 w-3.5" />}>{member.email}</DetailField>
+          <DetailField label="Slack Member ID" icon={<FileText className="h-3.5 w-3.5" />}>{member.slackId || "—"}</DetailField>
+          <DetailField label="Timezone" icon={<Globe className="h-3.5 w-3.5" />}>{member.timezone || "—"}</DetailField>
+          <DetailField label="Start Date" icon={<Clock className="h-3.5 w-3.5" />}>{member.startDate || "—"}</DetailField>
+          <DetailField label="Email" icon={<Mail className="h-3.5 w-3.5" />}>{member.email || "—"}</DetailField>
         </div>
       </CollapsibleSection>
       <CollapsibleSection title="Employment Details" defaultOpen>
@@ -766,7 +677,7 @@ function SettingsTab({ member }: { member: Member }) {
               member.employment === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-orange-50 text-orange-700 border-orange-200"
             )}>{member.employment}</span>
           </DetailField>
-          <DetailField label="Role">{member.role}</DetailField>
+          <DetailField label="Role">{member.role || "—"}</DetailField>
           <DetailField label="Department">
             <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded", deptColors[member.department]?.bg, deptColors[member.department]?.text)}>{member.department}</span>
           </DetailField>
@@ -793,8 +704,8 @@ function CollapsibleSection({ title, children, defaultOpen = false }: { title: s
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <MetricCard 
-      label={label} 
+    <MetricCard
+      label={label}
       value={value}
     />
   )

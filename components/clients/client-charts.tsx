@@ -82,14 +82,14 @@ export function ClientsOnboardedChart() {
 
 export function ClientsChurnedChart() {
   const { data: clients, isLoading } = useAirtable('clients', {
-    fields: ['Client Status', 'Closed Date'],
+    fields: ['Client Status', 'Churn Date'],
     filterExtra: '{Client Status} = "Inactive"',
   })
 
   const churnData = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const r of clients ?? []) {
-      const d = r.fields['Closed Date'] as string
+      const d = r.fields['Churn Date'] as string
       if (!d) continue
       const dt = new Date(d)
       const key = `${dt.toLocaleString('default', { month: 'short' })} ${dt.getFullYear()}`
@@ -277,7 +277,7 @@ export function RevenueByClientChart() {
 
 export function ClientRetentionChart() {
   const { data: clients, isLoading } = useAirtable('clients', {
-    fields: ['Client Status', 'Initial Closed Date', 'Closed Date'],
+    fields: ['Client Status', 'Initial Closed Date', 'Churn Date'],
   })
 
   const retentionData = useMemo(() => {
@@ -295,7 +295,7 @@ export function ClientRetentionChart() {
         return cd && new Date(cd) <= endOfMonth
       }).length
       const churnedByThen = (clients ?? []).filter(r => {
-        const ch = r.fields['Closed Date'] as string
+        const ch = r.fields['Churn Date'] as string
         return ch && new Date(ch) <= endOfMonth
       }).length
       if (totalByThen > 0) {

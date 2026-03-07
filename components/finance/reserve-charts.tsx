@@ -10,42 +10,16 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { DonutChart } from "@/components/shared/donut-chart"
+import { useAirtable } from "@/hooks/use-airtable"
+import { parseCurrency } from "@/lib/transforms"
+import { useMemo } from "react"
 
-const allBalanceData = [
-  { month: "Oct 2022", balance: 1165, yearIndex: 2022 },
-  { month: "Dec 2022", balance: 4783, yearIndex: 2022 },
-  { month: "Feb 2023", balance: 9099, yearIndex: 2023 },
-  { month: "Apr 2023", balance: 14063, yearIndex: 2023 },
-  { month: "Jun 2023", balance: -28500, yearIndex: 2023 },
-  { month: "Aug 2023", balance: -12300, yearIndex: 2023 },
-  { month: "Oct 2023", balance: 5200, yearIndex: 2023 },
-  { month: "Dec 2023", balance: 19200, yearIndex: 2023 },
-  { month: "Feb 2024", balance: 35800, yearIndex: 2024 },
-  { month: "Apr 2024", balance: 48308, yearIndex: 2024 },
-  { month: "Jun 2024", balance: 52100, yearIndex: 2024 },
-  { month: "Aug 2024", balance: 58400, yearIndex: 2024 },
-  { month: "Oct 2024", balance: 72300, yearIndex: 2024 },
-  { month: "Dec 2024", balance: 78500, yearIndex: 2024 },
-  { month: "Feb 2025", balance: 85100, yearIndex: 2025 },
-  { month: "Apr 2025", balance: 88400, yearIndex: 2025 },
-  { month: "Jun 2025", balance: 92600, yearIndex: 2025 },
-  { month: "Aug 2025", balance: 95300, yearIndex: 2025 },
-  { month: "Oct 2025", balance: 102700, yearIndex: 2025 },
-  { month: "Dec 2025", balance: 105625, yearIndex: 2025 },
+const pieColors = [
+  "hsl(210, 65%, 50%)",
+  "hsl(175, 55%, 48%)",
+  "hsl(38, 70%, 55%)",
+  "hsl(262, 45%, 58%)",
 ]
-
-const allTransactionTypeData = [
-  { name: "Emergency Reserve Allocation", value: 94.2, yearIndex: 2022 },
-  { name: "Internal Team Salary", value: 5.8, yearIndex: 2022 },
-  { name: "Emergency Reserve Allocation", value: 88.5, yearIndex: 2023 },
-  { name: "Internal Team Salary", value: 11.5, yearIndex: 2023 },
-  { name: "Emergency Reserve Allocation", value: 92.1, yearIndex: 2024 },
-  { name: "Internal Team Salary", value: 7.9, yearIndex: 2024 },
-  { name: "Emergency Reserve Allocation", value: 96.0, yearIndex: 2025 },
-  { name: "Internal Team Salary", value: 4.0, yearIndex: 2025 },
-]
-
-const pieColors = ["hsl(210, 65%, 50%)", "hsl(175, 55%, 48%)"]
 
 function formatDollar(value: number) {
   if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(0)}k`
@@ -55,19 +29,35 @@ function formatDollar(value: number) {
 const chartColor = "hsl(195, 65%, 48%)"
 
 export function ReserveBalanceChart({ year = "all" }: { year?: string }) {
-  const getFilteredData = () => {
-    if (year === "all") return allBalanceData
-    const yearNum = parseInt(year)
-    return allBalanceData.filter(d => d.yearIndex === yearNum)
-  }
+  const { data: rawReserve, isLoading } = useAirtable('reserve', {
+    sort: [{ field: 'DateClean', direction: 'asc' }],
+  })
 
-  const data = getFilteredData()
+  const data = useMemo(() => {
+    if (!rawReserve) return []
+    const yearNum = year !== 'all' ? parseInt(year) : null
+    const byMonth: Record<string, number> = {}
+    const monthOrder: string[] = []
 
-  const getInterval = () => {
-    if (data.length <= 3) return 0
-    if (data.length <= 6) return 1
-    return 2
-  }
+    for (const r of rawReserve) {
+      // Month & Year (from Month & Year) is a lookup — returns array of strings
+      const monthRaw = r.fields['Month & Year (from Month & Year)']
+      const monthYear = String(Array.isArray(monthRaw) ? (monthRaw[0] ?? '') : (monthRaw ?? ''))
+      const dateClean = String(r.fields['DateClean'] ?? '')
+      if (!monthYear) continue
+      if (yearNum && !dateClean.startsWith(String(yearNum))) continue
+
+      // Use the latest balance for each month (data sorted ASC, later entries overwrite)
+      const balance = parseCurrency(r.fields['New Account Balance'] as string)
+      if (!byMonth[monthYear]) monthOrder.push(monthYear)
+      byMonth[monthYear] = balance
+    }
+
+    return monthOrder.map(m => ({ month: m, balance: byMonth[m] }))
+  }, [rawReserve, year])
+
+  const interval = Math.max(0, Math.ceil(data.length / 12) - 1)
+  const shouldTilt = data.length > 6
 
   return (
     <div className="bg-card rounded-xl border border-border">
@@ -81,50 +71,56 @@ export function ReserveBalanceChart({ year = "all" }: { year?: string }) {
       </div>
       <div className="p-5 pt-4">
         <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
-              <defs>
-                <linearGradient id="fillReserveBalance" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={chartColor} stopOpacity={0.1} />
-                  <stop offset="100%" stopColor={chartColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220, 13%, 91%)" />
-              <XAxis
-                dataKey="month"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
-                dy={8}
-                interval={getInterval()}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
-                dx={-4}
-                width={50}
-                tickFormatter={formatDollar}
-              />
-              <Tooltip
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 8,
-                  border: "1px solid hsl(220, 13%, 91%)",
-                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-                  backgroundColor: "white",
-                }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "Balance"]}
-              />
-              <Area
-                type="monotone"
-                dataKey="balance"
-                stroke={chartColor}
-                strokeWidth={1.5}
-                fill="url(#fillReserveBalance)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {isLoading ? (
+            <div className="h-full bg-muted animate-pulse rounded" />
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data} margin={{ bottom: shouldTilt ? 40 : 0 }}>
+                <defs>
+                  <linearGradient id="fillReserveBalance" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chartColor} stopOpacity={0.1} />
+                    <stop offset="100%" stopColor={chartColor} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220, 13%, 91%)" />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dy={shouldTilt ? 0 : 8}
+                  angle={shouldTilt ? -45 : 0}
+                  textAnchor={shouldTilt ? "end" : "middle"}
+                  interval={interval}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(220, 8%, 46%)" }}
+                  dx={-4}
+                  width={50}
+                  tickFormatter={formatDollar}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid hsl(220, 13%, 91%)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
+                    backgroundColor: "white",
+                  }}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, "Balance"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="balance"
+                  stroke={chartColor}
+                  strokeWidth={1.5}
+                  fill="url(#fillReserveBalance)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>
@@ -132,23 +128,57 @@ export function ReserveBalanceChart({ year = "all" }: { year?: string }) {
 }
 
 export function ReserveTransactionTypePie({ year = "all" }: { year?: string }) {
-  const getFilteredData = () => {
-    if (year === "all") return allTransactionTypeData.slice(0, 2)
-    const yearNum = parseInt(year)
-    const filtered = allTransactionTypeData.filter(d => d.yearIndex === yearNum)
-    return filtered.length > 0 ? filtered : allTransactionTypeData.slice(0, 2)
-  }
+  const { data: rawReserve } = useAirtable('reserve', {})
 
-  const data = getFilteredData().map((d, i) => ({
-    name: d.name,
-    value: d.value,
-    color: pieColors[i % pieColors.length],
-  }))
+  const data = useMemo(() => {
+    if (!rawReserve) return []
+    const yearNum = year !== 'all' ? parseInt(year) : null
+    const byCat: Record<string, number> = {}
+
+    for (const r of rawReserve) {
+      const dateClean = String(r.fields['DateClean'] ?? '')
+      if (yearNum) {
+        // Handle both "YYYY/MM/D" and "YYYY-MM-DD" formats
+        const yearFromDate = parseInt(dateClean.split(/[\/\-]/)[0] ?? '0')
+        if (yearFromDate !== yearNum) continue
+      }
+
+      // Use absolute allocated amount — include $0 records so every category shows
+      const amt = Math.abs(parseCurrency(r.fields['Allocated Amount'] as string))
+
+      // Primary grouping: Category (from Category) lookup field
+      // Airtable lookup fields return arrays; handle both array and scalar forms
+      const catValue = r.fields['Category (from Category)']
+      let cat: string
+      if (Array.isArray(catValue) && catValue.length > 0) {
+        cat = String(catValue[0])
+      } else if (catValue && String(catValue).trim()) {
+        cat = String(catValue).trim()
+      } else {
+        // Fallback: Transaction Type when Category lookup is unpopulated
+        const txType = String(r.fields['Transaction Type'] ?? '').trim()
+        cat = txType || 'Uncategorized'
+      }
+
+      byCat[cat] = (byCat[cat] ?? 0) + amt
+    }
+
+    const total = Object.values(byCat).reduce((s, v) => s + v, 0)
+    if (total === 0) return []
+
+    return Object.entries(byCat)
+      .map(([name, value], i) => ({
+        name,
+        value: Math.round((value / total) * 100 * 10) / 10,
+        color: pieColors[i % pieColors.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [rawReserve, year])
 
   return (
     <DonutChart
-      title="Reserve Transactions by Type"
-      subtitle="Transaction breakdown"
+      title="Reserve Transactions by Category"
+      subtitle="Allocation breakdown by category"
       data={data}
     />
   )

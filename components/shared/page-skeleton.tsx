@@ -5,16 +5,18 @@
  * Design matches the overall card-based layout of the dashboard.
  */
 
+import React from 'react'
 import { cn } from '@/lib/utils'
 
 // ─── Base shimmer ─────────────────────────────────────────────────────────────
-function Shimmer({ className }: { className?: string }) {
+function Shimmer({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <div
       className={cn(
         'bg-muted rounded-lg animate-pulse',
         className
       )}
+      style={style}
     />
   )
 }
